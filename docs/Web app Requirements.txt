@@ -1,0 +1,320 @@
+User Roles
+Use these roles consistently across the system:
+Super Admin — FBS/system administrator
+Company Admin — client/company administrator
+HR Admin — manages employees, attendance, leave, etc.
+Payroll Admin — processes and manages payroll
+Manager — approves employee requests
+Employee — uses Employee Self-Service
+For the UI prototype, Claude should prioritize the Company Admin, HR/Payroll Admin, Manager, and Employee experiences. Super Admin features can be treated as SaaS administration later.
+01. Dashboard
+Company Admin / HR / Payroll Admin
+As a user, I want to see a payroll dashboard so I can quickly understand the current payroll status.
+As a user, I want to see total employee headcount so I can monitor the company's workforce.
+As a user, I want to see the upcoming payroll date and payroll period so I know when payroll needs to be processed.
+As a user, I want to see attendance and leave summaries so I can identify workforce issues.
+As a user, I want to see pending approvals so I can immediately act on requests requiring my attention.
+As a user, I want to see payroll alerts and notifications so I do not miss important payroll tasks.
+UI Priority
+Show:
+Employee Count
+Current Payroll Status
+Next Payroll Date
+Attendance Summary
+Leave Summary
+Pending Approvals
+Payroll Alerts
+02. Employee Management
+HR / Company Admin
+As an HR user, I want to view all employees in one list so I can easily manage employee records.
+As an HR user, I want to add a new employee so I can maintain an updated employee database.
+As an HR user, I want to view an employee profile so I can access their complete employment information.
+As an HR user, I want to edit employee information so employee records remain accurate.
+As an HR user, I want to maintain employment details such as position, department, branch, and employment status.
+As an HR user, I want to maintain compensation details so payroll can use the correct salary information.
+As an HR user, I want to record government/statutory information so employee contributions can be calculated correctly.
+As an HR user, I want to maintain bank/payment details so employees can receive their salary through the appropriate payment method.
+As an HR user, I want to upload employee documents so important records are stored in one place.
+As an HR user, I want to view employee history so I can track changes to employment and compensation information.
+As an HR user, I want to activate, deactivate, or archive employees so employee status is properly reflected in the system.
+Important UI Sections
+Employee List
+Personal Information
+Employment
+Compensation
+Benefits
+Government Information
+Bank/Payment
+Documents
+History
+03. Attendance & Timekeeping
+HR / Manager / Employee
+As an employee, I want to record my time-in and time-out so my attendance can be tracked.
+As an HR user, I want to view daily attendance so I can monitor employee attendance.
+As an HR user, I want to assign schedules and shifts so attendance can be compared with expected working hours.
+As an HR user, I want to see late, undertime, and absence records so payroll can use accurate attendance information.
+As an employee, I want to view my attendance records so I can verify my recorded working hours.
+As an HR user, I want to adjust incorrect attendance records so payroll calculations remain accurate.
+As a manager, I want to approve attendance adjustments so unauthorized changes are prevented.
+As an HR user, I want to view attendance reports so I can analyze attendance trends.
+Future/Advanced
+Biometric integration
+GPS/location attendance
+Mobile clock-in/out
+Automatic attendance import
+Shift-based rules
+04. Leave Management
+HR / Manager / Employee
+As an HR user, I want to create leave types so the company can define its leave policies.
+As an HR user, I want to assign leave credits to employees so available leave balances are tracked.
+As an employee, I want to view my leave balance so I know how much leave I have available.
+As an employee, I want to submit a leave request so I can formally request time off.
+As a manager, I want to approve or reject leave requests so employee leave follows the company's approval process.
+As an employee, I want to view my leave request history so I can track previous requests.
+As an HR user, I want to view a leave calendar so I can see upcoming employee leaves.
+As an HR user, I want approved leave to automatically reflect in attendance and payroll.
+05. Payroll
+Payroll Admin
+As a payroll user, I want to create payroll periods so I can organize payroll processing.
+As a payroll user, I want to configure payroll settings so calculations follow company policies.
+As a payroll user, I want to start a payroll run for a specific period so employee salaries can be calculated.
+As a payroll user, I want the system to calculate regular earnings based on employee compensation and attendance.
+As a payroll user, I want to include allowances, overtime, bonuses, commissions, and other earnings in payroll.
+As a payroll user, I want to include loans and recurring deductions in payroll.
+As a payroll user, I want to make payroll adjustments when necessary.
+As a payroll user, I want to review payroll calculations before finalizing them.
+As a payroll user, I want to submit payroll for approval so authorized users can review it.
+As an authorized user, I want to approve payroll so it can be finalized.
+As a payroll user, I want to view payroll history so I can review previous payroll runs.
+As a payroll user, I want to prevent unauthorized changes after payroll is finalized.
+Payroll Flow
+Payroll Period
+      ↓
+Attendance
+      ↓
+Leave / Overtime
+      ↓
+Earnings
+      ↓
+Deductions
+      ↓
+Statutory Contributions
+      ↓
+Tax
+      ↓
+Payroll Calculation
+      ↓
+Review
+      ↓
+Approval
+      ↓
+Finalize
+      ↓
+Payslips
+      ↓
+Reports
+06. Statutory Contributions
+Payroll Admin
+As a payroll user, I want the system to calculate employee statutory contributions so deductions are included in payroll.
+As a payroll user, I want to calculate employer and employee shares so payroll records are complete.
+As a payroll user, I want to configure statutory contribution settings so the system can adapt to applicable rules.
+As a payroll user, I want to calculate withholding tax so employee tax deductions are included in payroll.
+As a payroll user, I want to view statutory contribution details for each employee.
+As a payroll user, I want to generate statutory reports so I can use payroll data for compliance and filing processes.
+Philippine Payroll Focus
+Include:
+SSS
+PhilHealth
+Pag-IBIG
+Withholding Tax
+For the prototype, make these configurable rather than hard-coded wherever practical, because contribution/tax rules may change.
+07. Payslips
+Payroll Admin / Employee
+As a payroll user, I want to generate payslips after payroll is finalized.
+As a payroll user, I want to generate payslips in bulk so I do not need to process them individually.
+As an employee, I want to view my payslips so I can review my salary details.
+As an employee, I want to download or print my payslip so I can keep a copy.
+As an employee, I want to view my payslip history so I can access previous payroll records.
+As a payroll user, I want to control when payslips become available to employees.
+Payslip should show
+Employee Information
+Payroll Period
+Basic Pay
+Earnings
+Overtime
+Allowances
+Deductions
+Government Contributions
+Tax
+Net Pay
+08. Loans & Deductions
+HR / Payroll Admin
+As a payroll user, I want to create employee loan records so employee loans can be tracked.
+As a payroll user, I want to define loan amounts and repayment schedules.
+As an employee, I want to view my outstanding loan balance.
+As a payroll user, I want recurring deductions to automatically appear in payroll.
+As a payroll user, I want to record other employee deductions.
+As a payroll user, I want to view deduction history so I can verify payroll deductions.
+As a payroll user, I want loan balances to automatically update after each payroll deduction.
+09. Employee Self-Service
+Employee
+As an employee, I want to view my profile so I can check my personal and employment information.
+As an employee, I want to view my payslips so I can review my salary history.
+As an employee, I want to view my attendance records.
+As an employee, I want to submit leave requests.
+As an employee, I want to submit overtime requests.
+As an employee, I want to view my loan and deduction balances.
+As an employee, I want to receive notifications about my requests and payroll.
+As an employee, I want to update allowed profile information without changing restricted payroll data.
+Important SaaS Consideration
+Employees should only see their own information.
+10. Reports
+HR / Payroll Admin / Company Admin
+As a payroll user, I want to generate a payroll register so I can review payroll details for all employees.
+As a payroll user, I want to generate payroll summaries so I can review total payroll costs.
+As a payroll user, I want to generate payslip reports.
+As an HR user, I want to generate attendance reports.
+As an HR user, I want to generate leave reports.
+As a payroll user, I want to generate overtime reports.
+As a payroll user, I want to generate deduction reports.
+As a payroll user, I want to generate statutory reports.
+As an HR user, I want to generate an employee masterlist.
+As a payroll user, I want to view payroll history.
+As an HR user, I want to generate employee benefits reports.
+As a user, I want to filter reports by date, employee, department, branch, and other relevant criteria.
+As a user, I want to export reports so I can use the data outside the system.
+Common UI
+Report Type
+Date Range
+Branch
+Department
+Employee
+Status
+        ↓
+Generate Report
+        ↓
+View / Export
+11. Approvals
+Manager / Admin
+As a manager, I want to see all requests requiring my approval so I can process them efficiently.
+As a manager, I want to approve or reject leave requests.
+As a manager, I want to approve or reject overtime requests.
+As a manager, I want to approve attendance adjustments.
+As an authorized user, I want to review payroll before approval.
+As an authorized user, I want to approve payroll before it is finalized.
+As an administrator, I want employee and compensation changes to require approval when configured.
+As a user, I want to see the status and history of approval requests.
+12. Notifications
+All Users
+As a user, I want to receive notifications for tasks requiring my attention.
+As an employee, I want to receive notifications when my leave or overtime request is approved or rejected.
+As a payroll user, I want to receive payroll reminders.
+As a manager, I want to receive notifications for pending approvals.
+As an employee, I want to receive a notification when my payslip becomes available.
+As an administrator, I want to send system announcements to users.
+13. User & Access Management
+Company Admin
+As a company administrator, I want to create user accounts so employees can access the system.
+As an administrator, I want to assign roles so users only access functions relevant to their responsibilities.
+As an administrator, I want to define permissions for different roles.
+As an administrator, I want to restrict employee access to their own information.
+As an administrator, I want to manage HR and payroll access separately.
+As an administrator, I want to deactivate users when they no longer need access.
+As an administrator, I want to view activity logs so I can track important system actions.
+SaaS Requirement
+Every client/company should have an isolated workspace:
+FBS OPS
+   ├── Company A
+   │    ├── Employees
+   │    ├── Payroll
+   │    └── Reports
+   │
+   ├── Company B
+   │    ├── Employees
+   │    ├── Payroll
+   │    └── Reports
+   │
+   └── Company C
+Users must never access another company's data.
+14. Company & Payroll Settings
+Company Admin
+As a company administrator, I want to maintain company information so the system reflects our organization.
+As a payroll administrator, I want to configure payroll frequency.
+As a payroll administrator, I want to define payroll periods.
+As an administrator, I want to configure work schedules and shifts.
+As an administrator, I want to define company holidays.
+As a payroll administrator, I want to configure pay types.
+As a payroll administrator, I want to configure deduction rules.
+As a payroll administrator, I want to configure statutory and tax settings.
+As an administrator, I want changes to important payroll settings to be restricted to authorized users.
+15. Multi-Branch Management
+Company Admin
+As a company administrator, I want to create company branches so employees can be organized by location.
+As an HR user, I want to assign employees to branches.
+As a payroll user, I want to process payroll by branch when needed.
+As a branch manager, I want to view information relevant to my branch.
+As a company administrator, I want to generate branch-specific reports.
+As a company administrator, I want to view consolidated payroll reports across all branches.
+SaaS Scalability
+Keep branch functionality flexible enough for:
+Company
+ ├── Head Office
+ ├── Branch 1
+ ├── Branch 2
+ └── Branch 3
+16. Integrations & API
+Company Admin / Payroll Admin
+As an administrator, I want to import employee information so I can quickly set up the system.
+As an administrator, I want to export payroll data so I can use it in other systems.
+As a payroll user, I want attendance data to be imported from supported attendance systems.
+As a company, I want payroll data to integrate with accounting software.
+As a company, I want payroll payment information to integrate with supported banking/payment systems.
+As an administrator, I want API access so external systems can communicate with FBS OPS.
+As an administrator, I want to manage integration settings so connected services can be controlled securely.
+Advanced/Future
+Accounting integrations
+Biometric integrations
+Banking/payment integrations
+API keys
+Webhooks
+Automated data synchronization
+Subscription / SaaS User Stories
+17. Subscription & Plan Management
+Company Admin
+As a company administrator, I want to see my current subscription plan so I know which features are available.
+As a company administrator, I want to view my subscription usage so I can monitor employee/user limits.
+As a company administrator, I want to upgrade my plan when I need additional features.
+As a company administrator, I want to see which features are included in each plan.
+As an administrator, I want unavailable features to clearly indicate that they belong to a higher plan.
+As an administrator, I want the system to prevent access to features that are not included in my subscription.
+UI Pattern
+Instead of hiding everything:
+Advanced Payroll Reports
+ Available in Professional Plan
+ Upgrade Plan
+This gives you a clean path for future monetization.
+18. SaaS Company Onboarding
+Company Admin
+As a new customer, I want to create my company workspace so I can start using FBS OPS.
+As a company administrator, I want to enter basic company information during setup.
+As an administrator, I want to configure payroll settings during onboarding.
+As an administrator, I want to add or import employees.
+As an administrator, I want to invite HR, payroll, managers, and employees.
+As a company, I want a setup checklist so I know what needs to be completed before running payroll.
+Suggested Onboarding
+Create Company
+      ↓
+Company Information
+      ↓
+Payroll Settings
+      ↓
+Work Schedule
+      ↓
+Government/Tax Settings
+      ↓
+Add Employees
+      ↓
+Invite Users
+      ↓
+Ready for Payroll
+
