@@ -9,7 +9,7 @@ import { leaveTypes } from '@/mock-data/seed/leaveTypes'
 import { schedules } from '@/mock-data/seed/schedules'
 import { statutoryConfigs } from '@/mock-data/seed/statutoryConfig'
 import { users } from '@/mock-data/seed/users'
-import type { ActivityLogEntry, Employee, PayrollLine, PayrollPeriod } from '@/types/domain'
+import type { ActivityLogEntry, ApiKey, Employee, PayrollLine, PayrollPeriod, Webhook } from '@/types/domain'
 
 const EMPLOYEE_COUNT_BY_COMPANY: Record<string, number> = {
   co_frontline: 24,
@@ -68,4 +68,6 @@ export const db = {
   activityLog: [] as ActivityLogEntry[],
   payrollPeriods: [] as PayrollPeriod[],
   payrollLines: [] as PayrollLine[],
+  apiKeys: [] as ApiKey[],
+  webhooks: [] as Webhook[],
 }
