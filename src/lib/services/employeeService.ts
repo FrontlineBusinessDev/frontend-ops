@@ -1,6 +1,13 @@
 import { scopeForSession } from '@/lib/tenancy/tenantScope'
 import { db } from '@/mock-data'
-import type { Employee, EmploymentStatus, SessionUser } from '@/types/domain'
+import type {
+  Employee,
+  EmployeeBank,
+  EmployeeGovernment,
+  EmployeePersonal,
+  EmploymentStatus,
+  SessionUser,
+} from '@/types/domain'
 
 /**
  * Mock-backed today, swappable for real HTTP calls later without changing
@@ -49,7 +56,9 @@ export async function createEmployee(session: SessionUser, input: CreateEmployee
       status: 'active',
     },
     compensation: { basicPay: input.basicPay, payType: 'monthly', allowances: [] },
-    benefits: { leaveCreditsByType: { 'Vacation Leave': 15, 'Sick Leave': 10, 'Emergency Leave': 5 } },
+    benefits: {
+      leaveCreditsByType: { 'Vacation Leave': 15, 'Sick Leave': 10, 'Emergency Leave': 5, 'Maternity/Paternity Leave': 7 },
+    },
     government: {},
     bank: {},
     documents: [],
@@ -59,6 +68,16 @@ export async function createEmployee(session: SessionUser, input: CreateEmployee
         timestamp: new Date().toISOString(),
         actor: session.name,
         action: 'Employee record created',
+      },
+    ],
+    compensationHistory: [
+      {
+        id: crypto.randomUUID(),
+        effectiveDate: input.dateHired,
+        type: 'Initial Hire',
+        previousSalary: null,
+        newSalary: input.basicPay,
+        approvedBy: session.name,
       },
     ],
   }
@@ -99,4 +118,134 @@ export async function updateEmployeeStatus(
     actor: session.name,
     action: `Status changed to ${status}`,
   })
+}
+
+function findCompanyEmployee(session: SessionUser, employeeId: string): Employee | undefined {
+  return db.employees.find((e) => e.id === employeeId && e.companyId === session.companyId)
+}
+
+function logHistory(employee: Employee, actor: string, action: string) {
+  employee.history.push({ id: crypto.randomUUID(), timestamp: new Date().toISOString(), actor, action })
+}
+
+export async function updateEmployeePersonalInfo(
+  session: SessionUser,
+  employeeId: string,
+  updates: EmployeePersonal,
+): Promise<void> {
+  const employee = findCompanyEmployee(session, employeeId)
+  if (!employee) return
+
+  employee.personal = updates
+  logHistory(employee, session.name, 'Personal information updated')
+}
+
+export interface UpdateEmploymentInfoInput {
+  position: string
+  department: string
+  employmentType: Employee['employment']['employmentType']
+  dateHired: string
+}
+
+export async function updateEmployeeEmploymentInfo(
+  session: SessionUser,
+  employeeId: string,
+  updates: UpdateEmploymentInfoInput,
+): Promise<void> {
+  const employee = findCompanyEmployee(session, employeeId)
+  if (!employee) return
+
+  Object.assign(employee.employment, updates)
+  logHistory(employee, session.name, 'Employment information updated')
+}
+
+export interface UpdateCompensationInput {
+  basicPay: number
+  payType: Employee['compensation']['payType']
+  reason: string
+}
+
+/** Records a Compensation History entry only when the base pay actually changes. */
+export async function updateEmployeeCompensation(
+  session: SessionUser,
+  employeeId: string,
+  updates: UpdateCompensationInput,
+): Promise<void> {
+  const employee = findCompanyEmployee(session, employeeId)
+  if (!employee) return
+
+  const previousSalary = employee.compensation.basicPay
+  employee.compensation.basicPay = updates.basicPay
+  employee.compensation.payType = updates.payType
+
+  if (updates.basicPay !== previousSalary) {
+    employee.compensationHistory.push({
+      id: crypto.randomUUID(),
+      effectiveDate: new Date().toISOString().slice(0, 10),
+      type: updates.reason,
+      previousSalary,
+      newSalary: updates.basicPay,
+      approvedBy: session.name,
+    })
+  }
+
+  logHistory(employee, session.name, 'Compensation updated')
+}
+
+export interface UpdateBenefitsInput {
+  hmoPlan?: string
+  leaveCreditsByType: Record<string, number>
+}
+
+export async function updateEmployeeBenefits(
+  session: SessionUser,
+  employeeId: string,
+  updates: UpdateBenefitsInput,
+): Promise<void> {
+  const employee = findCompanyEmployee(session, employeeId)
+  if (!employee) return
+
+  employee.benefits = updates
+  logHistory(employee, session.name, 'Benefits updated')
+}
+
+export async function updateEmployeeGovernmentInfo(
+  session: SessionUser,
+  employeeId: string,
+  updates: EmployeeGovernment,
+): Promise<void> {
+  const employee = findCompanyEmployee(session, employeeId)
+  if (!employee) return
+
+  employee.government = updates
+  logHistory(employee, session.name, 'Government information updated')
+}
+
+export async function updateEmployeeBankInfo(
+  session: SessionUser,
+  employeeId: string,
+  updates: EmployeeBank,
+): Promise<void> {
+  const employee = findCompanyEmployee(session, employeeId)
+  if (!employee) return
+
+  employee.bank = updates
+  logHistory(employee, session.name, 'Bank/payment information updated')
+}
+
+/** Employee ids with an approved leave request covering today — used to derive the "On Leave" filter without touching the core employment.status enum. */
+export async function getEmployeeIdsOnLeaveToday(session: SessionUser): Promise<Set<string>> {
+  const employees = scopeForSession(db.employees, session, { employeeIdField: 'id' })
+  const employeeIds = new Set(employees.map((e) => e.id))
+  const today = new Date().toISOString().slice(0, 10)
+
+  const onLeave = db.leaveRequests.filter(
+    (r) =>
+      r.companyId === session.companyId &&
+      r.status === 'approved' &&
+      employeeIds.has(r.employeeId) &&
+      r.dateFrom <= today &&
+      r.dateTo >= today,
+  )
+  return new Set(onLeave.map((r) => r.employeeId))
 }

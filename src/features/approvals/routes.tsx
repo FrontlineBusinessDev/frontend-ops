@@ -10,7 +10,7 @@ import { useLeaveRequests, useLeaveTypes } from '@/features/leave/hooks/useLeave
 export function ApprovalsPage() {
   const { adjustments, isLoading: isLoadingAdjustments, refetch: refetchAdjustments } = useAttendanceAdjustments()
   const { requests, isLoading: isLoadingLeave, refetch: refetchLeave } = useLeaveRequests()
-  const leaveTypes = useLeaveTypes()
+  const { leaveTypes } = useLeaveTypes()
   const { employees } = useEmployees()
 
   const pendingLeave = requests.filter((r) => r.status === 'pending')

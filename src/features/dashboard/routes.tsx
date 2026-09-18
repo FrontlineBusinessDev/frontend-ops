@@ -4,11 +4,25 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { AdminDashboard } from '@/features/dashboard/components/AdminDashboard'
 import { StatCard } from '@/features/dashboard/components/StatCard'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
+import { useSession } from '@/hooks/useSession'
 import { formatDate } from '@/lib/utils/format'
 
 export function DashboardPage() {
+  const { user } = useSession()
+
+  // Company Admin gets the enriched operational dashboard; every other role
+  // (HR/Payroll Admin, Manager, Super Admin) keeps the existing dashboard below untouched.
+  if (user.role === 'company_admin') {
+    return <AdminDashboard />
+  }
+
+  return <DefaultDashboard />
+}
+
+function DefaultDashboard() {
   const { stats, trend, isLoading } = useDashboardData()
 
   if (isLoading || !stats) {

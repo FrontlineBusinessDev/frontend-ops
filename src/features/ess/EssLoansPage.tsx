@@ -8,10 +8,13 @@ import { db } from '@/mock-data'
 import { formatCurrency, formatDate } from '@/lib/utils/format'
 
 const TYPE_LABELS: Record<string, string> = {
-  sss_loan: 'SSS Loan',
-  pagibig_loan: 'Pag-IBIG Loan',
-  company_loan: 'Company Loan',
-  other: 'Other',
+  sss_salary_loan: 'SSS Loan – Salary',
+  sss_calamity_loan: 'SSS Loan – Calamity',
+  pagibig_multipurpose_loan: 'Pag-IBIG Loan – Multi-Purpose',
+  pagibig_calamity_loan: 'Pag-IBIG Loan – Calamity',
+  pagibig_mp2: 'Pag-IBIG MP2 Savings',
+  company_loan: 'Company Loan / Emergency Advance',
+  other_deduction: 'Other Deduction',
 }
 
 export function EssLoansPage() {

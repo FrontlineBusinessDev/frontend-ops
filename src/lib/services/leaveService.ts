@@ -1,7 +1,7 @@
 import { getEmployees } from '@/lib/services/employeeService'
 import { scopeToCompany } from '@/lib/tenancy/tenantScope'
 import { db } from '@/mock-data'
-import type { ApprovalStatus, LeaveRequest, SessionUser } from '@/types/domain'
+import type { ApprovalStatus, LeaveRequest, LeaveType, LeaveTypeTierCredits, SessionUser } from '@/types/domain'
 
 async function scopedEmployeeIds(session: SessionUser): Promise<Set<string>> {
   const employees = await getEmployees(session)
@@ -10,6 +10,31 @@ async function scopedEmployeeIds(session: SessionUser): Promise<Set<string>> {
 
 export async function getLeaveTypes(session: SessionUser) {
   return scopeToCompany(db.leaveTypes, session.companyId)
+}
+
+export interface LeaveTypeInput {
+  name: string
+  defaultCredits: number
+  description?: string
+  isPaid: boolean
+  maxCarryOver: number
+  tierCredits: LeaveTypeTierCredits
+}
+
+export async function createLeaveType(session: SessionUser, input: LeaveTypeInput): Promise<LeaveType> {
+  const leaveType: LeaveType = {
+    id: crypto.randomUUID(),
+    companyId: session.companyId,
+    ...input,
+  }
+  db.leaveTypes.push(leaveType)
+  return leaveType
+}
+
+export async function updateLeaveType(session: SessionUser, leaveTypeId: string, input: LeaveTypeInput): Promise<void> {
+  const leaveType = db.leaveTypes.find((lt) => lt.id === leaveTypeId && lt.companyId === session.companyId)
+  if (!leaveType) return
+  Object.assign(leaveType, input)
 }
 
 export async function getLeaveRequests(session: SessionUser): Promise<LeaveRequest[]> {

@@ -7,11 +7,15 @@ export function useLeaveTypes() {
   const { user } = useSession()
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([])
 
-  useEffect(() => {
+  const refetch = useCallback(() => {
     getLeaveTypes(user).then(setLeaveTypes)
   }, [user])
 
-  return leaveTypes
+  useEffect(() => {
+    refetch()
+  }, [refetch])
+
+  return { leaveTypes, refetch }
 }
 
 export function useLeaveRequests() {

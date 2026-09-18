@@ -15,7 +15,15 @@ import type { Employee } from '@/types/domain'
 
 const schema = z.object({
   employeeId: z.string().min(1, 'Select an employee'),
-  type: z.enum(['sss_loan', 'pagibig_loan', 'company_loan', 'other']),
+  type: z.enum([
+    'sss_salary_loan',
+    'sss_calamity_loan',
+    'pagibig_multipurpose_loan',
+    'pagibig_calamity_loan',
+    'pagibig_mp2',
+    'company_loan',
+    'other_deduction',
+  ]),
   label: z.string().min(1, 'Required'),
   principal: z.number().positive('Must be greater than 0'),
   monthlyDeduction: z.number().positive('Must be greater than 0'),
@@ -25,10 +33,13 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 const TYPE_OPTIONS = [
-  { value: 'sss_loan', label: 'SSS Loan' },
-  { value: 'pagibig_loan', label: 'Pag-IBIG Loan' },
-  { value: 'company_loan', label: 'Company Loan' },
-  { value: 'other', label: 'Other' },
+  { value: 'sss_salary_loan', label: 'SSS Loan – Salary' },
+  { value: 'sss_calamity_loan', label: 'SSS Loan – Calamity' },
+  { value: 'pagibig_multipurpose_loan', label: 'Pag-IBIG Loan – Multi-Purpose' },
+  { value: 'pagibig_calamity_loan', label: 'Pag-IBIG Loan – Calamity' },
+  { value: 'pagibig_mp2', label: 'Pag-IBIG MP2 (Modified Pag-IBIG 2 Savings)' },
+  { value: 'company_loan', label: 'Company Loan / Emergency Advance' },
+  { value: 'other_deduction', label: 'Other Deduction (Uniform, HMO Co-pay, Equipment, etc.)' },
 ]
 
 export function AddLoanDialog({ employees, onCreated }: { employees: Employee[]; onCreated: () => void }) {
@@ -46,7 +57,7 @@ export function AddLoanDialog({ employees, onCreated }: { employees: Employee[];
 
   async function onSubmit(values: FormValues) {
     await createLoan(user, values)
-    notify({ title: 'Loan added', tone: 'success' })
+    notify({ title: 'Loan/Deduction added', tone: 'success' })
     reset()
     setOpen(false)
     onCreated()
@@ -55,11 +66,11 @@ export function AddLoanDialog({ employees, onCreated }: { employees: Employee[];
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button icon={<Plus className="size-4" />}>Add Loan</Button>
+        <Button icon={<Plus className="size-4" />}>Add Loan/Deduction</Button>
       </DialogTrigger>
       <DialogContent>
-        <DialogTitle>Add Loan Record</DialogTitle>
-        <DialogDescription>Recurring deductions from this loan will be applied automatically to future payroll runs.</DialogDescription>
+        <DialogTitle>Add Loan/Deduction Record</DialogTitle>
+        <DialogDescription>Recurring deductions will be applied automatically to future payroll runs.</DialogDescription>
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-5 grid grid-cols-2 gap-4">
           <FormField label="Employee" required error={errors.employeeId?.message} className="col-span-2">
@@ -76,7 +87,7 @@ export function AddLoanDialog({ employees, onCreated }: { employees: Employee[];
               )}
             />
           </FormField>
-          <FormField label="Loan type" required className="col-span-2">
+          <FormField label="Loan/Deduction Type" required className="col-span-2">
             <Controller
               control={control}
               name="type"
@@ -101,7 +112,7 @@ export function AddLoanDialog({ employees, onCreated }: { employees: Employee[];
               Cancel
             </Button>
             <Button type="submit" isLoading={isSubmitting}>
-              Add Loan
+              Add Loan/Deduction
             </Button>
           </div>
         </form>

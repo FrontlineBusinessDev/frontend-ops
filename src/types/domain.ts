@@ -91,6 +91,8 @@ export interface EmployeeGovernment {
   philhealthNo?: string
   pagibigNo?: string
   tinNo?: string
+  /** Overrides the company default Pag-IBIG employee contribution (see StatutoryConfig.pagibigEmployeeAmount) for this employee only. */
+  pagibigEmployeeContribution?: number
 }
 
 export interface EmployeeBank {
@@ -113,6 +115,16 @@ export interface AuditEntry {
   details?: string
 }
 
+export interface CompensationHistoryEntry {
+  id: string
+  effectiveDate: string
+  /** e.g. "Initial Hire", "Annual Merit Increase", "Promotion", "Adjustment", "Probationary to Regular" */
+  type: string
+  previousSalary: number | null
+  newSalary: number
+  approvedBy: string
+}
+
 export interface Employee {
   id: string
   companyId: string
@@ -126,6 +138,7 @@ export interface Employee {
   bank: EmployeeBank
   documents: DocumentRecord[]
   history: AuditEntry[]
+  compensationHistory: CompensationHistoryEntry[]
 }
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
@@ -160,10 +173,20 @@ export interface AttendanceAdjustment {
   requestedTimeIn: string | null
   requestedTimeOut: string | null
   reason: string
+  /** Optional categorization, e.g. "Missed Time In/Out", "System/Biometric Error" — set by the "File Adjustment" flow. */
+  reasonCategory?: string
   status: ApprovalStatus
   requestedAt: string
   decidedBy?: string
   decidedAt?: string
+}
+
+export type HierarchyLevel = 'executive' | 'managerial' | 'rank_and_file'
+
+export interface LeaveTypeTierCredits {
+  executive: number
+  managerial: number
+  rank_and_file: number
 }
 
 export interface LeaveType {
@@ -171,6 +194,11 @@ export interface LeaveType {
   companyId: string
   name: string
   defaultCredits: number
+  description?: string
+  isPaid?: boolean
+  maxCarryOver?: number
+  /** Annual credit allowance per employee hierarchy tier, configured via the Leave Type modal. */
+  tierCredits?: LeaveTypeTierCredits
 }
 
 export interface LeaveRequest {
@@ -206,11 +234,20 @@ export interface TaxBracket {
   baseTax: number
 }
 
+export interface SssBracket {
+  minSalary: number
+  maxSalary: number | null
+  msc: number
+  employeeShare: number
+  employerShare: number
+}
+
 export interface StatutoryConfig {
   companyId: string
-  sssEmployeeRate: number
-  sssEmployerRate: number
+  sssBrackets: SssBracket[]
   philhealthRate: number
+  philhealthEmployeeSharePercent: number
+  philhealthEmployerSharePercent: number
   pagibigEmployeeAmount: number
   pagibigEmployerAmount: number
   taxBrackets: TaxBracket[]
@@ -248,8 +285,23 @@ export interface PayrollLine {
   netPay: number
 }
 
-export type LoanType = 'sss_loan' | 'pagibig_loan' | 'company_loan' | 'other'
-export type LoanStatus = 'active' | 'completed'
+export type LoanType =
+  | 'sss_salary_loan'
+  | 'sss_calamity_loan'
+  | 'pagibig_multipurpose_loan'
+  | 'pagibig_calamity_loan'
+  | 'pagibig_mp2'
+  | 'company_loan'
+  | 'other_deduction'
+export type LoanStatus = 'active' | 'completed' | 'suspended'
+
+export interface LoanRepaymentEntry {
+  id: string
+  date: string
+  payrollReference: string
+  amount: number
+  remainingBalanceAfter: number
+}
 
 export interface LoanRecord {
   id: string
@@ -262,6 +314,7 @@ export interface LoanRecord {
   monthlyDeduction: number
   startDate: string
   status: LoanStatus
+  repaymentHistory?: LoanRepaymentEntry[]
 }
 
 export interface ApiKey {
@@ -280,4 +333,24 @@ export interface Webhook {
   url: string
   event: WebhookEvent
   createdAt: string
+}
+
+export type OvertimeType = 'regular' | 'rest_day_holiday' | 'night_diff'
+
+export interface OvertimeRecord {
+  id: string
+  companyId: string
+  employeeId: string
+  date: string
+  startTime: string
+  endTime: string
+  hours: number
+  type: OvertimeType
+  /** Rate multiplier applied on top of the hourly rate, e.g. 1.25 for Regular OT, 1.1 for Night Differential. */
+  multiplier: number
+  status: ApprovalStatus
+  reason?: string
+  requestedAt: string
+  decidedBy?: string
+  decidedAt?: string
 }

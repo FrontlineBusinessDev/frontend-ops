@@ -1,9 +1,11 @@
 import { Navigate, createBrowserRouter } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
-import { RequireCapability } from '@/lib/rbac/guards'
+import { LoginPage } from '@/features/auth/LoginPage'
+import { RequireAuth, RequireCapability } from '@/lib/rbac/guards'
 import { DashboardPage } from '@/features/dashboard/routes'
 import { EmployeeListPage, EmployeeProfilePage } from '@/features/employees/routes'
 import { AttendancePage } from '@/features/attendance/routes'
+import { OvertimePage } from '@/features/overtime/routes'
 import { LeavePage } from '@/features/leave/routes'
 import { PayrollListPage, PayrollPeriodDetailPage } from '@/features/payroll/routes'
 import { PayslipDetailPage, PayslipsListPage } from '@/features/payslips/routes'
@@ -31,9 +33,14 @@ import { CompaniesPage } from '@/features/platform/CompaniesPage'
 import { ForbiddenPage } from '@/features/misc/ForbiddenPage'
 
 export const router = createBrowserRouter([
+  { path: 'login', element: <LoginPage /> },
   {
     path: '/',
-    element: <AppShell />,
+    element: (
+      <RequireAuth>
+        <AppShell />
+      </RequireAuth>
+    ),
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       {
@@ -65,6 +72,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireCapability capability="attendance.view">
             <AttendancePage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'overtime',
+        element: (
+          <RequireCapability capability="overtime.view">
+            <OvertimePage />
           </RequireCapability>
         ),
       },

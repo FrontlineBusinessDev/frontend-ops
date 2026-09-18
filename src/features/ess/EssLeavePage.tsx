@@ -33,7 +33,7 @@ function RequestLeaveDialog({ employeeId, onCreated }: { employeeId: string; onC
   const [open, setOpen] = useState(false)
   const { user } = useSession()
   const { notify } = useToast()
-  const leaveTypes = useLeaveTypes()
+  const { leaveTypes } = useLeaveTypes()
 
   const {
     register,
@@ -102,7 +102,7 @@ function RequestLeaveDialog({ employeeId, onCreated }: { employeeId: string; onC
 export function EssLeavePage() {
   const { employee, isLoading: isLoadingEmployee } = useSelfEmployee()
   const { requests, isLoading: isLoadingRequests, refetch } = useLeaveRequests()
-  const leaveTypes = useLeaveTypes()
+  const { leaveTypes } = useLeaveTypes()
 
   if (isLoadingEmployee || isLoadingRequests) return <Skeleton className="h-72" />
   if (!employee) return <p className="text-sm text-muted-foreground">No employee record linked to this account.</p>

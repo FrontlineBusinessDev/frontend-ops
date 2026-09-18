@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   LineChart,
   ListChecks,
+  Moon,
   Plug,
   ReceiptText,
   Settings,
@@ -43,6 +44,13 @@ export const ADMIN_NAV: NavGroup[] = [
       { label: 'Employees', path: '/employees', icon: Users, capability: 'employees.view' },
       { label: 'Attendance', path: '/attendance', icon: Clock, capability: 'attendance.view' },
       { label: 'Leave', path: '/leave', icon: CalendarDays, capability: 'leave.view' },
+      {
+        label: 'Overtime & Night Differential',
+        path: '/overtime',
+        icon: Moon,
+        capability: 'overtime.view',
+      },
+      { label: 'Loans & Deductions', path: '/loans-deductions', icon: CreditCard, capability: 'loans.view' },
     ],
   },
   {
@@ -51,7 +59,6 @@ export const ADMIN_NAV: NavGroup[] = [
       { label: 'Payroll Runs', path: '/payroll', icon: Wallet, capability: 'payroll.view' },
       { label: 'Statutory Contributions', path: '/statutory', icon: Landmark, capability: 'statutory.view' },
       { label: 'Payslips', path: '/payslips', icon: ReceiptText, capability: 'payslips.view' },
-      { label: 'Loans & Deductions', path: '/loans-deductions', icon: CreditCard, capability: 'loans.view' },
     ],
   },
   {
@@ -82,6 +89,7 @@ export const MANAGER_NAV: NavGroup[] = [
     label: 'My Team',
     items: [
       { label: 'Attendance', path: '/attendance', icon: Clock },
+      { label: 'Overtime & Night Differential', path: '/overtime', icon: Moon },
       { label: 'Leave', path: '/leave', icon: CalendarDays },
       { label: 'Approvals', path: '/approvals', icon: ListChecks },
     ],

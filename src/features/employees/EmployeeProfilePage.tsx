@@ -1,4 +1,4 @@
-import { ArrowLeft, Archive, FileText, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, Archive, FileText, Pencil, ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -16,7 +16,15 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { useToast } from '@/components/ui/Toast'
+import { CompensationHistoryTable } from '@/features/employees/components/CompensationHistoryTable'
+import { EditBankInfoForm } from '@/features/employees/components/edit/EditBankInfoForm'
+import { EditBenefitsForm } from '@/features/employees/components/edit/EditBenefitsForm'
+import { EditCompensationForm } from '@/features/employees/components/edit/EditCompensationForm'
+import { EditEmploymentInfoForm } from '@/features/employees/components/edit/EditEmploymentInfoForm'
+import { EditGovernmentInfoForm } from '@/features/employees/components/edit/EditGovernmentInfoForm'
+import { EditPersonalInfoForm } from '@/features/employees/components/edit/EditPersonalInfoForm'
 import { useEmployee } from '@/features/employees/hooks/useEmployee'
+import { usePermission } from '@/hooks/usePermission'
 import { useTenant } from '@/hooks/useTenant'
 import { updateEmployeeStatus } from '@/lib/services/employeeService'
 import { useSession } from '@/hooks/useSession'
@@ -32,6 +40,16 @@ function Field({ label, value }: { label: string; value: string | undefined }) {
   )
 }
 
+type EditableSection = 'personal' | 'employment' | 'compensation' | 'benefits' | 'government' | 'bank'
+
+function SectionEditButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button size="sm" variant="ghost" icon={<Pencil className="size-3.5" />} onClick={onClick}>
+      Edit Information
+    </Button>
+  )
+}
+
 export function EmployeeProfilePage() {
   const { id } = useParams<{ id: string }>()
   const { employee, isLoading, refetch } = useEmployee(id)
@@ -40,6 +58,14 @@ export function EmployeeProfilePage() {
   const { notify } = useToast()
   const navigate = useNavigate()
   const [statusDialog, setStatusDialog] = useState<EmploymentStatus | null>(null)
+  const [editingSection, setEditingSection] = useState<EditableSection | null>(null)
+  const canEditProfile = usePermission('employees.edit')
+  const canEditCompensation = usePermission('employees.compensation.edit')
+
+  function stopEditing() {
+    setEditingSection(null)
+    refetch()
+  }
 
   if (isLoading) return <Skeleton className="h-96" />
   if (!employee) {
@@ -122,75 +148,165 @@ export function EmployeeProfilePage() {
         </TabsList>
 
         <TabsContent value="personal">
-          <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
-            <Field label="First name" value={employee.personal.firstName} />
-            <Field label="Last name" value={employee.personal.lastName} />
-            <Field label="Birth date" value={formatDate(employee.personal.birthDate)} />
-            <Field label="Civil status" value={employee.personal.civilStatus} />
-            <Field label="Contact number" value={employee.personal.contactNumber} />
-            <Field label="Personal email" value={employee.personal.personalEmail} />
-            <Field label="Address" value={employee.personal.address} />
-          </div>
+          <Card className="p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <Card.Title>Personal Information</Card.Title>
+              {canEditProfile && editingSection !== 'personal' && (
+                <SectionEditButton onClick={() => setEditingSection('personal')} />
+              )}
+            </div>
+            {editingSection === 'personal' ? (
+              <EditPersonalInfoForm employee={employee} onSaved={stopEditing} onCancel={() => setEditingSection(null)} />
+            ) : (
+              <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+                <Field label="First name" value={employee.personal.firstName} />
+                <Field label="Last name" value={employee.personal.lastName} />
+                <Field label="Birth date" value={formatDate(employee.personal.birthDate)} />
+                <Field label="Civil status" value={employee.personal.civilStatus} />
+                <Field label="Contact number" value={employee.personal.contactNumber} />
+                <Field label="Personal email" value={employee.personal.personalEmail} />
+                <Field label="Address" value={employee.personal.address} />
+              </div>
+            )}
+          </Card>
         </TabsContent>
 
         <TabsContent value="employment">
-          <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
-            <Field label="Position" value={employee.employment.position} />
-            <Field label="Department" value={employee.employment.department} />
-            <Field label="Branch" value={branch?.name} />
-            <Field label="Employment type" value={employee.employment.employmentType.replace('_', ' ')} />
-            <Field label="Date hired" value={formatDate(employee.employment.dateHired)} />
-            <Field label="Status" value={employee.employment.status} />
-          </div>
+          <Card className="p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <Card.Title>Employment</Card.Title>
+              {canEditProfile && editingSection !== 'employment' && (
+                <SectionEditButton onClick={() => setEditingSection('employment')} />
+              )}
+            </div>
+            {editingSection === 'employment' ? (
+              <EditEmploymentInfoForm employee={employee} onSaved={stopEditing} onCancel={() => setEditingSection(null)} />
+            ) : (
+              <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+                <Field label="Position" value={employee.employment.position} />
+                <Field label="Department" value={employee.employment.department} />
+                <Field label="Branch" value={branch?.name} />
+                <Field label="Employment type" value={employee.employment.employmentType.replace('_', ' ')} />
+                <Field label="Date hired" value={formatDate(employee.employment.dateHired)} />
+                <Field label="Status" value={employee.employment.status} />
+              </div>
+            )}
+          </Card>
         </TabsContent>
 
-        <TabsContent value="compensation">
-          <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
-            <Field label="Basic pay" value={formatCurrency(employee.compensation.basicPay)} />
-            <Field label="Pay type" value={employee.compensation.payType} />
-          </div>
-          {employee.compensation.allowances.length > 0 && (
-            <div className="mt-5">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Allowances</p>
-              <div className="flex flex-wrap gap-2">
-                {employee.compensation.allowances.map((a) => (
-                  <Badge key={a.label} tone="brand">
-                    {a.label}: {formatCurrency(a.amount)}
-                  </Badge>
-                ))}
-              </div>
+        <TabsContent value="compensation" className="space-y-5">
+          <Card className="p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <Card.Title>Current Compensation</Card.Title>
+              {canEditCompensation && editingSection !== 'compensation' && (
+                <SectionEditButton onClick={() => setEditingSection('compensation')} />
+              )}
             </div>
-          )}
+            {editingSection === 'compensation' ? (
+              <EditCompensationForm employee={employee} onSaved={stopEditing} onCancel={() => setEditingSection(null)} />
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+                  <Field label="Basic pay" value={formatCurrency(employee.compensation.basicPay)} />
+                  <Field label="Pay frequency" value={employee.compensation.payType} />
+                </div>
+                {employee.compensation.allowances.length > 0 && (
+                  <div className="mt-5">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Allowances</p>
+                    <div className="flex flex-wrap gap-2">
+                      {employee.compensation.allowances.map((a) => (
+                        <Badge key={a.label} tone="brand">
+                          {a.label}: {formatCurrency(a.amount)}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </Card>
+
+          <Card className="p-5">
+            <Card.Title>Compensation History</Card.Title>
+            <Card.Description>Salary changes over time, with the reason and who approved each one.</Card.Description>
+            <div className="mt-4">
+              <CompensationHistoryTable entries={employee.compensationHistory} />
+            </div>
+          </Card>
         </TabsContent>
 
         <TabsContent value="benefits">
-          <div>
-            <Field label="HMO plan" value={employee.benefits.hmoPlan} />
-            <p className="mb-2 mt-5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Leave credits</p>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(employee.benefits.leaveCreditsByType).map(([type, credits]) => (
-                <Badge key={type} tone="neutral">
-                  {type}: {credits} days
-                </Badge>
-              ))}
+          <Card className="p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <Card.Title>Benefits</Card.Title>
+              {canEditProfile && editingSection !== 'benefits' && (
+                <SectionEditButton onClick={() => setEditingSection('benefits')} />
+              )}
             </div>
-          </div>
+            {editingSection === 'benefits' ? (
+              <EditBenefitsForm employee={employee} onSaved={stopEditing} onCancel={() => setEditingSection(null)} />
+            ) : (
+              <div>
+                <Field label="HMO plan" value={employee.benefits.hmoPlan} />
+                <p className="mb-2 mt-5 text-xs font-medium uppercase tracking-wide text-muted-foreground">Leave credits</p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(employee.benefits.leaveCreditsByType).map(([type, credits]) => (
+                    <Badge key={type} tone="neutral">
+                      {type}: {credits} days
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Card>
         </TabsContent>
 
         <TabsContent value="government">
-          <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
-            <Field label="SSS No." value={employee.government.sssNo} />
-            <Field label="PhilHealth No." value={employee.government.philhealthNo} />
-            <Field label="Pag-IBIG No." value={employee.government.pagibigNo} />
-            <Field label="TIN" value={employee.government.tinNo} />
-          </div>
+          <Card className="p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <Card.Title>Government Information</Card.Title>
+              {canEditProfile && editingSection !== 'government' && (
+                <SectionEditButton onClick={() => setEditingSection('government')} />
+              )}
+            </div>
+            {editingSection === 'government' ? (
+              <EditGovernmentInfoForm employee={employee} onSaved={stopEditing} onCancel={() => setEditingSection(null)} />
+            ) : (
+              <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+                <Field label="SSS No." value={employee.government.sssNo} />
+                <Field label="PhilHealth No." value={employee.government.philhealthNo} />
+                <Field label="Pag-IBIG No." value={employee.government.pagibigNo} />
+                <Field label="TIN" value={employee.government.tinNo} />
+                <Field
+                  label="Pag-IBIG Employee Contribution (PHP)"
+                  value={
+                    employee.government.pagibigEmployeeContribution
+                      ? `${formatCurrency(employee.government.pagibigEmployeeContribution)} (custom)`
+                      : 'Company default'
+                  }
+                />
+              </div>
+            )}
+          </Card>
         </TabsContent>
 
         <TabsContent value="bank">
-          <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
-            <Field label="Bank name" value={employee.bank.bankName} />
-            <Field label="Account number" value={employee.bank.accountNumber} />
-          </div>
+          <Card className="p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <Card.Title>Bank/Payment</Card.Title>
+              {canEditProfile && editingSection !== 'bank' && (
+                <SectionEditButton onClick={() => setEditingSection('bank')} />
+              )}
+            </div>
+            {editingSection === 'bank' ? (
+              <EditBankInfoForm employee={employee} onSaved={stopEditing} onCancel={() => setEditingSection(null)} />
+            ) : (
+              <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+                <Field label="Bank name" value={employee.bank.bankName} />
+                <Field label="Account number" value={employee.bank.accountNumber} />
+              </div>
+            )}
+          </Card>
         </TabsContent>
 
         <TabsContent value="documents">

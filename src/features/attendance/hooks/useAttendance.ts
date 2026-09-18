@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSession } from '@/hooks/useSession'
-import { getAttendanceAdjustments, getAttendanceForDate, getSchedules } from '@/lib/services/attendanceService'
+import {
+  getAttendanceAdjustments,
+  getAttendanceForDate,
+  getEmployeeIdsOnLeaveForDate,
+  getEmployeeIdsWithPendingAdjustmentForDate,
+  getSchedules,
+} from '@/lib/services/attendanceService'
 import type { AttendanceAdjustment, AttendanceRecord, Schedule } from '@/types/domain'
 
 function todayKey() {
@@ -19,6 +25,20 @@ export function useDailyAttendance(date: string = todayKey()) {
   }, [user, date])
 
   return { records: records ?? [], schedules, isLoading: records === null }
+}
+
+/** Powers the "On Leave" / "Pending Adjustment" status filter options on the Daily Attendance tab. */
+export function useDateStatusSets(date: string) {
+  const { user } = useSession()
+  const [onLeaveIds, setOnLeaveIds] = useState<Set<string>>(new Set())
+  const [pendingAdjustmentIds, setPendingAdjustmentIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    getEmployeeIdsOnLeaveForDate(user, date).then(setOnLeaveIds)
+    getEmployeeIdsWithPendingAdjustmentForDate(user, date).then(setPendingAdjustmentIds)
+  }, [user, date])
+
+  return { onLeaveIds, pendingAdjustmentIds }
 }
 
 export function useAttendanceAdjustments() {

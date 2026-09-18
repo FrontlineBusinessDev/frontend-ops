@@ -1,6 +1,6 @@
 import { scopeToCompany } from '@/lib/tenancy/tenantScope'
 import { db } from '@/mock-data'
-import type { Employee, PayrollLine, PayrollPeriod, PayrollPeriodStatus, SessionUser, StatutoryConfig } from '@/types/domain'
+import type { Employee, PayrollLine, PayrollPeriod, PayrollPeriodStatus, SessionUser, SssBracket, StatutoryConfig } from '@/types/domain'
 
 export async function getPayrollPeriods(session: SessionUser): Promise<PayrollPeriod[]> {
   return scopeToCompany(db.payrollPeriods, session.companyId).sort((a, b) => b.startDate.localeCompare(a.startDate))
@@ -44,6 +44,13 @@ function taxFor(taxable: number, config: StatutoryConfig): number {
   return bracket.baseTax + (taxable - bracket.min) * bracket.rate
 }
 
+function sssBracketFor(basicPay: number, brackets: SssBracket[]): SssBracket | undefined {
+  return (
+    brackets.find((b) => basicPay >= b.minSalary && (b.maxSalary === null || basicPay < b.maxSalary)) ??
+    brackets[brackets.length - 1]
+  )
+}
+
 function computeLine(session: SessionUser, period: PayrollPeriod, config: StatutoryConfig, employee: Employee): PayrollLine {
   const workingDaysInPeriod = 11 // half-month approximation for a semi-monthly period
   const dailyRate = employee.compensation.basicPay / (workingDaysInPeriod * 2)
@@ -62,16 +69,22 @@ function computeLine(session: SessionUser, period: PayrollPeriod, config: Statut
     amount: Math.min(loan.monthlyDeduction / 2, loan.balance),
   }))
 
-  const sssEmployeeShare = Math.round(employee.compensation.basicPay * config.sssEmployeeRate) / 2
-  const sssEmployerShare = Math.round(employee.compensation.basicPay * config.sssEmployerRate) / 2
+  const sssBracket = sssBracketFor(employee.compensation.basicPay, config.sssBrackets)
+  const sssEmployeeMonthly = sssBracket?.employeeShare ?? 0
+  const sssEmployerMonthly = sssBracket?.employerShare ?? 0
+  const sssEmployeeShare = Math.round(sssEmployeeMonthly) / 2
+  const sssEmployerShare = Math.round(sssEmployerMonthly) / 2
   const philhealthTotal = employee.compensation.basicPay * config.philhealthRate
-  const philhealthEmployeeShare = Math.round(philhealthTotal / 2) / 2
-  const philhealthEmployerShare = Math.round(philhealthTotal / 2) / 2
-  const pagibigEmployeeShare = config.pagibigEmployeeAmount / 2
+  const philhealthEmployeeMonthly = philhealthTotal * config.philhealthEmployeeSharePercent
+  const philhealthEmployerMonthly = philhealthTotal * config.philhealthEmployerSharePercent
+  const philhealthEmployeeShare = Math.round(philhealthEmployeeMonthly) / 2
+  const philhealthEmployerShare = Math.round(philhealthEmployerMonthly) / 2
+  const pagibigEmployeeMonthly = employee.government.pagibigEmployeeContribution ?? config.pagibigEmployeeAmount
+  const pagibigEmployeeShare = pagibigEmployeeMonthly / 2
   const pagibigEmployerShare = config.pagibigEmployerAmount / 2
 
   const monthlyTaxable =
-    employee.compensation.basicPay - employee.compensation.basicPay * config.sssEmployeeRate - philhealthTotal / 2 - config.pagibigEmployeeAmount
+    employee.compensation.basicPay - sssEmployeeMonthly - philhealthEmployeeMonthly - pagibigEmployeeMonthly
   const withholdingTax = Math.round(taxFor(monthlyTaxable, config) / 2)
 
   const otherDeductions = absenceDeduction > 0 ? [{ label: 'Absences', amount: absenceDeduction }] : []
@@ -146,6 +159,16 @@ export async function finalizePayroll(session: SessionUser, periodId: string): P
       if (loan) {
         loan.balance = Math.max(0, loan.balance - deduction.amount)
         if (loan.balance === 0) loan.status = 'completed'
+        loan.repaymentHistory = [
+          ...(loan.repaymentHistory ?? []),
+          {
+            id: crypto.randomUUID(),
+            date: period.payDate,
+            payrollReference: period.label,
+            amount: deduction.amount,
+            remainingBalanceAfter: loan.balance,
+          },
+        ]
       }
     }
   }

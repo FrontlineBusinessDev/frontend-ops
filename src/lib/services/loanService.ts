@@ -23,6 +23,7 @@ export async function createLoan(session: SessionUser, input: CreateLoanInput): 
     companyId: session.companyId,
     balance: input.principal,
     status: 'active',
+    repaymentHistory: [],
     ...input,
   }
   db.loans.unshift(loan)

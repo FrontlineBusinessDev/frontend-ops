@@ -1,3 +1,4 @@
+import { Building2 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useSession } from '@/hooks/useSession'
 import { usePermission } from '@/hooks/usePermission'
@@ -15,8 +16,13 @@ function useNavGroups(): NavGroup[] {
 }
 
 function NavItemLink({ item }: { item: NavGroup['items'][number] }) {
+  const { user } = useSession()
   const hasCapability = usePermission(item.capability ?? 'dashboard.view')
   if (item.capability && !hasCapability) return null
+
+  // Company Admin gets a bolder "pill" active state (per its dashboard redesign); other
+  // roles keep the existing subtle highlight untouched.
+  const isCompanyAdmin = user.role === 'company_admin'
 
   return (
     <NavLink
@@ -25,7 +31,10 @@ function NavItemLink({ item }: { item: NavGroup['items'][number] }) {
         cn(
           'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-muted transition-colors duration-150',
           'hover:bg-sidebar-active hover:text-sidebar-foreground',
-          isActive && 'bg-sidebar-active text-sidebar-foreground',
+          isActive &&
+            (isCompanyAdmin
+              ? 'bg-primary text-primary-foreground shadow-soft hover:bg-primary'
+              : 'bg-sidebar-active text-sidebar-foreground'),
         )
       }
     >
@@ -36,6 +45,7 @@ function NavItemLink({ item }: { item: NavGroup['items'][number] }) {
 }
 
 export function Sidebar() {
+  const { user } = useSession()
   const groups = useNavGroups()
 
   return (
@@ -58,6 +68,14 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
+      {user.role === 'company_admin' && (
+        <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-sidebar-border bg-white/5 px-3 py-3">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/20 text-primary">
+            <Building2 className="size-4" />
+          </div>
+          <p className="text-[11px] leading-snug text-sidebar-muted">Building better workplaces together.</p>
+        </div>
+      )}
     </aside>
   )
 }

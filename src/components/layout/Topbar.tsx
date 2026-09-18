@@ -1,6 +1,6 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Bell, ChevronDown, FlaskConical } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Bell, ChevronDown, FlaskConical, LogOut } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Avatar } from '@/components/ui/Avatar'
 import { useNotifications } from '@/features/notifications/hooks/useNotifications'
 import { useSession } from '@/hooks/useSession'
@@ -17,9 +17,15 @@ const ROLE_LABELS: Record<string, string> = {
 }
 
 export function Topbar() {
-  const { user, availableUsers, setCurrentUserId } = useSession()
+  const { user, availableUsers, setCurrentUserId, logout } = useSession()
   const { company, activeBranch } = useTenant()
   const notifications = useNotifications()
+  const navigate = useNavigate()
+
+  function onLogout() {
+    logout()
+    navigate('/login')
+  }
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-card/60 px-4 backdrop-blur-sm lg:px-6">
@@ -78,13 +84,31 @@ export function Topbar() {
           )}
         </Link>
 
-        <div className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-2">
-          <Avatar name={user.name} size="sm" />
-          <div className="hidden text-left sm:block">
-            <p className="text-xs font-semibold leading-tight">{user.name}</p>
-            <p className="text-[11px] leading-tight text-muted-foreground">{ROLE_LABELS[user.role]}</p>
-          </div>
-        </div>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger
+            className={cn(
+              'flex items-center gap-2 rounded-lg py-1 pl-1 pr-2',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            )}
+          >
+            <Avatar name={user.name} size="sm" />
+            <div className="hidden text-left sm:block">
+              <p className="text-xs font-semibold leading-tight">{user.name}</p>
+              <p className="text-[11px] leading-tight text-muted-foreground">{ROLE_LABELS[user.role]}</p>
+            </div>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content align="end" sideOffset={6} className="z-50 w-44 rounded-xl border border-border bg-card p-1 shadow-soft-lg">
+              <DropdownMenu.Item
+                onSelect={onLogout}
+                className="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-danger outline-none data-[highlighted]:bg-muted"
+              >
+                <LogOut className="size-3.5" />
+                Log out
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </div>
     </header>
   )

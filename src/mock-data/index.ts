@@ -1,6 +1,7 @@
 import { generateAttendanceRecords } from '@/mock-data/generators/attendance'
 import { generateEmployeesForCompany } from '@/mock-data/generators/employees'
 import { generateLoans } from '@/mock-data/generators/loans'
+import { generateOvertimeRecords } from '@/mock-data/generators/overtime'
 import { generateAttendanceAdjustments, generateLeaveRequests } from '@/mock-data/generators/workflowRecords'
 import { branches } from '@/mock-data/seed/branches'
 import { companies } from '@/mock-data/seed/companies'
@@ -64,6 +65,7 @@ export const db = {
   leaveRequests: generateLeaveRequests(employees, leaveTypes),
   statutoryConfigs,
   loans: generateLoans(employees),
+  overtimeRecords: generateOvertimeRecords(employees),
   holidays,
   activityLog: [] as ActivityLogEntry[],
   payrollPeriods: [] as PayrollPeriod[],

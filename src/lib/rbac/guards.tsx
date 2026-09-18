@@ -5,6 +5,15 @@ import type { Capability } from '@/lib/rbac/permissions'
 import { roleHasCapability } from '@/lib/rbac/permissions'
 import type { Role } from '@/types/domain'
 
+/** Gates the authenticated app shell — redirects to the login screen when no demo session is active. */
+export function RequireAuth({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useSession()
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+  return <>{children}</>
+}
+
 interface RequireRoleProps {
   roles: Role[]
   children: ReactNode

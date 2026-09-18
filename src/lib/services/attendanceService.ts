@@ -25,6 +25,44 @@ export async function getAttendanceForEmployee(session: SessionUser, employeeId:
     .sort((a, b) => b.date.localeCompare(a.date))
 }
 
+export async function getAttendanceRecordForEmployeeDate(
+  session: SessionUser,
+  employeeId: string,
+  date: string,
+): Promise<AttendanceRecord | undefined> {
+  return db.attendanceRecords.find((r) => r.companyId === session.companyId && r.employeeId === employeeId && r.date === date)
+}
+
+/** Employee ids with an approved leave request covering the given date — powers the "On Leave" filter option. */
+export async function getEmployeeIdsOnLeaveForDate(session: SessionUser, date: string): Promise<Set<string>> {
+  const employeeIds = await scopedEmployeeIds(session)
+  const onLeave = db.leaveRequests.filter(
+    (r) =>
+      r.companyId === session.companyId &&
+      r.status === 'approved' &&
+      employeeIds.has(r.employeeId) &&
+      r.dateFrom <= date &&
+      r.dateTo >= date,
+  )
+  return new Set(onLeave.map((r) => r.employeeId))
+}
+
+/** Employee ids with a pending adjustment request tied to the given date's attendance record — powers the "Pending Adjustment" filter option. */
+export async function getEmployeeIdsWithPendingAdjustmentForDate(session: SessionUser, date: string): Promise<Set<string>> {
+  const employeeIds = await scopedEmployeeIds(session)
+  const recordIdsForDate = new Set(
+    db.attendanceRecords.filter((r) => r.companyId === session.companyId && r.date === date).map((r) => r.id),
+  )
+  const pending = db.attendanceAdjustments.filter(
+    (a) =>
+      a.companyId === session.companyId &&
+      a.status === 'pending' &&
+      employeeIds.has(a.employeeId) &&
+      recordIdsForDate.has(a.attendanceRecordId),
+  )
+  return new Set(pending.map((a) => a.employeeId))
+}
+
 export async function getAttendanceAdjustments(session: SessionUser): Promise<AttendanceAdjustment[]> {
   const employeeIds = await scopedEmployeeIds(session)
   return db.attendanceAdjustments
@@ -37,6 +75,7 @@ export interface CreateAdjustmentInput {
   requestedTimeIn: string | null
   requestedTimeOut: string | null
   reason: string
+  reasonCategory?: string
 }
 
 export async function createAttendanceAdjustment(
@@ -54,11 +93,57 @@ export async function createAttendanceAdjustment(
     requestedTimeIn: input.requestedTimeIn,
     requestedTimeOut: input.requestedTimeOut,
     reason: input.reason,
+    reasonCategory: input.reasonCategory,
     status: 'pending',
     requestedAt: new Date().toISOString(),
   }
   db.attendanceAdjustments.unshift(adjustment)
   return adjustment
+}
+
+export interface FileAdjustmentInput {
+  employeeId: string
+  date: string
+  requestedTimeIn: string | null
+  requestedTimeOut: string | null
+  reasonCategory: string
+  remarks: string
+}
+
+/**
+ * Backs the standalone "+ File Adjustment" flow, which starts from an employee + date
+ * rather than an existing attendance-table row. Resolves (or creates, if the employee
+ * has no record yet for that date — e.g. an unlogged absence) the underlying
+ * AttendanceRecord so every adjustment still ties back to one, matching the existing
+ * per-row request flow's data shape.
+ */
+export async function fileAttendanceAdjustment(session: SessionUser, input: FileAdjustmentInput): Promise<AttendanceAdjustment> {
+  let record = db.attendanceRecords.find(
+    (r) => r.companyId === session.companyId && r.employeeId === input.employeeId && r.date === input.date,
+  )
+
+  if (!record) {
+    const schedule = db.schedules.find((s) => s.companyId === session.companyId)
+    record = {
+      id: crypto.randomUUID(),
+      companyId: session.companyId,
+      employeeId: input.employeeId,
+      scheduleId: schedule?.id ?? '',
+      date: input.date,
+      timeIn: null,
+      timeOut: null,
+      status: 'absent',
+    }
+    db.attendanceRecords.push(record)
+  }
+
+  return createAttendanceAdjustment(session, {
+    attendanceRecordId: record.id,
+    requestedTimeIn: input.requestedTimeIn,
+    requestedTimeOut: input.requestedTimeOut,
+    reason: input.remarks,
+    reasonCategory: input.reasonCategory,
+  })
 }
 
 export async function decideAttendanceAdjustment(

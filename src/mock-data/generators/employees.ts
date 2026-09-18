@@ -1,4 +1,4 @@
-import type { Branch, Employee, EmploymentStatus } from '@/types/domain'
+import type { Branch, CompensationHistoryEntry, Employee, EmploymentStatus } from '@/types/domain'
 
 const FIRST_NAMES = [
   'Maria', 'Jose', 'Ana', 'Juan', 'Grace', 'Mark', 'Angel', 'Paolo', 'Rina', 'Carlo',
@@ -14,6 +14,8 @@ const LAST_NAMES = [
 const DEPARTMENTS = ['Operations', 'Finance', 'Sales', 'HR', 'IT', 'Warehouse', 'Customer Support']
 const POSITIONS = ['Associate', 'Senior Associate', 'Team Lead', 'Supervisor', 'Manager', 'Analyst']
 const LEAVE_TYPES = ['Vacation Leave', 'Sick Leave', 'Emergency Leave']
+const COMP_HISTORY_REASONS = ['Annual Merit Increase', 'Promotion', 'Adjustment', 'Probationary to Regular']
+const COMP_APPROVERS = ['Andrea Villareal', 'Patrick Ong', 'Karen Sison']
 
 function pick<T>(arr: T[], seed: number) {
   return arr[seed % arr.length]
@@ -21,6 +23,44 @@ function pick<T>(arr: T[], seed: number) {
 
 function pad(n: number, width = 4) {
   return String(n).padStart(width, '0')
+}
+
+/** Deterministic salary-progression trail ending at `currentBasicPay`, so the Compensation History tab is never empty. */
+function buildCompensationHistory(
+  companyId: string,
+  seed: number,
+  hiredYear: number,
+  hiredMonth: string,
+  currentBasicPay: number,
+) {
+  const approver = pick(COMP_APPROVERS, seed)
+  const hasMidRaise = seed % 3 !== 2
+  // The last entry must always land exactly on the employee's actual current basic pay.
+  const initialSalary = hasMidRaise ? Math.round((currentBasicPay - 3000 - (seed % 4) * 1000) / 500) * 500 : currentBasicPay
+
+  const entries: CompensationHistoryEntry[] = [
+    {
+      id: `${companyId}_comphist_${pad(seed)}_1`,
+      effectiveDate: `${hiredYear}-${hiredMonth}-01`,
+      type: 'Initial Hire',
+      previousSalary: null,
+      newSalary: initialSalary,
+      approvedBy: approver,
+    },
+  ]
+
+  if (hasMidRaise) {
+    entries.push({
+      id: `${companyId}_comphist_${pad(seed)}_2`,
+      effectiveDate: `${hiredYear + 1}-01-01`,
+      type: pick(COMP_HISTORY_REASONS, seed),
+      previousSalary: initialSalary,
+      newSalary: currentBasicPay,
+      approvedBy: approver,
+    })
+  }
+
+  return entries
 }
 
 export function generateEmployeesForCompany(companyId: string, companyBranches: Branch[], count: number): Employee[] {
@@ -37,6 +77,7 @@ export function generateEmployeesForCompany(companyId: string, companyBranches: 
     const status: EmploymentStatus = statusRoll === 0 ? 'archived' : statusRoll === 1 ? 'inactive' : 'active'
     const hiredYear = 2019 + (seed % 6)
     const hiredMonth = String(1 + (seed % 12)).padStart(2, '0')
+    const basicPay = 18000 + (seed % 12) * 2500
 
     employees.push({
       id: `${companyId}_emp_${pad(seed)}`,
@@ -60,7 +101,7 @@ export function generateEmployeesForCompany(companyId: string, companyBranches: 
         status,
       },
       compensation: {
-        basicPay: 18000 + (seed % 12) * 2500,
+        basicPay,
         payType: 'monthly',
         allowances:
           seed % 4 === 0
@@ -69,7 +110,10 @@ export function generateEmployeesForCompany(companyId: string, companyBranches: 
       },
       benefits: {
         hmoPlan: seed % 3 === 0 ? undefined : 'HMO Plan B',
-        leaveCreditsByType: Object.fromEntries(LEAVE_TYPES.map((lt, idx) => [lt, 15 - idx * 5])),
+        leaveCreditsByType: {
+          ...Object.fromEntries(LEAVE_TYPES.map((lt, idx) => [lt, 15 - idx * 5])),
+          'Maternity/Paternity Leave': 7,
+        },
       },
       government: {
         sssNo: `34-${pad(1000000 + seed, 7)}-1`,
@@ -102,6 +146,7 @@ export function generateEmployeesForCompany(companyId: string, companyBranches: 
             ]
           : []),
       ],
+      compensationHistory: buildCompensationHistory(companyId, seed, hiredYear, hiredMonth, basicPay),
     })
   }
 
