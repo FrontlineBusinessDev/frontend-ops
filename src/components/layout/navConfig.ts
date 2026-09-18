@@ -9,7 +9,6 @@ import {
   Landmark,
   LayoutDashboard,
   LineChart,
-  ListChecks,
   Moon,
   Plug,
   ReceiptText,
@@ -63,7 +62,6 @@ export const ADMIN_NAV: NavGroup[] = [
   },
   {
     items: [
-      { label: 'Approvals', path: '/approvals', icon: ListChecks, capability: 'approvals.view' },
       { label: 'Reports', path: '/reports', icon: LineChart, capability: 'reports.view' },
       { label: 'Notifications', path: '/notifications', icon: Bell, capability: 'notifications.view' },
     ],
@@ -91,7 +89,6 @@ export const MANAGER_NAV: NavGroup[] = [
       { label: 'Attendance', path: '/attendance', icon: Clock },
       { label: 'Overtime & Night Differential', path: '/overtime', icon: Moon },
       { label: 'Leave', path: '/leave', icon: CalendarDays },
-      { label: 'Approvals', path: '/approvals', icon: ListChecks },
     ],
   },
   {

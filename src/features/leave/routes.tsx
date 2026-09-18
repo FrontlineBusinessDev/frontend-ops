@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
+import type { SortDirection } from '@/components/ui/FiltersPopover'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
@@ -12,11 +13,17 @@ import { useLeaveRequests, useLeaveTypes } from '@/features/leave/hooks/useLeave
 import { usePermission } from '@/hooks/usePermission'
 import type { Employee } from '@/types/domain'
 
+const SORT_OPTIONS = [
+  { value: 'requestedAt', label: 'Date Requested' },
+  { value: 'name', label: 'Employee Name' },
+]
+
 export function LeavePage() {
   const { requests, isLoading, refetch } = useLeaveRequests()
   const { leaveTypes, refetch: refetchLeaveTypes } = useLeaveTypes()
   const { employees } = useEmployees()
   const canRequest = usePermission('leave.request')
+  const [activeTab, setActiveTab] = useState('requests')
 
   const [search, setSearch] = useState('')
   const [leaveTypeId, setLeaveTypeId] = useState('all')
@@ -24,6 +31,8 @@ export function LeavePage() {
   const [hierarchy, setHierarchy] = useState('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [sortBy, setSortBy] = useState('requestedAt')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   const employeeById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees])
   const leaveTypeById = useMemo(() => new Map(leaveTypes.map((lt) => [lt.id, lt])), [leaveTypes])
@@ -73,7 +82,13 @@ export function LeavePage() {
     .sort((a, b) => {
       if (a.status === 'pending' && b.status !== 'pending') return -1
       if (a.status !== 'pending' && b.status === 'pending') return 1
-      return b.requestedAt.localeCompare(a.requestedAt)
+      const result =
+        sortBy === 'name'
+          ? `${employeeById.get(a.employeeId)?.personal.firstName} ${employeeById.get(a.employeeId)?.personal.lastName}`.localeCompare(
+              `${employeeById.get(b.employeeId)?.personal.firstName} ${employeeById.get(b.employeeId)?.personal.lastName}`,
+            )
+          : a.requestedAt.localeCompare(b.requestedAt)
+      return sortDirection === 'asc' ? result : -result
     })
 
   return (
@@ -81,10 +96,10 @@ export function LeavePage() {
       <PageHeader
         title="Leave Management"
         description="Leave requests, approvals, and company leave types."
-        actions={canRequest && <LeaveRequestDialog employees={employees} leaveTypes={leaveTypes} onCreated={refetch} />}
+        actions={activeTab === 'requests' && canRequest && <LeaveRequestDialog employees={employees} leaveTypes={leaveTypes} onCreated={refetch} />}
       />
 
-      <Tabs defaultValue="requests">
+      <Tabs defaultValue="requests" onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="requests">Requests</TabsTrigger>
           <TabsTrigger value="types">Leave Types & Credits</TabsTrigger>
@@ -106,6 +121,11 @@ export function LeavePage() {
             onDateFromChange={setDateFrom}
             dateTo={dateTo}
             onDateToChange={setDateTo}
+            sortBy={sortBy}
+            onSortByChange={setSortBy}
+            sortOptions={SORT_OPTIONS}
+            sortDirection={sortDirection}
+            onSortDirectionChange={setSortDirection}
             hasActiveFilters={hasActiveFilters}
             onClear={clearFilters}
           />

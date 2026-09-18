@@ -18,13 +18,17 @@ export function useDailyAttendance(date: string = todayKey()) {
   const [records, setRecords] = useState<AttendanceRecord[] | null>(null)
   const [schedules, setSchedules] = useState<Schedule[]>([])
 
-  useEffect(() => {
-    setRecords(null)
+  const refetch = useCallback(() => {
     getAttendanceForDate(user, date).then(setRecords)
     getSchedules(user).then(setSchedules)
   }, [user, date])
 
-  return { records: records ?? [], schedules, isLoading: records === null }
+  useEffect(() => {
+    setRecords(null)
+    refetch()
+  }, [refetch])
+
+  return { records: records ?? [], schedules, isLoading: records === null, refetch }
 }
 
 /** Powers the "On Leave" / "Pending Adjustment" status filter options on the Daily Attendance tab. */

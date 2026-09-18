@@ -1,5 +1,5 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Bell, ChevronDown, FlaskConical, LogOut } from 'lucide-react'
+import { Bell, ChevronDown, FlaskConical, LogOut, Menu } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Avatar } from '@/components/ui/Avatar'
 import { useNotifications } from '@/features/notifications/hooks/useNotifications'
@@ -16,7 +16,7 @@ const ROLE_LABELS: Record<string, string> = {
   employee: 'Employee',
 }
 
-export function Topbar() {
+export function Topbar({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
   const { user, availableUsers, setCurrentUserId, logout } = useSession()
   const { company, activeBranch } = useTenant()
   const notifications = useNotifications()
@@ -29,9 +29,21 @@ export function Topbar() {
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-card/60 px-4 backdrop-blur-sm lg:px-6">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold tracking-tight">{company?.name}</p>
-        {activeBranch && <p className="truncate text-xs text-muted-foreground">{activeBranch.name}</p>}
+      <div className="flex min-w-0 items-center gap-2">
+        {onOpenMobileNav && (
+          <button
+            type="button"
+            onClick={onOpenMobileNav}
+            aria-label="Open navigation menu"
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
+          >
+            <Menu className="size-4" />
+          </button>
+        )}
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold tracking-tight">{company?.name}</p>
+          {activeBranch && <p className="truncate text-xs text-muted-foreground">{activeBranch.name}</p>}
+        </div>
       </div>
 
       <div className="flex items-center gap-2">

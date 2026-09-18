@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useSession } from '@/hooks/useSession'
-import { getAdminDashboardOverview, getDashboardStats, getHeadcountTrend } from '@/lib/services/dashboardService'
-import type { AdminDashboardOverview, DashboardStats } from '@/lib/services/dashboardService'
+import {
+  getAdminDashboardOverview,
+  getDashboardStats,
+  getHeadcountTrend,
+  getPendingRequestsSummary,
+} from '@/lib/services/dashboardService'
+import type { AdminDashboardOverview, DashboardStats, PendingRequestsSummary } from '@/lib/services/dashboardService'
 
 export function useDashboardData() {
   const { user } = useSession()
@@ -38,4 +43,22 @@ export function useAdminDashboardOverview() {
   }, [user])
 
   return { overview, isLoading: overview === null }
+}
+
+export function usePendingRequestsSummary() {
+  const { user } = useSession()
+  const [summary, setSummary] = useState<PendingRequestsSummary | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setSummary(null)
+    getPendingRequestsSummary(user).then((result) => {
+      if (!cancelled) setSummary(result)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  return { summary, isLoading: summary === null }
 }

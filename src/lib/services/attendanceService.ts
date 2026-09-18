@@ -63,6 +63,56 @@ export async function getEmployeeIdsWithPendingAdjustmentForDate(session: Sessio
   return new Set(pending.map((a) => a.employeeId))
 }
 
+export interface ImportBiometricsResult {
+  fileName: string
+  importedCount: number
+}
+
+/**
+ * Mock biometrics import: simulates parsing a raw punch-log file by filling in time-in/time-out
+ * for the selected date — completing any employee currently missing a punch (absent, or no
+ * record yet) with a plausible present-day log. No real file parsing happens.
+ */
+export async function importBiometricsRecords(
+  session: SessionUser,
+  date: string,
+  fileName: string,
+): Promise<ImportBiometricsResult> {
+  const employees = await getEmployees(session)
+  const activeEmployees = employees.filter((e) => e.employment.status === 'active')
+  const schedules = await getSchedules(session)
+  const scheduleId = schedules[0]?.id
+  if (!scheduleId) return { fileName, importedCount: 0 }
+
+  let importedCount = 0
+  for (const employee of activeEmployees) {
+    const existing = db.attendanceRecords.find(
+      (r) => r.companyId === session.companyId && r.employeeId === employee.id && r.date === date,
+    )
+    if (existing) {
+      if (existing.status === 'absent' || !existing.timeIn) {
+        existing.timeIn = '08:56'
+        existing.timeOut = '18:02'
+        existing.status = 'present'
+        importedCount++
+      }
+      continue
+    }
+    db.attendanceRecords.push({
+      id: `${employee.id}_att_${date}_import`,
+      companyId: session.companyId,
+      employeeId: employee.id,
+      scheduleId,
+      date,
+      timeIn: '08:56',
+      timeOut: '18:02',
+      status: 'present',
+    })
+    importedCount++
+  }
+  return { fileName, importedCount }
+}
+
 export async function getAttendanceAdjustments(session: SessionUser): Promise<AttendanceAdjustment[]> {
   const employeeIds = await scopedEmployeeIds(session)
   return db.attendanceAdjustments

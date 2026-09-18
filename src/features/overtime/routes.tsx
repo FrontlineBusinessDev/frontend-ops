@@ -1,4 +1,4 @@
-import { Download } from 'lucide-react'
+import { Download, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Avatar } from '@/components/ui/Avatar'
@@ -6,6 +6,7 @@ import { Badge, StatusBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { FilterField, FiltersPopover, SortControl, type SortDirection } from '@/components/ui/FiltersPopover'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -39,6 +40,12 @@ const PERIOD_OPTIONS = [
   { value: 'current', label: 'Current Period (last 15 days)' },
   { value: 'previous', label: 'Previous Period' },
   { value: 'all', label: 'All Time' },
+]
+
+const SORT_OPTIONS = [
+  { value: 'date', label: 'Date' },
+  { value: 'hours', label: 'Hours Logged' },
+  { value: 'name', label: 'Employee Name' },
 ]
 
 const TYPE_LABEL: Record<OvertimeType, string> = {
@@ -92,6 +99,8 @@ export function OvertimePage() {
   const [type, setType] = useState('all')
   const [status, setStatus] = useState('all')
   const [period, setPeriod] = useState('current')
+  const [sortBy, setSortBy] = useState('date')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [selectedRecord, setSelectedRecord] = useState<OvertimeRecord | null>(null)
 
   const employeeById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees])
@@ -101,27 +110,44 @@ export function OvertimePage() {
     setRefreshKey((k) => k + 1)
   }
 
-  const filtered = records.filter((record) => {
-    if (type !== 'all' && record.type !== type) return false
-    if (status !== 'all' && record.status !== status) return false
+  const filtered = records
+    .filter((record) => {
+      if (type !== 'all' && record.type !== type) return false
+      if (status !== 'all' && record.status !== status) return false
 
-    if (period === 'current' && new Date(record.date) < daysAgo(15)) return false
-    if (period === 'previous') {
-      const date = new Date(record.date)
-      if (date < daysAgo(30) || date > daysAgo(16)) return false
-    }
+      if (period === 'current' && new Date(record.date) < daysAgo(15)) return false
+      if (period === 'previous') {
+        const date = new Date(record.date)
+        if (date < daysAgo(30) || date > daysAgo(16)) return false
+      }
 
-    const query = search.trim().toLowerCase()
-    if (query) {
-      const employee = employeeById.get(record.employeeId)
-      const haystack = employee
-        ? `${employee.personal.firstName} ${employee.personal.lastName} ${employee.employeeNumber} ${employee.employment.department}`.toLowerCase()
-        : ''
-      if (!haystack.includes(query)) return false
-    }
+      const query = search.trim().toLowerCase()
+      if (query) {
+        const employee = employeeById.get(record.employeeId)
+        const haystack = employee
+          ? `${employee.personal.firstName} ${employee.personal.lastName} ${employee.employeeNumber} ${employee.employment.department}`.toLowerCase()
+          : ''
+        if (!haystack.includes(query)) return false
+      }
 
-    return true
-  })
+      return true
+    })
+    .sort((a, b) => {
+      if (a.status === 'pending' && b.status !== 'pending') return -1
+      if (a.status !== 'pending' && b.status === 'pending') return 1
+      let result = 0
+      if (sortBy === 'hours') result = a.hours - b.hours
+      else if (sortBy === 'name') {
+        const employeeA = employeeById.get(a.employeeId)
+        const employeeB = employeeById.get(b.employeeId)
+        result = `${employeeA?.personal.firstName} ${employeeA?.personal.lastName}`.localeCompare(
+          `${employeeB?.personal.firstName} ${employeeB?.personal.lastName}`,
+        )
+      } else {
+        result = a.date.localeCompare(b.date)
+      }
+      return sortDirection === 'asc' ? result : -result
+    })
 
   async function handleDecide(record: OvertimeRecord, decision: 'approved' | 'rejected') {
     await decideOvertimeRecord(user, record.id, decision)
@@ -187,18 +213,33 @@ export function OvertimePage() {
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="w-full max-w-xs">
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search employee, ID, department…" />
+        <div className="relative w-full max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search employee, ID, department…"
+            className="pl-9"
+          />
         </div>
-        <div className="w-64">
-          <Select value={type} onValueChange={setType} options={TYPE_OPTIONS} />
-        </div>
-        <div className="w-44">
-          <Select value={status} onValueChange={setStatus} options={STATUS_OPTIONS} />
-        </div>
-        <div className="w-56">
-          <Select value={period} onValueChange={setPeriod} options={PERIOD_OPTIONS} />
-        </div>
+        <FiltersPopover activeCount={[type !== 'all', status !== 'all', period !== 'current'].filter(Boolean).length}>
+          <FilterField label="Type">
+            <Select value={type} onValueChange={setType} options={TYPE_OPTIONS} />
+          </FilterField>
+          <FilterField label="Status">
+            <Select value={status} onValueChange={setStatus} options={STATUS_OPTIONS} />
+          </FilterField>
+          <FilterField label="Period">
+            <Select value={period} onValueChange={setPeriod} options={PERIOD_OPTIONS} />
+          </FilterField>
+          <SortControl
+            value={sortBy}
+            onValueChange={setSortBy}
+            options={SORT_OPTIONS}
+            direction={sortDirection}
+            onDirectionChange={setSortDirection}
+          />
+        </FiltersPopover>
         <p className="ml-auto self-center text-sm text-muted-foreground">
           {filtered.length} of {records.length} records
         </p>

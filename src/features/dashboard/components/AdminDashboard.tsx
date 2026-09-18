@@ -19,6 +19,7 @@ import { Card } from '@/components/ui/Card'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
 import { useAdminDashboardOverview } from '@/features/dashboard/hooks/useDashboardData'
+import { PendingRequestsCard } from '@/features/dashboard/components/PendingRequestsCard'
 import { formatCurrency } from '@/lib/utils/format'
 
 function timeOfDayGreeting() {
@@ -146,6 +147,8 @@ export function AdminDashboard() {
           tone="brand"
         />
       </div>
+
+      <PendingRequestsCard />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">

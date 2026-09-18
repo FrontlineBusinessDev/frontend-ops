@@ -1,3 +1,6 @@
+import { getAttendanceAdjustments } from '@/lib/services/attendanceService'
+import { getLeaveRequests } from '@/lib/services/leaveService'
+import { getOvertimeRecords } from '@/lib/services/overtimeService'
 import { scopeForSession } from '@/lib/tenancy/tenantScope'
 import { db } from '@/mock-data'
 import type { SessionUser } from '@/types/domain'
@@ -63,6 +66,29 @@ export interface AdminDashboardOverview {
   payrollCalendar: { id: string; dateLabel: string; title: string; description: string }[]
   recentEmployees: { id: string; name: string; department: string; status: 'active' | 'on_leave' | 'inactive' }[]
   announcements: { id: string; title: string; dateLabel: string }[]
+}
+
+export interface PendingRequestsSummary {
+  leavePending: number
+  overtimePending: number
+  nightDiffPending: number
+  attendanceAdjustmentsPending: number
+}
+
+/** Real, live counts of everything awaiting admin review — powers the Dashboard's "Pending Requests" widget. */
+export async function getPendingRequestsSummary(session: SessionUser): Promise<PendingRequestsSummary> {
+  const [leaveRequests, overtimeRecords, adjustments] = await Promise.all([
+    getLeaveRequests(session),
+    getOvertimeRecords(session),
+    getAttendanceAdjustments(session),
+  ])
+
+  return {
+    leavePending: leaveRequests.filter((r) => r.status === 'pending').length,
+    overtimePending: overtimeRecords.filter((r) => r.status === 'pending' && r.type !== 'night_diff').length,
+    nightDiffPending: overtimeRecords.filter((r) => r.status === 'pending' && r.type === 'night_diff').length,
+    attendanceAdjustmentsPending: adjustments.filter((a) => a.status === 'pending').length,
+  }
 }
 
 /**

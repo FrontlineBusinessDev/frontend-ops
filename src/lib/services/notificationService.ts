@@ -27,7 +27,7 @@ export async function getNotifications(session: SessionUser): Promise<AppNotific
         message: `${pendingLeave.length} leave request${pendingLeave.length === 1 ? '' : 's'} awaiting your approval`,
         tone: 'warning',
         timestamp: new Date().toISOString(),
-        link: '/approvals',
+        link: '/leave',
       })
     }
     if (pendingAdjustments.length > 0) {
@@ -36,7 +36,7 @@ export async function getNotifications(session: SessionUser): Promise<AppNotific
         message: `${pendingAdjustments.length} attendance adjustment${pendingAdjustments.length === 1 ? '' : 's'} awaiting your approval`,
         tone: 'warning',
         timestamp: new Date().toISOString(),
-        link: '/approvals',
+        link: '/attendance',
       })
     }
   }

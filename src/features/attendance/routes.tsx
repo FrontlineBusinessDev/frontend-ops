@@ -4,12 +4,14 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
+import type { SortDirection } from '@/components/ui/FiltersPopover'
 import { AttendanceFilterBar } from '@/features/attendance/components/AttendanceFilterBar'
 import { AdjustmentsList } from '@/features/attendance/components/AdjustmentsList'
 import { DailyAttendanceTable } from '@/features/attendance/components/DailyAttendanceTable'
 import { FileAdjustmentDialog } from '@/features/attendance/components/FileAdjustmentDialog'
 import { MiniCalendarPicker } from '@/features/attendance/components/MiniCalendarPicker'
 import { GROUP_OPTIONS, getEmployeeGroup } from '@/features/attendance/groupUtil'
+import { ImportBiometricsDialog } from '@/features/attendance/components/ImportBiometricsDialog'
 import { useAttendanceAdjustments, useDailyAttendance, useDateStatusSets } from '@/features/attendance/hooks/useAttendance'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
 import { usePermission } from '@/hooks/usePermission'
@@ -42,10 +44,20 @@ const ADJUSTMENT_STATUS_OPTIONS = [
   { value: 'rejected', label: 'Rejected' },
 ]
 
+const DAILY_SORT_OPTIONS = [
+  { value: 'name', label: 'Employee Name' },
+  { value: 'status', label: 'Status' },
+]
+
+const ADJUSTMENT_SORT_OPTIONS = [
+  { value: 'requestedAt', label: 'Date Requested' },
+  { value: 'name', label: 'Employee Name' },
+]
+
 export function AttendancePage() {
   const [date, setDate] = useState(todayKey)
   const [activeTab, setActiveTab] = useState('daily')
-  const { records, isLoading: isLoadingAttendance } = useDailyAttendance(date)
+  const { records, isLoading: isLoadingAttendance, refetch: refetchDaily } = useDailyAttendance(date)
   const { onLeaveIds, pendingAdjustmentIds } = useDateStatusSets(date)
   const { adjustments, isLoading: isLoadingAdjustments, refetch } = useAttendanceAdjustments()
   const { employees, refetch: refetchEmployees } = useEmployees()
@@ -57,6 +69,10 @@ export function AttendancePage() {
   const [group, setGroup] = useState('all')
   const [department, setDepartment] = useState('all')
   const [status, setStatus] = useState('all')
+  const [dailySortBy, setDailySortBy] = useState('name')
+  const [dailySortDirection, setDailySortDirection] = useState<SortDirection>('asc')
+  const [adjustmentSortBy, setAdjustmentSortBy] = useState('requestedAt')
+  const [adjustmentSortDirection, setAdjustmentSortDirection] = useState<SortDirection>('desc')
 
   const employeeById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees])
 
@@ -97,15 +113,26 @@ export function AttendancePage() {
     return true
   }
 
-  const filteredRecords = records.filter((record) => {
-    const employee = employeeById.get(record.employeeId)
-    if (!matchesCommonFilters(employee)) return false
+  function employeeName(employeeId: string): string {
+    const employee = employeeById.get(employeeId)
+    return employee ? `${employee.personal.firstName} ${employee.personal.lastName}` : ''
+  }
 
-    if (status === 'all') return true
-    if (status === 'on_leave') return onLeaveIds.has(record.employeeId)
-    if (status === 'pending_adjustment') return pendingAdjustmentIds.has(record.employeeId)
-    return record.status === status
-  })
+  const filteredRecords = records
+    .filter((record) => {
+      const employee = employeeById.get(record.employeeId)
+      if (!matchesCommonFilters(employee)) return false
+
+      if (status === 'all') return true
+      if (status === 'on_leave') return onLeaveIds.has(record.employeeId)
+      if (status === 'pending_adjustment') return pendingAdjustmentIds.has(record.employeeId)
+      return record.status === status
+    })
+    .sort((a, b) => {
+      const result =
+        dailySortBy === 'status' ? a.status.localeCompare(b.status) : employeeName(a.employeeId).localeCompare(employeeName(b.employeeId))
+      return dailySortDirection === 'asc' ? result : -result
+    })
 
   const filteredAdjustments = adjustments
     .filter((adjustment) => {
@@ -118,7 +145,11 @@ export function AttendancePage() {
     .sort((a, b) => {
       if (a.status === 'pending' && b.status !== 'pending') return -1
       if (a.status !== 'pending' && b.status === 'pending') return 1
-      return b.requestedAt.localeCompare(a.requestedAt)
+      const result =
+        adjustmentSortBy === 'name'
+          ? employeeName(a.employeeId).localeCompare(employeeName(b.employeeId))
+          : a.requestedAt.localeCompare(b.requestedAt)
+      return adjustmentSortDirection === 'asc' ? result : -result
     })
 
   return (
@@ -140,6 +171,11 @@ export function AttendancePage() {
         status={status}
         onStatusChange={setStatus}
         statusOptions={activeTab === 'daily' ? DAILY_STATUS_OPTIONS : ADJUSTMENT_STATUS_OPTIONS}
+        sortBy={activeTab === 'daily' ? dailySortBy : adjustmentSortBy}
+        onSortByChange={activeTab === 'daily' ? setDailySortBy : setAdjustmentSortBy}
+        sortOptions={activeTab === 'daily' ? DAILY_SORT_OPTIONS : ADJUSTMENT_SORT_OPTIONS}
+        sortDirection={activeTab === 'daily' ? dailySortDirection : adjustmentSortDirection}
+        onSortDirectionChange={activeTab === 'daily' ? setDailySortDirection : setAdjustmentSortDirection}
         hasActiveFilters={hasActiveFilters}
         onClear={clearFilters}
       />
@@ -151,15 +187,18 @@ export function AttendancePage() {
         </TabsList>
 
         <TabsContent value="daily">
-          <div className="mb-4 flex items-center gap-2">
-            <Button size="sm" variant="secondary" icon={<ChevronLeft className="size-4" />} onClick={() => setDate((d) => shiftDate(d, -1))} />
-            <MiniCalendarPicker value={date} onChange={setDate} />
-            <Button size="sm" variant="secondary" icon={<ChevronRight className="size-4" />} onClick={() => setDate((d) => shiftDate(d, 1))} />
-            {date !== todayKey() && (
-              <Button size="sm" variant="ghost" onClick={() => setDate(todayKey())}>
-                Today
-              </Button>
-            )}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="secondary" icon={<ChevronLeft className="size-4" />} onClick={() => setDate((d) => shiftDate(d, -1))} />
+              <MiniCalendarPicker value={date} onChange={setDate} />
+              <Button size="sm" variant="secondary" icon={<ChevronRight className="size-4" />} onClick={() => setDate((d) => shiftDate(d, 1))} />
+              {date !== todayKey() && (
+                <Button size="sm" variant="ghost" onClick={() => setDate(todayKey())}>
+                  Today
+                </Button>
+              )}
+            </div>
+            <ImportBiometricsDialog date={date} onImported={refetchDaily} />
           </div>
           {isLoadingAttendance ? (
             <Skeleton className="h-72" />
@@ -169,6 +208,7 @@ export function AttendancePage() {
               employees={employees}
               onAdjustmentCreated={() => {
                 refetch()
+                refetchDaily()
               }}
             />
           )}

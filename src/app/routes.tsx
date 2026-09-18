@@ -20,7 +20,6 @@ import {
   EssPayslipsPage,
   EssProfilePage,
 } from '@/features/ess/routes'
-import { ApprovalsPage } from '@/features/approvals/routes'
 import { NotificationsPage } from '@/features/notifications/routes'
 import { ReportsPage } from '@/features/reports/routes'
 import { UserAccessPage } from '@/features/user-access/routes'
@@ -192,14 +191,6 @@ export const router = createBrowserRouter([
         element: (
           <RequireCapability capability="ess.view">
             <EssLoansPage />
-          </RequireCapability>
-        ),
-      },
-      {
-        path: 'approvals',
-        element: (
-          <RequireCapability capability="approvals.view">
-            <ApprovalsPage />
           </RequireCapability>
         ),
       },

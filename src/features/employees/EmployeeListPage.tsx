@@ -2,6 +2,7 @@ import { Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
+import { FilterField, FiltersPopover, SortControl, type SortDirection } from '@/components/ui/FiltersPopover'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -20,6 +21,12 @@ const STATUS_OPTIONS = [
   { value: 'archived', label: 'Archived' },
 ]
 
+const SORT_OPTIONS = [
+  { value: 'name', label: 'Name' },
+  { value: 'department', label: 'Department' },
+  { value: 'branch', label: 'Branch' },
+]
+
 export function EmployeeListPage() {
   const { user } = useSession()
   const { employees, isLoading, refetch } = useEmployees()
@@ -29,6 +36,8 @@ export function EmployeeListPage() {
   const [branchId, setBranchId] = useState('all')
   const [department, setDepartment] = useState('all')
   const [onLeaveIds, setOnLeaveIds] = useState<Set<string>>(new Set())
+  const [sortBy, setSortBy] = useState('name')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   useEffect(() => {
     getEmployeeIdsOnLeaveToday(user).then(setOnLeaveIds)
@@ -44,7 +53,8 @@ export function EmployeeListPage() {
     return [{ value: 'all', label: 'All departments' }, ...unique.map((d) => ({ value: d, label: d }))]
   }, [employees])
 
-  const hasActiveFilters = search.trim() !== '' || status !== 'active' || branchId !== 'all' || department !== 'all'
+  const activeFilterCount = [status !== 'active', branchId !== 'all', department !== 'all'].filter(Boolean).length
+  const hasActiveFilters = search.trim() !== '' || activeFilterCount > 0
 
   function resetFilters() {
     setSearch('')
@@ -53,24 +63,34 @@ export function EmployeeListPage() {
     setDepartment('all')
   }
 
-  const filtered = employees.filter((e) => {
-    if (status === 'on_leave') {
-      if (!onLeaveIds.has(e.id)) return false
-    } else if (status !== 'all' && e.employment.status !== status) {
-      return false
-    }
-    if (branchId !== 'all' && e.branchId !== branchId) return false
-    if (department !== 'all' && e.employment.department !== department) return false
+  const branchNameById = useMemo(() => new Map(branches.map((b) => [b.id, b.name])), [branches])
 
-    const query = search.trim().toLowerCase()
-    if (query) {
-      const fullName = `${e.personal.firstName} ${e.personal.lastName}`.toLowerCase()
-      const haystack = [fullName, e.employeeNumber, e.personal.personalEmail ?? '', e.employment.position].join(' ').toLowerCase()
-      if (!haystack.includes(query)) return false
-    }
+  const filtered = employees
+    .filter((e) => {
+      if (status === 'on_leave') {
+        if (!onLeaveIds.has(e.id)) return false
+      } else if (status !== 'all' && e.employment.status !== status) {
+        return false
+      }
+      if (branchId !== 'all' && e.branchId !== branchId) return false
+      if (department !== 'all' && e.employment.department !== department) return false
 
-    return true
-  })
+      const query = search.trim().toLowerCase()
+      if (query) {
+        const fullName = `${e.personal.firstName} ${e.personal.lastName}`.toLowerCase()
+        const haystack = [fullName, e.employeeNumber, e.personal.personalEmail ?? '', e.employment.position].join(' ').toLowerCase()
+        if (!haystack.includes(query)) return false
+      }
+
+      return true
+    })
+    .sort((a, b) => {
+      let result = 0
+      if (sortBy === 'department') result = a.employment.department.localeCompare(b.employment.department)
+      else if (sortBy === 'branch') result = (branchNameById.get(a.branchId) ?? '').localeCompare(branchNameById.get(b.branchId) ?? '')
+      else result = `${a.personal.firstName} ${a.personal.lastName}`.localeCompare(`${b.personal.firstName} ${b.personal.lastName}`)
+      return sortDirection === 'asc' ? result : -result
+    })
 
   return (
     <div className="space-y-5">
@@ -90,20 +110,33 @@ export function EmployeeListPage() {
             className="pl-9"
           />
         </div>
-        <div className="w-44">
-          <Select value={status} onValueChange={setStatus} options={STATUS_OPTIONS} />
-        </div>
-        <div className="w-48">
-          <Select value={department} onValueChange={setDepartment} options={departmentOptions} />
-        </div>
-        <div className="w-52">
-          <Select value={branchId} onValueChange={setBranchId} options={branchOptions} />
-        </div>
-        {hasActiveFilters && (
-          <Button size="sm" variant="ghost" icon={<X className="size-3.5" />} onClick={resetFilters}>
-            Reset
-          </Button>
-        )}
+        <FiltersPopover
+          activeCount={activeFilterCount}
+          footer={
+            hasActiveFilters && (
+              <Button size="sm" variant="ghost" icon={<X className="size-3.5" />} onClick={resetFilters}>
+                Clear Filters
+              </Button>
+            )
+          }
+        >
+          <FilterField label="Status">
+            <Select value={status} onValueChange={setStatus} options={STATUS_OPTIONS} />
+          </FilterField>
+          <FilterField label="Department">
+            <Select value={department} onValueChange={setDepartment} options={departmentOptions} />
+          </FilterField>
+          <FilterField label="Branch">
+            <Select value={branchId} onValueChange={setBranchId} options={branchOptions} />
+          </FilterField>
+          <SortControl
+            value={sortBy}
+            onValueChange={setSortBy}
+            options={SORT_OPTIONS}
+            direction={sortDirection}
+            onDirectionChange={setSortDirection}
+          />
+        </FiltersPopover>
         <p className="ml-auto self-center text-sm text-muted-foreground">
           {filtered.length} of {employees.length} employees
         </p>
