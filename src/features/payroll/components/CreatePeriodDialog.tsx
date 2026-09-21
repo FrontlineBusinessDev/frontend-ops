@@ -1,13 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { Button } from '@/components/ui/Button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/Dialog'
 import { FormField } from '@/components/ui/FormField'
 import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
 import { useToast } from '@/components/ui/Toast'
+import { usePayrollGroups } from '@/features/company-settings/hooks/usePayrollGroups'
 import { useSession } from '@/hooks/useSession'
 import { createPayrollPeriod } from '@/lib/services/payrollService'
 
@@ -16,6 +18,7 @@ const schema = z.object({
   startDate: z.string().min(1, 'Required'),
   endDate: z.string().min(1, 'Required'),
   payDate: z.string().min(1, 'Required'),
+  payrollGroupId: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -24,16 +27,23 @@ export function CreatePeriodDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false)
   const { user } = useSession()
   const { notify } = useToast()
+  const { groups } = usePayrollGroups()
 
   const {
     register,
     handleSubmit,
+    control,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema) })
+  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { payrollGroupId: 'all' } })
+
+  const groupOptions = [
+    { value: 'all', label: 'All Employees (no Payroll Group filter)' },
+    ...groups.filter((g) => g.status === 'active').map((g) => ({ value: g.id, label: g.name })),
+  ]
 
   async function onSubmit(values: FormValues) {
-    await createPayrollPeriod(user, values)
+    await createPayrollPeriod(user, { ...values, payrollGroupId: values.payrollGroupId === 'all' ? undefined : values.payrollGroupId })
     notify({ title: 'Payroll period created', tone: 'success' })
     reset()
     setOpen(false)
@@ -50,6 +60,13 @@ export function CreatePeriodDialog({ onCreated }: { onCreated: () => void }) {
         <DialogDescription>Define the period before running payroll calculations.</DialogDescription>
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-5 grid grid-cols-2 gap-4">
+          <FormField label="Payroll Group" hint="Leave as 'All Employees' to run against every active employee, matching current behavior." className="col-span-2">
+            <Controller
+              control={control}
+              name="payrollGroupId"
+              render={({ field }) => <Select value={field.value} onValueChange={field.onChange} options={groupOptions} />}
+            />
+          </FormField>
           <FormField label="Label" required error={errors.label?.message} className="col-span-2">
             <Input {...register('label')} placeholder="Sep 16 – 30, 2026" />
           </FormField>

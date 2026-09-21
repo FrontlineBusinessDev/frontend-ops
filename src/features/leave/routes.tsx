@@ -10,6 +10,7 @@ import { LeaveRequestsList } from '@/features/leave/components/LeaveRequestsList
 import { LeaveTypesPanel } from '@/features/leave/components/LeaveTypesPanel'
 import { HIERARCHY_LABEL, HIERARCHY_LEVELS, getEmployeeHierarchyLevel } from '@/features/leave/hierarchyUtil'
 import { useLeaveRequests, useLeaveTypes } from '@/features/leave/hooks/useLeave'
+import { useHighlightTarget } from '@/hooks/useHighlightTarget'
 import { usePermission } from '@/hooks/usePermission'
 import type { Employee } from '@/types/domain'
 
@@ -23,6 +24,7 @@ export function LeavePage() {
   const { leaveTypes, refetch: refetchLeaveTypes } = useLeaveTypes()
   const { employees } = useEmployees()
   const canRequest = usePermission('leave.request')
+  const { highlightId } = useHighlightTarget()
   const [activeTab, setActiveTab] = useState('requests')
 
   const [search, setSearch] = useState('')
@@ -133,7 +135,13 @@ export function LeavePage() {
           {isLoading ? (
             <Skeleton className="h-72" />
           ) : (
-            <LeaveRequestsList requests={filteredRequests} employees={employees} leaveTypes={leaveTypes} onDecided={refetch} />
+            <LeaveRequestsList
+              requests={filteredRequests}
+              employees={employees}
+              leaveTypes={leaveTypes}
+              onDecided={refetch}
+              highlightId={highlightId}
+            />
           )}
         </TabsContent>
 

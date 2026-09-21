@@ -15,6 +15,14 @@ const EMPLOYMENT_TYPE_OPTIONS = [
   { value: 'part_time', label: 'Part-time' },
 ]
 
+const CATEGORY_OPTIONS = [
+  { value: 'regular', label: 'Regular Employee' },
+  { value: 'admin_staff', label: 'Admin Staff' },
+  { value: 'production_worker', label: 'Production Worker' },
+  { value: 'field_worker', label: 'Field Worker' },
+  { value: 'contractor', label: 'Contractor' },
+]
+
 export function EditEmploymentInfoForm({
   employee,
   onSaved,
@@ -39,6 +47,7 @@ export function EditEmploymentInfoForm({
       department: employee.employment.department,
       employmentType: employee.employment.employmentType,
       dateHired: employee.employment.dateHired,
+      category: employee.employment.category,
     },
   })
 
@@ -65,6 +74,13 @@ export function EditEmploymentInfoForm({
       </FormField>
       <FormField label="Date hired">
         <Input type="date" {...register('dateHired')} />
+      </FormField>
+      <FormField label="Employee category" hint="Used only to suggest Payroll Group assignment — never restricts it.">
+        <Select
+          value={watch('category')}
+          onValueChange={(v) => setValue('category', v as UpdateEmploymentInfoInput['category'])}
+          options={CATEGORY_OPTIONS}
+        />
       </FormField>
 
       <div className="col-span-2 flex justify-end gap-2 sm:col-span-3">

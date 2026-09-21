@@ -1,8 +1,7 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Bell, ChevronDown, FlaskConical, LogOut, Menu } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { ChevronDown, FlaskConical, LogOut, Menu } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { Avatar } from '@/components/ui/Avatar'
-import { useNotifications } from '@/features/notifications/hooks/useNotifications'
 import { useSession } from '@/hooks/useSession'
 import { useTenant } from '@/hooks/useTenant'
 import { cn } from '@/lib/utils/cn'
@@ -19,7 +18,6 @@ const ROLE_LABELS: Record<string, string> = {
 export function Topbar({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
   const { user, availableUsers, setCurrentUserId, logout } = useSession()
   const { company, activeBranch } = useTenant()
-  const notifications = useNotifications()
   const navigate = useNavigate()
 
   function onLogout() {
@@ -28,7 +26,7 @@ export function Topbar({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
   }
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-card/60 px-4 backdrop-blur-sm lg:px-6">
+    <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-card/60 px-4 backdrop-blur-sm lg:px-6 print:hidden">
       <div className="flex min-w-0 items-center gap-2">
         {onOpenMobileNav && (
           <button
@@ -84,17 +82,6 @@ export function Topbar({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
             </DropdownMenu.Content>
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
-
-        <Link
-          to="/notifications"
-          className="relative flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label="Notifications"
-        >
-          <Bell className="size-4" />
-          {notifications.length > 0 && (
-            <span className="absolute right-1.5 top-1.5 flex size-2 rounded-full bg-danger" />
-          )}
-        </Link>
 
         <DropdownMenu.Root>
           <DropdownMenu.Trigger

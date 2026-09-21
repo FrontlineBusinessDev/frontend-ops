@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/Toast'
 import { usePermission } from '@/hooks/usePermission'
 import { useSession } from '@/hooks/useSession'
 import { decideAttendanceAdjustment } from '@/lib/services/attendanceService'
+import { cn } from '@/lib/utils/cn'
 import { formatDate } from '@/lib/utils/format'
 import type { AttendanceAdjustment, Employee } from '@/types/domain'
 
@@ -14,10 +15,12 @@ export function AdjustmentsList({
   adjustments,
   employees,
   onDecided,
+  highlightId,
 }: {
   adjustments: AttendanceAdjustment[]
   employees: Employee[]
   onDecided: () => void
+  highlightId?: string
 }) {
   const canApprove = usePermission('attendance.approve')
   const { user } = useSession()
@@ -39,7 +42,7 @@ export function AdjustmentsList({
       {adjustments.map((adjustment) => {
         const employee = employeeById.get(adjustment.employeeId)
         return (
-          <Card key={adjustment.id} className="p-4">
+          <Card key={adjustment.id} id={`row-${adjustment.id}`} className={cn('p-4', adjustment.id === highlightId && 'highlight-target')}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-medium">

@@ -96,6 +96,7 @@ export async function importEmployeesCsv(session: SessionUser, csvText: string):
       branchId: defaultBranchId,
       employmentType: (employmentType as 'regular' | 'probationary' | 'contractual' | 'part_time') || 'regular',
       dateHired: dateHired || new Date().toISOString().slice(0, 10),
+      payType: 'monthly',
       basicPay,
     })
     result.imported += 1

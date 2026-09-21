@@ -1,7 +1,7 @@
 import { getEmployees } from '@/lib/services/employeeService'
 import { getPayrollLines, getPayrollPeriods } from '@/lib/services/payrollService'
 import { db } from '@/mock-data'
-import type { AttendanceStatus, Employee, SessionUser } from '@/types/domain'
+import type { AttendanceStatus, Employee, PayrollLine, PayrollPeriod, SessionUser } from '@/types/domain'
 
 export interface PayrollRegisterRow {
   employee: Employee
@@ -125,4 +125,30 @@ export async function getLeaveSummary(session: SessionUser): Promise<LeaveSummar
 export async function getEmployeeMasterlist(session: SessionUser): Promise<Employee[]> {
   const employees = await getEmployees(session)
   return [...employees].sort((a, b) => a.personal.lastName.localeCompare(b.personal.lastName))
+}
+
+export interface PayrollLineWithContext {
+  period: PayrollPeriod
+  line: PayrollLine
+  employee: Employee
+}
+
+/**
+ * Every payroll line ever run for this company, joined with its period and employee — the shared
+ * dataset behind every multi-period report (Payroll Summary, statutory/BIR reports, Advanced
+ * Analytics) so they all read the same real payroll history instead of each re-deriving it.
+ */
+export async function getAllPayrollLines(session: SessionUser): Promise<PayrollLineWithContext[]> {
+  const [periods, employees] = await Promise.all([getPayrollPeriods(session), getEmployees(session)])
+  const employeeById = new Map(employees.map((e) => [e.id, e]))
+
+  const rows: PayrollLineWithContext[] = []
+  for (const period of periods) {
+    const lines = await getPayrollLines(session, period.id)
+    for (const line of lines) {
+      const employee = employeeById.get(line.employeeId)
+      if (employee) rows.push({ period, line, employee })
+    }
+  }
+  return rows.sort((a, b) => a.period.startDate.localeCompare(b.period.startDate))
 }

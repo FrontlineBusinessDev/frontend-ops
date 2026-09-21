@@ -11,6 +11,10 @@ export interface AppNotification {
   tone: 'default' | 'success' | 'warning' | 'danger'
   timestamp: string
   link?: string
+  /** Record id to scroll to and briefly highlight on the destination page, if the notification refers to one specific row. */
+  highlightId?: string
+  /** Tab to switch to on the destination page before highlighting, for pages where the target lives on a non-default tab. */
+  tab?: string
 }
 
 export async function getNotifications(session: SessionUser): Promise<AppNotification[]> {
@@ -28,6 +32,7 @@ export async function getNotifications(session: SessionUser): Promise<AppNotific
         tone: 'warning',
         timestamp: new Date().toISOString(),
         link: '/leave',
+        highlightId: pendingLeave[0].id,
       })
     }
     if (pendingAdjustments.length > 0) {
@@ -37,6 +42,8 @@ export async function getNotifications(session: SessionUser): Promise<AppNotific
         tone: 'warning',
         timestamp: new Date().toISOString(),
         link: '/attendance',
+        highlightId: pendingAdjustments[0].id,
+        tab: 'adjustments',
       })
     }
   }

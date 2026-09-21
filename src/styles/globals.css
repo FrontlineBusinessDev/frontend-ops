@@ -116,6 +116,40 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Seamless scrolling across the portal — smooth anchor/programmatic scrolls and
+   momentum scrolling on touch devices, for every scroll container (page body,
+   dialogs, tables, card grids), while respecting reduced-motion preferences. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Print output (e.g. the Payslip print/PDF view) — standard page size/margins, and force
+   light backgrounds (like the Net Pay highlight) to actually print instead of being
+   stripped by the browser's default print color handling. Sidebar/header hide via their
+   own print:hidden utility classes rather than a broad selector here. */
+@page {
+  size: A4;
+  margin: 14mm;
+}
+
+@media print {
+  * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  body {
+    background-color: #fff;
+  }
+}
+
+* {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
 * {
   border-color: var(--color-border);
 }
@@ -156,4 +190,23 @@ body {
   display: none;
   width: 0;
   height: 0;
+}
+
+/* Brief attention pulse for a table row/card jumped to from a notification — soft background
+   flash + ring, using the existing primary token, then fades back to normal. */
+@keyframes highlight-pulse {
+  0%,
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  12%,
+  55% {
+    background-color: color-mix(in srgb, var(--color-primary) 14%, transparent);
+    box-shadow: inset 0 0 0 1px var(--color-primary);
+  }
+}
+
+.highlight-target {
+  animation: highlight-pulse 2.4s ease-in-out;
 }

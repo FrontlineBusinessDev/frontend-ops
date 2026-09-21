@@ -6,10 +6,12 @@ import {
   Clock,
   CreditCard,
   Gauge,
+  Gift,
   Landmark,
   LayoutDashboard,
   LineChart,
   Moon,
+  PartyPopper,
   Plug,
   ReceiptText,
   Settings,
@@ -56,15 +58,15 @@ export const ADMIN_NAV: NavGroup[] = [
     label: 'Payroll',
     items: [
       { label: 'Payroll Runs', path: '/payroll', icon: Wallet, capability: 'payroll.view' },
+      { label: 'Bonuses & Incentives', path: '/bonuses', icon: Gift, capability: 'bonuses.view' },
+      { label: '13th Month Pay', path: '/thirteenth-month-pay', icon: PartyPopper, capability: 'thirteenth_month.view' },
       { label: 'Statutory Contributions', path: '/statutory', icon: Landmark, capability: 'statutory.view' },
       { label: 'Payslips', path: '/payslips', icon: ReceiptText, capability: 'payslips.view' },
     ],
   },
   {
-    items: [
-      { label: 'Reports', path: '/reports', icon: LineChart, capability: 'reports.view' },
-      { label: 'Notifications', path: '/notifications', icon: Bell, capability: 'notifications.view' },
-    ],
+    label: 'Analytics and Reports',
+    items: [{ label: 'Reports', path: '/reports', icon: LineChart, capability: 'reports.view' }],
   },
   {
     label: 'Settings',
@@ -92,10 +94,8 @@ export const MANAGER_NAV: NavGroup[] = [
     ],
   },
   {
-    items: [
-      { label: 'Reports', path: '/reports', icon: LineChart },
-      { label: 'Notifications', path: '/notifications', icon: Bell },
-    ],
+    label: 'Analytics and Reports',
+    items: [{ label: 'Reports', path: '/reports', icon: LineChart }],
   },
   {
     label: 'My Info',

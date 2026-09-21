@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSession } from '@/hooks/useSession'
 import {
+  getAllPayrollLines,
   getAttendanceSummary,
   getEmployeeMasterlist,
   getLeaveSummary,
   getPayrollRegister,
   type AttendanceSummaryRow,
   type LeaveSummaryRow,
+  type PayrollLineWithContext,
   type PayrollRegisterReport,
 } from '@/lib/services/reportService'
 import { getPayrollPeriods } from '@/lib/services/payrollService'
@@ -74,4 +76,17 @@ export function useEmployeeMasterlist() {
   }, [user])
 
   return { employees: employees ?? [], isLoading: employees === null }
+}
+
+/** Every payroll line ever run, joined with period + employee — powers Payroll Summary, statutory/BIR, and Advanced Analytics reports. */
+export function useAllPayrollLines() {
+  const { user } = useSession()
+  const [rows, setRows] = useState<PayrollLineWithContext[] | null>(null)
+
+  useEffect(() => {
+    setRows(null)
+    getAllPayrollLines(user).then(setRows)
+  }, [user])
+
+  return { rows: rows ?? [], isLoading: rows === null }
 }

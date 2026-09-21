@@ -3,9 +3,9 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
+import { MetricCard } from '@/components/ui/MetricCard'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { AdminDashboard } from '@/features/dashboard/components/AdminDashboard'
-import { StatCard } from '@/features/dashboard/components/StatCard'
 import { useDashboardData } from '@/features/dashboard/hooks/useDashboardData'
 import { useSession } from '@/hooks/useSession'
 import { formatDate } from '@/lib/utils/format'
@@ -43,15 +43,15 @@ function DefaultDashboard() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Employee Count" value={String(stats.headcount)} icon={Users} tone="brand" hint={`${stats.activeHeadcount} active`} />
-        <StatCard
+        <MetricCard label="Employee Count" value={String(stats.headcount)} icon={Users} tone="primary" hint={`${stats.activeHeadcount} active`} />
+        <MetricCard
           label="Next Payroll Date"
           value={formatDate(stats.nextPayrollDate, { month: 'short', day: 'numeric' })}
           icon={Wallet}
           hint={stats.payrollPeriodLabel}
         />
-        <StatCard label="Pending Approvals" value={String(stats.pendingApprovals)} icon={ListChecks} hint="Awaiting your action" />
-        <StatCard label="On Leave Today" value={String(stats.onLeaveToday)} icon={CalendarCheck} hint={`${stats.attendanceRate}% attendance rate`} />
+        <MetricCard label="Pending Approvals" value={String(stats.pendingApprovals)} icon={ListChecks} hint="Awaiting your action" />
+        <MetricCard label="On Leave Today" value={String(stats.onLeaveToday)} icon={CalendarCheck} hint={`${stats.attendanceRate}% attendance rate`} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">

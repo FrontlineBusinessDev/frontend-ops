@@ -17,6 +17,12 @@ export async function getAttendanceForDate(session: SessionUser, date: string): 
   return db.attendanceRecords.filter((r) => r.companyId === session.companyId && r.date === date && employeeIds.has(r.employeeId))
 }
 
+/** Every attendance record in scope, unfiltered by date — used to derive Daily/Hourly Basic Pay for a Payroll Run. */
+export async function getAttendanceRecords(session: SessionUser): Promise<AttendanceRecord[]> {
+  const employeeIds = await scopedEmployeeIds(session)
+  return db.attendanceRecords.filter((r) => r.companyId === session.companyId && employeeIds.has(r.employeeId))
+}
+
 export async function getAttendanceForEmployee(session: SessionUser, employeeId: string): Promise<AttendanceRecord[]> {
   const employeeIds = await scopedEmployeeIds(session)
   if (!employeeIds.has(employeeId)) return []

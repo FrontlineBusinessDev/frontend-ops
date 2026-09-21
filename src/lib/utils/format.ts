@@ -25,3 +25,20 @@ export function initials(name: string) {
     .map((part) => part[0]?.toUpperCase())
     .join('')
 }
+
+interface AddressLike {
+  buildingUnit?: string
+  street?: string
+  barangay?: string
+  city?: string
+  province?: string
+  region?: string
+  zipCode?: string
+  country: string
+}
+
+export function formatAddress(address: AddressLike) {
+  return [address.buildingUnit, address.street, address.barangay, address.city, address.province, address.zipCode, address.country]
+    .filter(Boolean)
+    .join(', ')
+}

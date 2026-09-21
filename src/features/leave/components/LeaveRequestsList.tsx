@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/Toast'
 import { usePermission } from '@/hooks/usePermission'
 import { useSession } from '@/hooks/useSession'
 import { decideLeaveRequest } from '@/lib/services/leaveService'
+import { cn } from '@/lib/utils/cn'
 import { formatDate } from '@/lib/utils/format'
 import type { Employee, LeaveRequest, LeaveType } from '@/types/domain'
 
@@ -15,11 +16,13 @@ export function LeaveRequestsList({
   employees,
   leaveTypes,
   onDecided,
+  highlightId,
 }: {
   requests: LeaveRequest[]
   employees: Employee[]
   leaveTypes: LeaveType[]
   onDecided: () => void
+  highlightId?: string
 }) {
   const canApprove = usePermission('leave.approve')
   const { user } = useSession()
@@ -43,7 +46,7 @@ export function LeaveRequestsList({
         const employee = employeeById.get(request.employeeId)
         const leaveType = leaveTypeById.get(request.leaveTypeId)
         return (
-          <Card key={request.id} className="p-4">
+          <Card key={request.id} id={`row-${request.id}`} className={cn('p-4', request.id === highlightId && 'highlight-target')}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-medium">

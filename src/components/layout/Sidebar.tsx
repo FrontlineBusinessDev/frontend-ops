@@ -4,6 +4,7 @@ import { useSession } from '@/hooks/useSession'
 import { usePermission } from '@/hooks/usePermission'
 import { ADMIN_NAV, EMPLOYEE_NAV, MANAGER_NAV, SUPER_ADMIN_NAV } from '@/components/layout/navConfig'
 import type { NavGroup } from '@/components/layout/navConfig'
+import { NotificationsBell } from '@/components/layout/NotificationsBell'
 import { cn } from '@/lib/utils/cn'
 
 export interface SidebarProps {
@@ -56,7 +57,7 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavGroup['items'][
 
 function SidebarNav({ groups, collapsed, onNavigate }: { groups: NavGroup[]; collapsed: boolean; onNavigate?: () => void }) {
   return (
-    <nav className="flex flex-1 flex-col gap-5 overflow-y-auto">
+    <nav className="flex flex-1 flex-col gap-4 overflow-y-auto">
       {groups.map((group, idx) => (
         <div key={group.label ?? idx} className="flex flex-col gap-1">
           {group.label && !collapsed && (
@@ -73,9 +74,12 @@ function SidebarNav({ groups, collapsed, onNavigate }: { groups: NavGroup[]; col
 
 function SidebarBrand({ collapsed }: { collapsed: boolean }) {
   return (
-    <div className={cn('flex items-center gap-2 px-2 pb-6', collapsed && 'justify-center px-0')}>
-      <img src="/favicon.svg" alt="" className="size-7 shrink-0" />
-      {!collapsed && <span className="font-display text-sm font-semibold tracking-tight text-sidebar-foreground">FBS OPS</span>}
+    <div className={cn('flex items-center gap-2 px-2 pb-6', collapsed ? 'justify-center px-0' : 'justify-between')}>
+      <div className="flex min-w-0 items-center gap-2">
+        <img src="/favicon.svg" alt="" className="size-7 shrink-0" />
+        {!collapsed && <span className="truncate font-display text-sm font-semibold tracking-tight text-sidebar-foreground">FBS OPS</span>}
+      </div>
+      {!collapsed && <NotificationsBell />}
     </div>
   )
 }
@@ -102,7 +106,7 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
       {/* Desktop persistent sidebar — collapsible to an icon-only rail. */}
       <aside
         className={cn(
-          'hidden shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar py-5 lg:flex',
+          'hidden shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar py-5 lg:flex print:hidden',
           'transition-[width] duration-200 ease-[var(--ease-editorial)]',
           collapsed ? 'w-16 px-2' : 'w-64 px-3',
         )}
@@ -144,14 +148,17 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
               <img src="/favicon.svg" alt="" className="size-7 shrink-0" />
               <span className="font-display text-sm font-semibold tracking-tight text-sidebar-foreground">FBS OPS</span>
             </div>
-            <button
-              type="button"
-              onClick={onCloseMobile}
-              aria-label="Close navigation menu"
-              className="flex size-8 items-center justify-center rounded-lg text-sidebar-muted transition-colors hover:bg-sidebar-active hover:text-sidebar-foreground"
-            >
-              <X className="size-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <NotificationsBell />
+              <button
+                type="button"
+                onClick={onCloseMobile}
+                aria-label="Close navigation menu"
+                className="flex size-8 items-center justify-center rounded-lg text-sidebar-muted transition-colors hover:bg-sidebar-active hover:text-sidebar-foreground"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
           </div>
           <SidebarNav groups={groups} collapsed={false} onNavigate={onCloseMobile} />
           <SidebarTagline collapsed={false} />

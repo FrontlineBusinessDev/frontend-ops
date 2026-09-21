@@ -6,6 +6,7 @@ import type {
   EmployeeGovernment,
   EmployeePersonal,
   EmploymentStatus,
+  PayRateType,
   SessionUser,
 } from '@/types/domain'
 
@@ -30,7 +31,9 @@ export interface CreateEmployeeInput {
   branchId: string
   employmentType: Employee['employment']['employmentType']
   dateHired: string
+  payType: PayRateType
   basicPay: number
+  outputUnit?: string | null
 }
 
 export async function createEmployee(session: SessionUser, input: CreateEmployeeInput): Promise<Employee> {
@@ -54,8 +57,9 @@ export async function createEmployee(session: SessionUser, input: CreateEmployee
       employmentType: input.employmentType,
       dateHired: input.dateHired,
       status: 'active',
+      category: 'regular',
     },
-    compensation: { basicPay: input.basicPay, payType: 'monthly', allowances: [] },
+    compensation: { basicPay: input.basicPay, payType: input.payType, outputUnit: input.outputUnit ?? null, allowances: [] },
     benefits: {
       leaveCreditsByType: { 'Vacation Leave': 15, 'Sick Leave': 10, 'Emergency Leave': 5, 'Maternity/Paternity Leave': 7 },
     },
@@ -145,6 +149,7 @@ export interface UpdateEmploymentInfoInput {
   department: string
   employmentType: Employee['employment']['employmentType']
   dateHired: string
+  category: Employee['employment']['category']
 }
 
 export async function updateEmployeeEmploymentInfo(
@@ -161,7 +166,8 @@ export async function updateEmployeeEmploymentInfo(
 
 export interface UpdateCompensationInput {
   basicPay: number
-  payType: Employee['compensation']['payType']
+  payType: PayRateType
+  outputUnit?: string | null
   reason: string
 }
 
@@ -177,6 +183,7 @@ export async function updateEmployeeCompensation(
   const previousSalary = employee.compensation.basicPay
   employee.compensation.basicPay = updates.basicPay
   employee.compensation.payType = updates.payType
+  employee.compensation.outputUnit = updates.payType === 'output_based' ? updates.outputUnit ?? null : null
 
   if (updates.basicPay !== previousSalary) {
     employee.compensationHistory.push({

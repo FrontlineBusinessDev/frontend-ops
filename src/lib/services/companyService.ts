@@ -5,11 +5,7 @@ export async function getCompany(session: SessionUser): Promise<Company | undefi
   return db.companies.find((c) => c.id === session.companyId)
 }
 
-export interface UpdateCompanyInput {
-  name: string
-  timezone: string
-  payrollFrequency: Company['payrollFrequency']
-}
+export type UpdateCompanyInput = Partial<Omit<Company, 'id' | 'planTier' | 'createdAt'>>
 
 export async function updateCompany(session: SessionUser, updates: UpdateCompanyInput): Promise<void> {
   const company = db.companies.find((c) => c.id === session.companyId)
@@ -26,12 +22,34 @@ export interface CreateScheduleInput {
   startTime: string
   endTime: string
   daysOfWeek: number[]
+  breakMinutes?: number
+  shiftType?: Schedule['shiftType']
+  gracePeriodMinutes?: number
+  restDays?: number[]
 }
 
 export async function createSchedule(session: SessionUser, input: CreateScheduleInput): Promise<Schedule> {
-  const schedule: Schedule = { id: crypto.randomUUID(), companyId: session.companyId, ...input }
+  const schedule: Schedule = { id: crypto.randomUUID(), companyId: session.companyId, assignedEmployeeIds: [], ...input }
   db.schedules.push(schedule)
   return schedule
+}
+
+export type UpdateScheduleInput = Partial<CreateScheduleInput>
+
+export async function updateSchedule(session: SessionUser, scheduleId: string, updates: UpdateScheduleInput): Promise<void> {
+  const schedule = db.schedules.find((s) => s.id === scheduleId && s.companyId === session.companyId)
+  if (!schedule) return
+  Object.assign(schedule, updates)
+}
+
+export async function setScheduleAssignedEmployees(
+  session: SessionUser,
+  scheduleId: string,
+  employeeIds: string[],
+): Promise<void> {
+  const schedule = db.schedules.find((s) => s.id === scheduleId && s.companyId === session.companyId)
+  if (!schedule) return
+  schedule.assignedEmployeeIds = employeeIds
 }
 
 export async function getHolidays(session: SessionUser): Promise<Holiday[]> {

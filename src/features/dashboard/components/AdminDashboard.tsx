@@ -16,6 +16,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Badge, StatusBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { MetricCard } from '@/components/ui/MetricCard'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
 import { useAdminDashboardOverview } from '@/features/dashboard/hooks/useDashboardData'
@@ -27,41 +28,6 @@ function timeOfDayGreeting() {
   if (hour < 12) return 'Good morning'
   if (hour < 18) return 'Good afternoon'
   return 'Good evening'
-}
-
-function AdminMetricCard({
-  label,
-  value,
-  hint,
-  icon: Icon,
-  tone,
-}: {
-  label: string
-  value: string
-  hint: string
-  icon: typeof Users
-  tone: 'brand' | 'success' | 'warning' | 'accent' | 'default'
-}) {
-  const toneClasses: Record<typeof tone, string> = {
-    brand: 'bg-primary/10 text-primary',
-    success: 'bg-success/10 text-success',
-    warning: 'bg-warning/10 text-warning',
-    accent: 'bg-accent/10 text-accent',
-    default: 'bg-muted text-muted-foreground',
-  }
-
-  return (
-    <Card className="flex flex-col gap-3 p-5">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-        <div className={`flex size-8 items-center justify-center rounded-lg ${toneClasses[tone]}`}>
-          <Icon className="size-4" />
-        </div>
-      </div>
-      <p className="font-display text-2xl font-semibold tracking-tight">{value}</p>
-      <p className="text-xs text-muted-foreground">{hint}</p>
-    </Card>
-  )
 }
 
 const RECENT_EMPLOYEE_STATUS_LABEL: Record<string, string> = {
@@ -86,7 +52,7 @@ export function AdminDashboard() {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-28" />
+          <Skeleton key={i} className="h-36" />
         ))}
       </div>
     )
@@ -111,40 +77,45 @@ export function AdminDashboard() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <AdminMetricCard
+        <MetricCard
           label="Total Employees"
           value={String(metrics.totalEmployees)}
           hint={`Active: ${metrics.activeEmployees} | Inactive: ${metrics.inactiveEmployees}`}
           icon={Users}
-          tone="brand"
+          tone="primary"
+          footer={{ label: 'View Employees', to: '/employees' }}
         />
-        <AdminMetricCard
+        <MetricCard
           label="Present Today"
           value={String(metrics.presentToday)}
           hint={`${metrics.attendanceRate}% attendance rate`}
           icon={CalendarClock}
           tone="success"
+          footer={{ label: 'View Attendance', to: '/attendance' }}
         />
-        <AdminMetricCard
+        <MetricCard
           label="On Leave Today"
           value={String(metrics.onLeaveToday)}
           hint={`${metrics.leaveApproved} approved | ${metrics.leavePending} pending`}
           icon={Plane}
           tone="warning"
+          footer={{ label: 'View Leave', to: '/leave' }}
         />
-        <AdminMetricCard
+        <MetricCard
           label="With Overtime Today"
           value={String(metrics.overtimeToday)}
           hint={`${metrics.overtimeEmployees} employees`}
           icon={Clock3}
           tone="accent"
+          footer={{ label: 'View Overtime', to: '/overtime' }}
         />
-        <AdminMetricCard
+        <MetricCard
           label="Payroll Status"
           value={metrics.payrollStatusLabel}
           hint={metrics.payrollCutoffLabel}
           icon={Wallet}
-          tone="brand"
+          tone="primary"
+          footer={{ label: 'View Payroll', to: '/payroll' }}
         />
       </div>
 

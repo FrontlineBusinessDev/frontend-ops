@@ -1,8 +1,8 @@
-import { ArrowLeft, Lock, PlayCircle, ShieldCheck } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowLeft, Calculator, Lock, PlayCircle, ShieldCheck } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { PageHeader } from '@/components/layout/PageHeader'
-import { StatusBadge } from '@/components/ui/Badge'
+import { Badge, StatusBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/Dialog'
@@ -10,12 +10,26 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
 import { useToast } from '@/components/ui/Toast'
+import { usePayrollGroups } from '@/features/company-settings/hooks/usePayrollGroups'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
+import { EmployeeComputationDrawer } from '@/features/payroll/components/EmployeeComputationDrawer'
 import { usePayrollLines, usePayrollPeriods } from '@/features/payroll/hooks/usePayroll'
 import { usePermission } from '@/hooks/usePermission'
 import { useSession } from '@/hooks/useSession'
-import { approvePayroll, finalizePayroll, runPayroll } from '@/lib/services/payrollService'
+import { useTenant } from '@/hooks/useTenant'
+import { bonusAppliesToEmployee } from '@/lib/payroll/bonusMatching'
+import { findEmployeePayrollGroup } from '@/lib/payroll/groupAssignment'
+import { PAY_RATE_TYPE_LABEL, formatBaseRateShort } from '@/lib/payroll/payRate'
+import { basicPayFor } from '@/lib/payroll/rateBasis'
+import { getAttendanceRecords } from '@/lib/services/attendanceService'
+import { getBonuses } from '@/lib/services/bonusService'
+import { getLoans } from '@/lib/services/loanService'
+import { getOvertimeRecords } from '@/lib/services/overtimeService'
+import { approvePayroll, finalizePayroll, getStatutoryConfig, runPayroll } from '@/lib/services/payrollService'
+import { getDeductionConfigs } from '@/lib/services/payrollSettingsService'
+import { getThirteenthMonthLines, getThirteenthMonthRuns } from '@/lib/services/thirteenthMonthService'
 import { formatCurrency, formatDate } from '@/lib/utils/format'
+import type { AttendanceRecord, BonusIncentive, DeductionConfig, LoanRecord, OvertimeRecord, StatutoryConfig, ThirteenthMonthLine } from '@/types/domain'
 
 export function PayrollPeriodDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -25,23 +39,48 @@ export function PayrollPeriodDetailPage() {
   const { periods, refetch: refetchPeriods } = usePayrollPeriods()
   const { lines, isLoading: isLoadingLines, refetch: refetchLines } = usePayrollLines(id)
   const { employees } = useEmployees()
+  const { groups, compensationTypes } = usePayrollGroups()
+  const { branches } = useTenant()
   const canRun = usePermission('payroll.run')
   const canApprove = usePermission('payroll.approve')
   const canFinalize = usePermission('payroll.finalize')
   const [busy, setBusy] = useState(false)
   const [confirmFinalize, setConfirmFinalize] = useState(false)
+  const [deductionConfigs, setDeductionConfigs] = useState<DeductionConfig[]>([])
+  const [loans, setLoans] = useState<LoanRecord[]>([])
+  const [overtimeRecords, setOvertimeRecords] = useState<OvertimeRecord[]>([])
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([])
+  const [statutoryConfig, setStatutoryConfig] = useState<StatutoryConfig | undefined>(undefined)
+  const [bonuses, setBonuses] = useState<BonusIncentive[]>([])
+  const [thirteenthMonthLines, setThirteenthMonthLines] = useState<ThirteenthMonthLine[]>([])
 
   const period = periods.find((p) => p.id === id)
+  const periodLabel = period?.label
+
+  useEffect(() => {
+    getDeductionConfigs(user).then(setDeductionConfigs)
+    getLoans(user).then(setLoans)
+    getOvertimeRecords(user).then(setOvertimeRecords)
+    getAttendanceRecords(user).then(setAttendanceRecords)
+    getStatutoryConfig(user).then(setStatutoryConfig)
+    getBonuses(user).then(setBonuses)
+    getThirteenthMonthRuns(user).then((runs) => {
+      const finalizedRun = runs.find((r) => r.status === 'finalized' && r.payoutPeriodLabel.trim().toLowerCase() === (periodLabel ?? '').trim().toLowerCase())
+      if (finalizedRun) getThirteenthMonthLines(user, finalizedRun.id).then(setThirteenthMonthLines)
+      else setThirteenthMonthLines([])
+    })
+  }, [user, periodLabel])
   const employeeById = new Map(employees.map((e) => [e.id, e]))
+  const payrollGroup = period?.payrollGroupId ? groups.find((g) => g.id === period.payrollGroupId) : undefined
 
   if (!period) return <Skeleton className="h-96" />
 
   async function handleRun() {
     if (!id) return
     setBusy(true)
-    await runPayroll(user, id)
+    const generatedLines = await runPayroll(user, id)
     setBusy(false)
-    notify({ title: 'Payroll calculated', description: `${lines.length || employees.length} employee lines generated.`, tone: 'success' })
+    notify({ title: 'Payroll calculated', description: `${generatedLines.length} employee lines generated.`, tone: 'success' })
     refetchPeriods()
     refetchLines()
   }
@@ -82,6 +121,7 @@ export function PayrollPeriodDetailPage() {
         description={`${formatDate(period.startDate)} – ${formatDate(period.endDate)} · Pay date ${formatDate(period.payDate)}`}
         actions={
           <div className="flex items-center gap-2">
+            {payrollGroup ? <Badge tone="brand">{payrollGroup.name}</Badge> : <Badge tone="neutral">All Employees</Badge>}
             <StatusBadge status={period.status} />
             {period.status === 'draft' && canRun && (
               <Button size="sm" icon={<PlayCircle className="size-4" />} isLoading={busy} onClick={handleRun}>
@@ -130,33 +170,86 @@ export function PayrollPeriodDetailPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Employee</TableHead>
+                <TableHead>Position</TableHead>
+                <TableHead>Payroll Group</TableHead>
+                <TableHead>Pay Rate</TableHead>
+                <TableHead>Rate Type</TableHead>
+                <TableHead>Work/Input Basis</TableHead>
+                <TableHead>Basic Pay</TableHead>
                 <TableHead>Gross Pay</TableHead>
                 <TableHead>Deductions</TableHead>
                 <TableHead>Net Pay</TableHead>
-                {period.status === 'finalized' && <TableHead />}
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {lines.map((line) => {
                 const employee = employeeById.get(line.employeeId)
+                const employeeGroup = employee ? findEmployeePayrollGroup(groups, employee.id) : undefined
+                const compensationType = compensationTypes.find((c) => c.id === employeeGroup?.compensationTypeId)
+                const branch = branches.find((b) => b.id === employee?.branchId)
+                const basicPayResult = employee ? basicPayFor(employee, period, attendanceRecords) : undefined
+                const employeeApprovedBonuses = employee
+                  ? bonuses.filter(
+                      (b) => b.status === 'approved' && b.periodLabel.trim().toLowerCase() === period.label.trim().toLowerCase() && bonusAppliesToEmployee(b, employee),
+                    )
+                  : []
+                const employeeThirteenthMonthLine = employee ? thirteenthMonthLines.find((l) => l.employeeId === employee.id) : undefined
                 return (
                   <TableRow key={line.id}>
                     <TableCell>
                       <p className="text-sm font-medium">
                         {employee ? `${employee.personal.firstName} ${employee.personal.lastName}` : 'Unknown'}
                       </p>
-                      <p className="text-xs text-muted-foreground">{employee?.employeeNumber}</p>
                     </TableCell>
+                    <TableCell className="text-muted-foreground">{employee?.employment.position}</TableCell>
+                    <TableCell className="text-muted-foreground">{employeeGroup?.name ?? 'Unassigned'}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {employee ? formatBaseRateShort(employee.compensation.payType, employee.compensation.basicPay, employee.compensation.outputUnit) : '—'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{employee ? PAY_RATE_TYPE_LABEL[employee.compensation.payType] : '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {basicPayResult?.basis ? `${basicPayResult.basis.quantity} ${basicPayResult.basis.unit}` : '1 payroll period'}
+                    </TableCell>
+                    <TableCell>{formatCurrency(basicPayResult?.amount ?? line.earnings[0]?.amount ?? 0)}</TableCell>
                     <TableCell>{formatCurrency(line.grossPay)}</TableCell>
                     <TableCell>{formatCurrency(line.totalDeductions)}</TableCell>
                     <TableCell className="font-medium">{formatCurrency(line.netPay)}</TableCell>
-                    {period.status === 'finalized' && (
-                      <TableCell>
-                        <Button size="sm" variant="secondary" onClick={() => navigate(`/payslips/${line.id}`)}>
-                          View Payslip
-                        </Button>
-                      </TableCell>
-                    )}
+                    <TableCell>
+                      <StatusBadge status={period.status} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {employee && (
+                          <EmployeeComputationDrawer
+                            employee={employee}
+                            line={line}
+                            period={period}
+                            payrollGroup={employeeGroup}
+                            compensationType={compensationType}
+                            branch={branch}
+                            deductionConfigs={deductionConfigs}
+                            loans={loans.filter((l) => l.employeeId === employee.id)}
+                            overtimeRecords={overtimeRecords}
+                            attendanceRecords={attendanceRecords}
+                            statutoryConfig={statutoryConfig}
+                            approvedBonuses={employeeApprovedBonuses}
+                            thirteenthMonthLine={employeeThirteenthMonthLine}
+                            trigger={
+                              <Button size="sm" variant="ghost" icon={<Calculator className="size-3.5" />}>
+                                View Computation
+                              </Button>
+                            }
+                          />
+                        )}
+                        {period.status === 'finalized' && (
+                          <Button size="sm" variant="secondary" onClick={() => navigate(`/payslips/${line.id}`)}>
+                            View Payslip
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 )
               })}

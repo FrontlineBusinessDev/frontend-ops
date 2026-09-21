@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { StatusBadge } from '@/components/ui/Badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
 import { useTenant } from '@/hooks/useTenant'
+import { formatBaseRateShort } from '@/lib/payroll/payRate'
 import type { Employee } from '@/types/domain'
 
 export function EmployeeTable({ employees }: { employees: Employee[] }) {
@@ -45,6 +46,14 @@ export function EmployeeTable({ employees }: { employees: Employee[] }) {
       id: 'branch',
       header: 'Branch',
       cell: ({ row }) => branches.find((b) => b.id === row.original.branchId)?.name ?? '—',
+    },
+    {
+      id: 'baseRate',
+      header: 'Base Rate',
+      cell: ({ row }) => {
+        const { basicPay, payType, outputUnit } = row.original.compensation
+        return <span className="tabular-nums">{formatBaseRateShort(payType, basicPay, outputUnit)}</span>
+      },
     },
     {
       id: 'status',

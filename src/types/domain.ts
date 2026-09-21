@@ -8,14 +8,59 @@ export type Role =
 
 export type PlanTier = 'starter' | 'growth' | 'professional'
 
+export type CompanyType = 'corporation' | 'partnership' | 'sole_proprietorship' | 'other'
+
+export interface Address {
+  buildingUnit?: string
+  street?: string
+  barangay?: string
+  city?: string
+  province?: string
+  region?: string
+  zipCode?: string
+  country: string
+}
+
+export interface CompanyContact {
+  name: string
+  position?: string
+  email: string
+  contactNumber: string
+}
+
+export interface CompanyRegistration {
+  secNo?: string
+  dtiNo?: string
+  birTin?: string
+  rdoCode?: string
+  philhealthEmployerNo?: string
+  sssEmployerNo?: string
+  pagibigEmployerNo?: string
+  businessPermitNo?: string
+}
+
 export interface Company {
   id: string
   name: string
+  tradeName?: string
   logoUrl?: string
+  companyType?: CompanyType
+  industry?: string
+  description?: string
+  website?: string
+  email?: string
+  contactNumber?: string
   planTier: PlanTier
   timezone: string
   payrollFrequency: 'semi_monthly' | 'monthly' | 'weekly'
   createdAt: string
+  registration?: CompanyRegistration
+  registeredAddress?: Address
+  officeAddress?: Address
+  sameAsRegisteredAddress?: boolean
+  primaryContact?: CompanyContact
+  payrollContact?: CompanyContact
+  hrContact?: CompanyContact
 }
 
 export interface Branch {
@@ -66,6 +111,8 @@ export interface EmployeePersonal {
   personalEmail?: string
 }
 
+export type EmployeeCategory = 'regular' | 'admin_staff' | 'production_worker' | 'field_worker' | 'contractor'
+
 export interface EmployeeEmployment {
   position: string
   department: string
@@ -73,11 +120,23 @@ export interface EmployeeEmployment {
   dateHired: string
   status: EmploymentStatus
   managerId?: string
+  /** Broad payroll-relevant grouping, independent of Position — used to suggest (never restrict) Payroll Group assignment. */
+  category: EmployeeCategory
 }
+
+/**
+ * The unit/basis of the employee's base rate — distinct from `CompensationType` (the broader
+ * catalog concept in Payroll Settings, e.g. Fixed/Commission-Based/Mixed) and from `PayrollGroup`
+ * (how/when the employee is processed). An employee's `basicPay` is interpreted according to this
+ * field: a monthly salary, a semi-monthly amount, a daily rate, an hourly rate, or a piece rate.
+ */
+export type PayRateType = 'monthly' | 'semi_monthly' | 'daily' | 'hourly' | 'output_based'
 
 export interface EmployeeCompensation {
   basicPay: number
-  payType: 'monthly' | 'daily' | 'hourly'
+  payType: PayRateType
+  /** Only meaningful when payType is 'output_based', e.g. "Per Unit", "Per Piece". */
+  outputUnit?: string | null
   allowances: { label: string; amount: number }[]
 }
 
@@ -143,6 +202,8 @@ export interface Employee {
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
+export type ShiftType = 'day' | 'night' | 'split' | 'flexible'
+
 export interface Schedule {
   id: string
   companyId: string
@@ -150,6 +211,122 @@ export interface Schedule {
   startTime: string
   endTime: string
   daysOfWeek: number[]
+  breakMinutes?: number
+  shiftType?: ShiftType
+  gracePeriodMinutes?: number
+  restDays?: number[]
+  assignedEmployeeIds?: string[]
+}
+
+export type PayrollFrequency = 'weekly' | 'biweekly' | 'semi_monthly' | 'monthly' | 'custom'
+
+export interface PayrollGroup {
+  id: string
+  companyId: string
+  name: string
+  description?: string
+  status: 'active' | 'inactive'
+  frequency: PayrollFrequency
+  cutoffSchedule: string
+  payDates: string
+  compensationTypeId?: string
+  workScheduleId?: string
+  effectiveDate: string
+  employeeIds: string[]
+  /** Only meaningful when frequency is 'custom' — how many pay periods this group runs per month, for allocating monthly recurring deductions. Defaults to 2 when unset. */
+  periodsPerMonth?: number
+}
+
+export type CompensationKind =
+  | 'monthly_rate'
+  | 'semi_monthly_rate'
+  | 'daily_rate'
+  | 'hourly_rate'
+  | 'output_based'
+  | 'commission_based'
+  | 'mixed'
+
+export interface OutputRateItem {
+  label: string
+  unit: string
+  ratePerUnit: number
+}
+
+export interface CompensationTypeConfig {
+  basicRate?: number
+  outputRates?: OutputRateItem[]
+  outputMin?: number
+  outputMax?: number
+  commissionType?: 'percentage' | 'fixed'
+  commissionValue?: number
+  commissionBasis?: string
+  mixedComponents?: string[]
+}
+
+export interface CompensationType {
+  id: string
+  companyId: string
+  name: string
+  kind: CompensationKind
+  config: CompensationTypeConfig
+  isActive: boolean
+}
+
+export interface EarningConfig {
+  id: string
+  companyId: string
+  name: string
+  category: string
+  calcType: 'fixed' | 'variable'
+  taxable: boolean
+  includedInPayroll: boolean
+  isActive: boolean
+}
+
+export type DeductionCategory = 'government' | 'tax' | 'loan' | 'other'
+
+/**
+ * How a monthly recurring deduction is spread across a Payroll Group's periods within a month.
+ * Configuration only — SSS/PhilHealth/Pag-IBIG/Tax/Loans are always actually computed as an equal
+ * semi-monthly split by the payroll engine today; this drives the "Recurring Company Deductions"
+ * preview shown in the computation breakdown, not the authoritative payroll math.
+ */
+export type DeductionAllocationMethod = 'equal_split' | 'specific_cutoff' | 'custom'
+
+export interface DeductionConfig {
+  id: string
+  companyId: string
+  name: string
+  category: DeductionCategory
+  calcType: 'fixed' | 'variable'
+  recurrence: 'recurring' | 'one_time'
+  isActive: boolean
+  allocationMethod?: DeductionAllocationMethod
+  /** For 'specific_cutoff': 1-based index of the period within the month that collects the full amount. */
+  specificCutoffPeriod?: number
+  /** For 'custom': percentage of the monthly amount collected per period, in order. Must sum to 100. */
+  customSplitPercentages?: number[]
+}
+
+export interface PayrollRules {
+  companyId: string
+  roundingDecimalPrecision: number
+  roundingMethod: 'nearest' | 'round_up' | 'round_down'
+  lateGracePeriodMinutes: number
+  lateDeductionMethod: 'per_minute' | 'fixed'
+  latePerMinuteDeduction: number
+  overtimePreApprovalRequired: boolean
+  overtimeDefaultMultiplier: number
+  overtimeRestDayMultiplier: number
+  overtimeHolidayMultiplier: number
+  absenceDailyRateBasis: 'basic_pay_divided_by_working_days' | 'fixed_daily_rate'
+  absenceUnpaidHandling: 'deduct_daily_rate' | 'no_deduction'
+  prorationNewEmployee: boolean
+  prorationResignedEmployee: boolean
+  prorationMidPeriodChanges: boolean
+  adjustmentsRetroactiveAllowed: boolean
+  adjustmentsManualAllowed: boolean
+  adjustmentsApprovalRequired: boolean
 }
 
 export type AttendanceStatus = 'present' | 'late' | 'undertime' | 'absent'
@@ -225,6 +402,8 @@ export interface PayrollPeriod {
   endDate: string
   payDate: string
   status: PayrollPeriodStatus
+  /** When set, this run only includes employees currently assigned to this Payroll Group. Unset runs against every active employee (legacy behavior). */
+  payrollGroupId?: string
 }
 
 export interface TaxBracket {
@@ -353,4 +532,55 @@ export interface OvertimeRecord {
   requestedAt: string
   decidedBy?: string
   decidedAt?: string
+}
+
+export type BonusApprovalStatus = 'draft' | 'pending' | 'approved' | 'rejected'
+export type BonusType = 'fixed_amount' | 'percentage' | 'performance_based' | 'output_based'
+export type BonusTargetType = 'employee' | 'department' | 'company'
+export type BonusFrequency = 'one_time' | 'recurring'
+
+export interface BonusIncentive {
+  id: string
+  companyId: string
+  name: string
+  bonusType: BonusType
+  targetType: BonusTargetType
+  targetEmployeeId?: string
+  targetDepartment?: string
+  /** Peso value for fixed_amount/performance_based/output_based; percentage points (e.g. 10 = 10%) of the employee's monthly-equivalent basic pay for 'percentage'. */
+  amount: number
+  /** Free-text label of the targeted cutoff/payroll run, e.g. "December 2026". The payroll engine pulls in approved bonuses whose label matches the PayrollPeriod being run. */
+  periodLabel: string
+  taxable: boolean
+  frequency: BonusFrequency
+  notes?: string
+  status: BonusApprovalStatus
+  createdAt: string
+  decidedBy?: string
+  decidedAt?: string
+}
+
+export type ThirteenthMonthRunStatus = 'draft' | 'finalized'
+
+export interface ThirteenthMonthRun {
+  id: string
+  companyId: string
+  year: number
+  generationDate: string
+  /** Free-text payroll run label this batch pays out on, matched against PayrollPeriod.label the same way BonusIncentive.periodLabel is. */
+  payoutPeriodLabel: string
+  status: ThirteenthMonthRunStatus
+  createdAt: string
+  finalizedAt?: string
+}
+
+export interface ThirteenthMonthLine {
+  id: string
+  companyId: string
+  runId: string
+  employeeId: string
+  annualBasicEarned: number
+  /** Out of 12 — less than 12 when the employee was hired mid-year (statutory proration). */
+  monthsCredited: number
+  thirteenthMonthPay: number
 }

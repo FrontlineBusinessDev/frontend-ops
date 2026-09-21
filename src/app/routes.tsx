@@ -11,6 +11,8 @@ import { PayrollListPage, PayrollPeriodDetailPage } from '@/features/payroll/rou
 import { PayslipDetailPage, PayslipsListPage } from '@/features/payslips/routes'
 import { StatutoryPage } from '@/features/statutory/routes'
 import { LoansDeductionsPage } from '@/features/loans-deductions/routes'
+import { BonusesPage } from '@/features/bonuses/routes'
+import { ThirteenthMonthPage } from '@/features/thirteenth-month/routes'
 import {
   EssAttendancePage,
   EssHomePage,
@@ -21,7 +23,7 @@ import {
   EssProfilePage,
 } from '@/features/ess/routes'
 import { NotificationsPage } from '@/features/notifications/routes'
-import { ReportsPage } from '@/features/reports/routes'
+import { ReportDetailPage, ReportsPage } from '@/features/reports/routes'
 import { UserAccessPage } from '@/features/user-access/routes'
 import { CompanySettingsPage } from '@/features/company-settings/routes'
 import { OnboardingPage } from '@/features/onboarding/routes'
@@ -103,6 +105,22 @@ export const router = createBrowserRouter([
         element: (
           <RequireCapability capability="payroll.view">
             <PayrollPeriodDetailPage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'bonuses',
+        element: (
+          <RequireCapability capability="bonuses.view">
+            <BonusesPage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'thirteenth-month-pay',
+        element: (
+          <RequireCapability capability="thirteenth_month.view">
+            <ThirteenthMonthPage />
           </RequireCapability>
         ),
       },
@@ -200,6 +218,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireCapability capability="reports.view">
             <ReportsPage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'reports/:reportId',
+        element: (
+          <RequireCapability capability="reports.view">
+            <ReportDetailPage />
           </RequireCapability>
         ),
       },

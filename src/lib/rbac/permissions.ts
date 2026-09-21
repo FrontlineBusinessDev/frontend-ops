@@ -25,6 +25,10 @@ export type Capability =
   | 'payslips.generate'
   | 'loans.view'
   | 'loans.manage'
+  | 'bonuses.view'
+  | 'bonuses.manage'
+  | 'thirteenth_month.view'
+  | 'thirteenth_month.manage'
   | 'ess.view'
   | 'reports.view'
   | 'approvals.view'
@@ -64,6 +68,10 @@ const ALL_ADMIN_CAPS: Capability[] = [
   'payslips.generate',
   'loans.view',
   'loans.manage',
+  'bonuses.view',
+  'bonuses.manage',
+  'thirteenth_month.view',
+  'thirteenth_month.manage',
   'reports.view',
   'approvals.view',
   'notifications.view',
@@ -116,6 +124,10 @@ export const ROLE_PERMISSIONS: Record<Role, Capability[]> = {
     'payslips.generate',
     'loans.view',
     'loans.manage',
+    'bonuses.view',
+    'bonuses.manage',
+    'thirteenth_month.view',
+    'thirteenth_month.manage',
     'reports.view',
     'approvals.view',
     'notifications.view',

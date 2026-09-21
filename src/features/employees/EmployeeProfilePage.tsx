@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/Dialog'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Select } from '@/components/ui/Select'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { useToast } from '@/components/ui/Toast'
@@ -24,12 +25,24 @@ import { EditEmploymentInfoForm } from '@/features/employees/components/edit/Edi
 import { EditGovernmentInfoForm } from '@/features/employees/components/edit/EditGovernmentInfoForm'
 import { EditPersonalInfoForm } from '@/features/employees/components/edit/EditPersonalInfoForm'
 import { useEmployee } from '@/features/employees/hooks/useEmployee'
+import { usePayrollGroups } from '@/features/company-settings/hooks/usePayrollGroups'
 import { usePermission } from '@/hooks/usePermission'
 import { useTenant } from '@/hooks/useTenant'
 import { updateEmployeeStatus } from '@/lib/services/employeeService'
 import { useSession } from '@/hooks/useSession'
+import { categoryLabel, findEmployeePayrollGroup } from '@/lib/payroll/groupAssignment'
+import { PAY_RATE_TYPE_LABEL, estimatedEquivalentFor, formatBaseRate, rateFieldLabel } from '@/lib/payroll/payRate'
+import { setEmployeePayrollGroup } from '@/lib/services/payrollSettingsService'
 import { formatCurrency, formatDate } from '@/lib/utils/format'
 import type { EmploymentStatus } from '@/types/domain'
+
+const FREQUENCY_LABEL: Record<string, string> = {
+  weekly: 'Weekly',
+  biweekly: 'Bi-weekly',
+  semi_monthly: 'Semi-monthly',
+  monthly: 'Monthly',
+  custom: 'Custom',
+}
 
 function Field({ label, value }: { label: string; value: string | undefined }) {
   return (
@@ -54,11 +67,13 @@ export function EmployeeProfilePage() {
   const { id } = useParams<{ id: string }>()
   const { employee, isLoading, refetch } = useEmployee(id)
   const { branches } = useTenant()
+  const { groups, compensationTypes, refetch: refetchPayrollGroups } = usePayrollGroups()
   const { user } = useSession()
   const { notify } = useToast()
   const navigate = useNavigate()
   const [statusDialog, setStatusDialog] = useState<EmploymentStatus | null>(null)
   const [editingSection, setEditingSection] = useState<EditableSection | null>(null)
+  const [pendingGroupId, setPendingGroupId] = useState<string | null | undefined>(undefined)
   const canEditProfile = usePermission('employees.edit')
   const canEditCompensation = usePermission('employees.compensation.edit')
 
@@ -84,6 +99,9 @@ export function EmployeeProfilePage() {
 
   const fullName = `${employee.personal.firstName} ${employee.personal.lastName}`
   const branch = branches.find((b) => b.id === employee.branchId)
+  const currentGroup = findEmployeePayrollGroup(groups, employee.id)
+  const compensationType = compensationTypes.find((c) => c.id === currentGroup?.compensationTypeId)
+  const pendingGroup = pendingGroupId ? groups.find((g) => g.id === pendingGroupId) : undefined
 
   async function applyStatusChange() {
     if (!statusDialog || !employee) return
@@ -91,6 +109,14 @@ export function EmployeeProfilePage() {
     notify({ title: `Employee ${statusDialog}`, tone: 'success' })
     setStatusDialog(null)
     refetch()
+  }
+
+  async function applyGroupChange() {
+    if (pendingGroupId === undefined || !employee) return
+    await setEmployeePayrollGroup(user, employee.id, pendingGroupId)
+    notify({ title: pendingGroupId ? `Reassigned to ${pendingGroup?.name}` : 'Removed from Payroll Group', tone: 'success' })
+    setPendingGroupId(undefined)
+    refetchPayrollGroups()
   }
 
   return (
@@ -140,6 +166,7 @@ export function EmployeeProfilePage() {
           <TabsTrigger value="personal">Personal Information</TabsTrigger>
           <TabsTrigger value="employment">Employment</TabsTrigger>
           <TabsTrigger value="compensation">Compensation</TabsTrigger>
+          <TabsTrigger value="payroll">Payroll Information</TabsTrigger>
           <TabsTrigger value="benefits">Benefits</TabsTrigger>
           <TabsTrigger value="government">Government Information</TabsTrigger>
           <TabsTrigger value="bank">Bank/Payment</TabsTrigger>
@@ -207,9 +234,23 @@ export function EmployeeProfilePage() {
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
-                  <Field label="Basic pay" value={formatCurrency(employee.compensation.basicPay)} />
-                  <Field label="Pay frequency" value={employee.compensation.payType} />
+                  <Field label="Pay Rate Type" value={PAY_RATE_TYPE_LABEL[employee.compensation.payType]} />
+                  <Field
+                    label={rateFieldLabel(employee.compensation.payType)}
+                    value={formatBaseRate(employee.compensation.payType, employee.compensation.basicPay, employee.compensation.outputUnit)}
+                  />
+                  {employee.compensation.payType === 'output_based' && (
+                    <Field label="Output Unit" value={employee.compensation.outputUnit ?? undefined} />
+                  )}
                 </div>
+                {(() => {
+                  const estimate = estimatedEquivalentFor(employee.compensation.payType, employee.compensation.basicPay)
+                  return estimate ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Estimated, not the actual payroll rate — {estimate.label.toLowerCase()}: {formatCurrency(estimate.value)}
+                    </p>
+                  ) : null
+                })()}
                 {employee.compensation.allowances.length > 0 && (
                   <div className="mt-5">
                     <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Allowances</p>
@@ -232,6 +273,49 @@ export function EmployeeProfilePage() {
             <div className="mt-4">
               <CompensationHistoryTable entries={employee.compensationHistory} />
             </div>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="payroll">
+          <Card className="p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <Card.Title>Payroll Information</Card.Title>
+              <Badge tone="neutral">Managed via Payroll Settings</Badge>
+            </div>
+            <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Payroll Group</p>
+                {canEditProfile ? (
+                  <Select
+                    value={currentGroup?.id ?? 'unassigned'}
+                    onValueChange={(v) => setPendingGroupId(v === 'unassigned' ? null : v)}
+                    options={[
+                      { value: 'unassigned', label: 'Unassigned' },
+                      ...groups.filter((g) => g.status === 'active').map((g) => ({ value: g.id, label: g.name })),
+                    ]}
+                    className="mt-1"
+                  />
+                ) : (
+                  <p className="mt-1 text-sm font-medium text-foreground">{currentGroup?.name ?? 'Unassigned'}</p>
+                )}
+              </div>
+              <Field label="Compensation Type" value={compensationType?.name ?? PAY_RATE_TYPE_LABEL[employee.compensation.payType]} />
+              <Field label="Payroll Frequency" value={currentGroup ? FREQUENCY_LABEL[currentGroup.frequency] : '—'} />
+              <Field label="Pay Rate Type" value={PAY_RATE_TYPE_LABEL[employee.compensation.payType]} />
+              <Field
+                label={rateFieldLabel(employee.compensation.payType)}
+                value={formatBaseRate(employee.compensation.payType, employee.compensation.basicPay, employee.compensation.outputUnit)}
+              />
+              {employee.compensation.payType === 'output_based' && (
+                <Field label="Output Unit" value={employee.compensation.outputUnit ?? undefined} />
+              )}
+              <Field label="Branch" value={branch?.name} />
+              <Field label="Employee Category" value={categoryLabel(employee.employment.category)} />
+            </div>
+            <p className="mt-4 text-xs text-muted-foreground">
+              Position and category only suggest which Payroll Group fits best — they never restrict assignment. Manage
+              members in bulk from Company &amp; Payroll Settings &rarr; Payroll Groups.
+            </p>
           </Card>
         </TabsContent>
 
@@ -364,6 +448,25 @@ export function EmployeeProfilePage() {
             <Button variant={statusDialog === 'archived' ? 'destructive' : 'primary'} onClick={applyStatusChange}>
               Confirm
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={pendingGroupId !== undefined} onOpenChange={(open) => !open && setPendingGroupId(undefined)}>
+        <DialogContent>
+          <DialogTitle>{pendingGroupId ? `Reassign to ${pendingGroup?.name}?` : 'Remove from Payroll Group?'}</DialogTitle>
+          <DialogDescription>
+            {currentGroup
+              ? `This employee is currently assigned to ${currentGroup.name}. ${
+                  pendingGroupId ? `Reassign to ${pendingGroup?.name}?` : 'Unassign them from it?'
+                }`
+              : `Assign ${fullName} to ${pendingGroup?.name}?`}
+          </DialogDescription>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setPendingGroupId(undefined)}>
+              Cancel
+            </Button>
+            <Button onClick={applyGroupChange}>Confirm</Button>
           </div>
         </DialogContent>
       </Dialog>

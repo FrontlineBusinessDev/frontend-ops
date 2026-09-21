@@ -1,12 +1,16 @@
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/Badge'
-import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { AddHolidayDialog } from '@/features/company-settings/components/AddHolidayDialog'
-import { AddScheduleDialog } from '@/features/company-settings/components/AddScheduleDialog'
 import { CompanyInfoForm } from '@/features/company-settings/components/CompanyInfoForm'
+import { DeductionsSection } from '@/features/company-settings/components/payroll/DeductionsSection'
+import { EarningsSection } from '@/features/company-settings/components/payroll/EarningsSection'
+import { PayrollCalendarSection } from '@/features/company-settings/components/payroll/PayrollCalendarSection'
+import { PayrollGroupsSection } from '@/features/company-settings/components/payroll/PayrollGroupsSection'
+import { PayrollRulesSection } from '@/features/company-settings/components/payroll/PayrollRulesSection'
+import { WorkSchedulesSection } from '@/features/company-settings/components/payroll/WorkSchedulesSection'
 import { useCompanySettings } from '@/features/company-settings/hooks/useCompanySettings'
 import { usePermission } from '@/hooks/usePermission'
 import { formatDate } from '@/lib/utils/format'
@@ -17,47 +21,88 @@ const HOLIDAY_TYPE_LABEL: Record<string, string> = {
 }
 
 export function CompanySettingsPage() {
-  const { company, schedules, holidays, isLoading, refetch } = useCompanySettings()
-  const canEdit = usePermission('settings.company.edit')
+  const {
+    company,
+    schedules,
+    holidays,
+    payrollGroups,
+    compensationTypes,
+    earningConfigs,
+    deductionConfigs,
+    payrollRules,
+    employees,
+    isLoading,
+    refetch,
+  } = useCompanySettings()
+  const canEditCompany = usePermission('settings.company.edit')
+  const canEditPayroll = usePermission('settings.payroll.edit') || canEditCompany
 
   if (isLoading || !company) return <Skeleton className="h-96" />
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Company & Payroll Settings" description="Company information, work schedules, and holidays." />
+      <PageHeader
+        title="Company & Payroll Settings"
+        description="Company profile, payroll structure, and holidays for your organization."
+      />
 
       <Tabs defaultValue="company">
         <TabsList>
           <TabsTrigger value="company">Company Info</TabsTrigger>
-          <TabsTrigger value="schedules">Work Schedules</TabsTrigger>
+          <TabsTrigger value="payroll-settings">Payroll Settings</TabsTrigger>
           <TabsTrigger value="holidays">Holidays</TabsTrigger>
         </TabsList>
 
         <TabsContent value="company">
-          <CompanyInfoForm company={company} canEdit={canEdit} onSaved={refetch} />
+          <CompanyInfoForm company={company} canEdit={canEditCompany} onSaved={refetch} />
         </TabsContent>
 
-        <TabsContent value="schedules">
-          <div className="mb-3 flex justify-end">{canEdit && <AddScheduleDialog onCreated={refetch} />}</div>
-          {schedules.length === 0 ? (
-            <EmptyState title="No work schedules yet" />
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {schedules.map((s) => (
-                <Card key={s.id} className="p-5">
-                  <p className="text-sm font-medium">{s.name}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {s.startTime} &ndash; {s.endTime}
-                  </p>
-                  <p className="mt-2 text-xs text-muted-foreground">Mon &ndash; Fri</p>
-                </Card>
-              ))}
-            </div>
-          )}
+        <TabsContent value="payroll-settings">
+          <Tabs defaultValue="groups">
+            <TabsList>
+              <TabsTrigger value="groups">Payroll Groups</TabsTrigger>
+              <TabsTrigger value="earnings">Earnings</TabsTrigger>
+              <TabsTrigger value="deductions">Deductions</TabsTrigger>
+              <TabsTrigger value="rules">Payroll Rules</TabsTrigger>
+              <TabsTrigger value="schedules">Work Schedules</TabsTrigger>
+              <TabsTrigger value="calendar">Payroll Calendar</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="groups">
+              <PayrollGroupsSection
+                groups={payrollGroups}
+                compensationTypes={compensationTypes}
+                schedules={schedules}
+                employees={employees}
+                canEdit={canEditPayroll}
+                onRefetch={refetch}
+              />
+            </TabsContent>
+
+            <TabsContent value="earnings">
+              <EarningsSection earnings={earningConfigs} canEdit={canEditPayroll} onRefetch={refetch} />
+            </TabsContent>
+
+            <TabsContent value="deductions">
+              <DeductionsSection deductions={deductionConfigs} canEdit={canEditPayroll} onRefetch={refetch} />
+            </TabsContent>
+
+            <TabsContent value="rules">
+              <PayrollRulesSection rules={payrollRules} canEdit={canEditPayroll} onRefetch={refetch} />
+            </TabsContent>
+
+            <TabsContent value="schedules">
+              <WorkSchedulesSection schedules={schedules} employees={employees} canEdit={canEditPayroll} onRefetch={refetch} />
+            </TabsContent>
+
+            <TabsContent value="calendar">
+              <PayrollCalendarSection groups={payrollGroups} holidays={holidays} />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="holidays">
-          <div className="mb-3 flex justify-end">{canEdit && <AddHolidayDialog onCreated={refetch} />}</div>
+          <div className="mb-3 flex justify-end">{canEditCompany && <AddHolidayDialog onCreated={refetch} />}</div>
           {holidays.length === 0 ? (
             <EmptyState title="No holidays configured" />
           ) : (

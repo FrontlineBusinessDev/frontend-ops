@@ -14,6 +14,7 @@ import { GROUP_OPTIONS, getEmployeeGroup } from '@/features/attendance/groupUtil
 import { ImportBiometricsDialog } from '@/features/attendance/components/ImportBiometricsDialog'
 import { useAttendanceAdjustments, useDailyAttendance, useDateStatusSets } from '@/features/attendance/hooks/useAttendance'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
+import { useHighlightTarget } from '@/hooks/useHighlightTarget'
 import { usePermission } from '@/hooks/usePermission'
 import { useTenant } from '@/hooks/useTenant'
 import type { Employee } from '@/types/domain'
@@ -55,8 +56,9 @@ const ADJUSTMENT_SORT_OPTIONS = [
 ]
 
 export function AttendancePage() {
+  const { highlightId, tab: highlightTab } = useHighlightTarget()
   const [date, setDate] = useState(todayKey)
-  const [activeTab, setActiveTab] = useState('daily')
+  const [activeTab, setActiveTab] = useState(highlightTab ?? 'daily')
   const { records, isLoading: isLoadingAttendance, refetch: refetchDaily } = useDailyAttendance(date)
   const { onLeaveIds, pendingAdjustmentIds } = useDateStatusSets(date)
   const { adjustments, isLoading: isLoadingAdjustments, refetch } = useAttendanceAdjustments()
@@ -180,7 +182,7 @@ export function AttendancePage() {
         onClear={clearFilters}
       />
 
-      <Tabs defaultValue="daily" onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="daily">Daily Attendance</TabsTrigger>
           <TabsTrigger value="adjustments">Adjustments</TabsTrigger>
@@ -236,6 +238,7 @@ export function AttendancePage() {
                 refetch()
                 refetchEmployees()
               }}
+              highlightId={highlightId}
             />
           )}
         </TabsContent>

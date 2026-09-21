@@ -1,4 +1,5 @@
-import type { Branch, CompensationHistoryEntry, Employee, EmploymentStatus } from '@/types/domain'
+import type { Branch, CompensationHistoryEntry, Employee, EmployeeCategory, EmploymentStatus, PayRateType } from '@/types/domain'
+import { OUTPUT_UNIT_OPTIONS } from '@/lib/payroll/payRate'
 
 const FIRST_NAMES = [
   'Maria', 'Jose', 'Ana', 'Juan', 'Grace', 'Mark', 'Angel', 'Paolo', 'Rina', 'Carlo',
@@ -13,6 +14,16 @@ const LAST_NAMES = [
 
 const DEPARTMENTS = ['Operations', 'Finance', 'Sales', 'HR', 'IT', 'Warehouse', 'Customer Support']
 const POSITIONS = ['Associate', 'Senior Associate', 'Team Lead', 'Supervisor', 'Manager', 'Analyst']
+/** Department is the primary signal for the employee's payroll category; contractual hires are always categorized as Contractor regardless of department. */
+const DEPARTMENT_CATEGORY: Record<string, EmployeeCategory> = {
+  Operations: 'regular',
+  Finance: 'admin_staff',
+  Sales: 'field_worker',
+  HR: 'admin_staff',
+  IT: 'admin_staff',
+  Warehouse: 'production_worker',
+  'Customer Support': 'field_worker',
+}
 const LEAVE_TYPES = ['Vacation Leave', 'Sick Leave', 'Emergency Leave']
 const COMP_HISTORY_REASONS = ['Annual Merit Increase', 'Promotion', 'Adjustment', 'Probationary to Regular']
 const COMP_APPROVERS = ['Andrea Villareal', 'Patrick Ong', 'Karen Sison']
@@ -35,8 +46,11 @@ function buildCompensationHistory(
 ) {
   const approver = pick(COMP_APPROVERS, seed)
   const hasMidRaise = seed % 3 !== 2
-  // The last entry must always land exactly on the employee's actual current basic pay.
-  const initialSalary = hasMidRaise ? Math.round((currentBasicPay - 3000 - (seed % 4) * 1000) / 500) * 500 : currentBasicPay
+  // The last entry must always land exactly on the employee's actual current basic pay. The raise
+  // is proportional (not a flat peso amount) so this stays sensible across every rate magnitude,
+  // from a ₱15/unit piece rate to a ₱40,000/month salary.
+  const raiseFraction = 0.08 + (seed % 4) * 0.03
+  const initialSalary = hasMidRaise ? Math.round(currentBasicPay * (1 - raiseFraction) * 100) / 100 : currentBasicPay
 
   const entries: CompensationHistoryEntry[] = [
     {
@@ -77,7 +91,29 @@ export function generateEmployeesForCompany(companyId: string, companyBranches: 
     const status: EmploymentStatus = statusRoll === 0 ? 'archived' : statusRoll === 1 ? 'inactive' : 'active'
     const hiredYear = 2019 + (seed % 6)
     const hiredMonth = String(1 + (seed % 12)).padStart(2, '0')
-    const basicPay = 18000 + (seed % 12) * 2500
+    const employmentType = seed % 8 === 0 ? 'contractual' : seed % 5 === 0 ? 'probationary' : 'regular'
+    const category: EmployeeCategory = employmentType === 'contractual' ? 'contractor' : DEPARTMENT_CATEGORY[department] ?? 'regular'
+
+    // Pay Rate Type is derived from category only to produce realistic, varied demo data —
+    // administrators can freely set any Pay Rate Type for any employee via Edit Compensation.
+    const { payType, basicPay, outputUnit } = ((): { payType: PayRateType; basicPay: number; outputUnit: string | null } => {
+      switch (category) {
+        case 'production_worker':
+          return seed % 2 === 0
+            ? { payType: 'output_based', basicPay: 15 + (seed % 20), outputUnit: OUTPUT_UNIT_OPTIONS[seed % OUTPUT_UNIT_OPTIONS.length] }
+            : { payType: 'daily', basicPay: 610 + (seed % 6) * 15, outputUnit: null }
+        case 'field_worker':
+          return { payType: 'hourly', basicPay: 80 + (seed % 8) * 5, outputUnit: null }
+        case 'contractor':
+          return { payType: 'daily', basicPay: 650 + (seed % 6) * 20, outputUnit: null }
+        case 'admin_staff':
+        case 'regular':
+        default:
+          return seed % 6 === 0
+            ? { payType: 'semi_monthly', basicPay: 9000 + (seed % 12) * 1250, outputUnit: null }
+            : { payType: 'monthly', basicPay: 18000 + (seed % 12) * 2500, outputUnit: null }
+      }
+    })()
 
     employees.push({
       id: `${companyId}_emp_${pad(seed)}`,
@@ -96,13 +132,15 @@ export function generateEmployeesForCompany(companyId: string, companyBranches: 
       employment: {
         position,
         department,
-        employmentType: seed % 8 === 0 ? 'contractual' : seed % 5 === 0 ? 'probationary' : 'regular',
+        employmentType,
         dateHired: `${hiredYear}-${hiredMonth}-01`,
         status,
+        category,
       },
       compensation: {
         basicPay,
-        payType: 'monthly',
+        payType,
+        outputUnit,
         allowances:
           seed % 4 === 0
             ? [{ label: 'Transportation Allowance', amount: 1500 }]
