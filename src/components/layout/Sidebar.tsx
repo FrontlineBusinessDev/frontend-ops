@@ -1,10 +1,13 @@
-import { Building2, ChevronsLeft, ChevronsRight, X } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
+import { ChevronsLeft, ChevronsRight, Lock, X } from 'lucide-react'
+import { Link, NavLink } from 'react-router-dom'
 import { useSession } from '@/hooks/useSession'
 import { usePermission } from '@/hooks/usePermission'
+import { useActivePlanTier } from '@/hooks/useActivePlanTier'
 import { ADMIN_NAV, EMPLOYEE_NAV, MANAGER_NAV, SUPER_ADMIN_NAV } from '@/components/layout/navConfig'
 import type { NavGroup } from '@/components/layout/navConfig'
 import { NotificationsBell } from '@/components/layout/NotificationsBell'
+import { SidebarPlanWidget } from '@/components/layout/SidebarPlanWidget'
+import { PLAN_DETAILS, minimumPlanFor, planHasFeature } from '@/lib/plans'
 import { cn } from '@/lib/utils/cn'
 
 export interface SidebarProps {
@@ -26,15 +29,39 @@ function useNavGroups(): NavGroup[] {
 function NavItemLink({ item, collapsed, onNavigate }: { item: NavGroup['items'][number]; collapsed: boolean; onNavigate?: () => void }) {
   const { user } = useSession()
   const hasCapability = usePermission(item.capability ?? 'dashboard.view')
+  const { tier } = useActivePlanTier()
   if (item.capability && !hasCapability) return null
 
   // Company Admin gets a bolder "pill" active state (per its dashboard redesign); other
   // roles keep the existing subtle highlight untouched.
   const isCompanyAdmin = user.role === 'company_admin'
 
+  // Module isn't included in the active plan tier (real, or a Demo Portal preview tier) — render
+  // it locked instead of hiding it, with a direct link to the Subscription page to upgrade.
+  if (item.feature && !planHasFeature(tier, item.feature)) {
+    const requiredPlan = minimumPlanFor(item.feature)
+    return (
+      <Link
+        to="/subscription"
+        onClick={onNavigate}
+        title={`Available in ${PLAN_DETAILS[requiredPlan].label} Plan — click to upgrade`}
+        className={cn(
+          'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-muted/50 transition-colors duration-150',
+          'hover:bg-sidebar-active/50 hover:text-sidebar-muted',
+          collapsed && 'justify-center px-0',
+        )}
+      >
+        <item.icon className="size-4 shrink-0" />
+        <span className={cn('flex-1 truncate', collapsed && 'sr-only')}>{item.label}</span>
+        {!collapsed && <Lock className="size-3 shrink-0" />}
+      </Link>
+    )
+  }
+
   return (
     <NavLink
       to={item.path}
+      end={item.exactMatch}
       onClick={onNavigate}
       title={collapsed ? item.label : undefined}
       className={({ isActive }) =>
@@ -57,7 +84,7 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavGroup['items'][
 
 function SidebarNav({ groups, collapsed, onNavigate }: { groups: NavGroup[]; collapsed: boolean; onNavigate?: () => void }) {
   return (
-    <nav className="flex flex-1 flex-col gap-4 overflow-y-auto">
+    <nav className="flex flex-1 scroll-smooth flex-col gap-4 overflow-y-auto">
       {groups.map((group, idx) => (
         <div key={group.label ?? idx} className="flex flex-col gap-1">
           {group.label && !collapsed && (
@@ -88,14 +115,7 @@ function SidebarTagline({ collapsed }: { collapsed: boolean }) {
   const { user } = useSession()
   if (user.role !== 'company_admin' || collapsed) return null
 
-  return (
-    <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-sidebar-border bg-white/5 px-3 py-3">
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/20 text-primary">
-        <Building2 className="size-4" />
-      </div>
-      <p className="text-[11px] leading-snug text-sidebar-muted">Building better workplaces together.</p>
-    </div>
-  )
+  return <SidebarPlanWidget />
 }
 
 export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobile }: SidebarProps) {

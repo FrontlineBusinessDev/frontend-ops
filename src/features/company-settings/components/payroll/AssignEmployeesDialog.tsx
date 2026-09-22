@@ -59,7 +59,7 @@ export function AssignEmployeesDialog({
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{selected.size} of {employees.length} employees assigned.</DialogDescription>
 
-        <div className="mt-4 max-h-80 space-y-1 overflow-y-auto">
+        <div className="mt-4 max-h-80 scroll-smooth space-y-1 overflow-y-auto">
           {employees.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">No employees found.</p>
           ) : (

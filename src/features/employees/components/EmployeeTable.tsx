@@ -7,12 +7,14 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { StatusBadge } from '@/components/ui/Badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
 import { useTenant } from '@/hooks/useTenant'
+import { useMixedCompensationStore, summarizeMixedCompensationShort } from '@/features/employees/mixedCompensationStore'
 import { formatBaseRateShort } from '@/lib/payroll/payRate'
 import type { Employee } from '@/types/domain'
 
 export function EmployeeTable({ employees }: { employees: Employee[] }) {
   const navigate = useNavigate()
   const { branches } = useTenant()
+  const mixedStructures = useMixedCompensationStore((s) => s.structures)
 
   const columns: ColumnDef<Employee, unknown>[] = [
     {
@@ -51,6 +53,8 @@ export function EmployeeTable({ employees }: { employees: Employee[] }) {
       id: 'baseRate',
       header: 'Base Rate',
       cell: ({ row }) => {
+        const mixed = mixedStructures[row.original.id]
+        if (mixed) return <span className="tabular-nums">{summarizeMixedCompensationShort(mixed)}</span>
         const { basicPay, payType, outputUnit } = row.original.compensation
         return <span className="tabular-nums">{formatBaseRateShort(payType, basicPay, outputUnit)}</span>
       },

@@ -209,7 +209,7 @@ export function PayrollGroupAssignDialog({
                   className="pl-9"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:grid-cols-4">
                 <Select value={branchFilter} onValueChange={setBranchFilter} options={branchOptions} aria-label="Branch" />
                 <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as EmployeeCategory | 'all')} options={CATEGORY_OPTIONS} aria-label="Category" />
                 <Select value={payTypeFilter} onValueChange={setPayTypeFilter} options={PAY_TYPE_OPTIONS} aria-label="Compensation Type" />
@@ -241,7 +241,7 @@ export function PayrollGroupAssignDialog({
               </label>
             </div>
 
-            <div className="mt-3 max-h-96 space-y-1.5 overflow-y-auto rounded-lg border border-border p-2">
+            <div className="mt-3 max-h-96 scroll-smooth space-y-1.5 overflow-y-auto rounded-lg border border-border p-2">
               {filtered.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">No employees match these filters.</p>
               ) : (

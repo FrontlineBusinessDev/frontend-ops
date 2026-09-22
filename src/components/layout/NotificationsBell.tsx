@@ -50,7 +50,7 @@ export function NotificationsBell({ className }: { className?: string }) {
           )}
         >
           <p className="border-b border-border px-4 py-3 font-display text-sm font-semibold tracking-tight">Notifications</p>
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-80 scroll-smooth overflow-y-auto">
             {notifications.length === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-muted-foreground">You&apos;re all caught up.</p>
             ) : (

@@ -37,7 +37,7 @@ export function EditGovernmentInfoForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+    <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:grid-cols-3">
       <FormField label="SSS No.">
         <Input {...register('sssNo')} />
       </FormField>
@@ -57,7 +57,7 @@ export function EditGovernmentInfoForm({
         <Input type="number" step="1" {...register('pagibigEmployeeContribution', { valueAsNumber: true })} />
       </FormField>
 
-      <div className="col-span-2 flex justify-end gap-2 sm:col-span-3">
+      <div className="col-span-1 flex justify-end gap-2 sm:col-span-2 md:col-span-3">
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
         </Button>

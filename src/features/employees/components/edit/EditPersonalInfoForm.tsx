@@ -42,7 +42,7 @@ export function EditPersonalInfoForm({
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+    <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:grid-cols-3">
       <FormField label="First name" required error={errors.firstName?.message}>
         <Input {...register('firstName', { required: 'Required' })} />
       </FormField>
@@ -65,11 +65,11 @@ export function EditPersonalInfoForm({
       <FormField label="Personal email">
         <Input type="email" {...register('personalEmail')} />
       </FormField>
-      <FormField label="Address" className="col-span-2 sm:col-span-3">
+      <FormField label="Address" className="col-span-1 sm:col-span-2 md:col-span-3">
         <Input {...register('address')} />
       </FormField>
 
-      <div className="col-span-2 flex justify-end gap-2 sm:col-span-3">
+      <div className="col-span-1 flex justify-end gap-2 sm:col-span-2 md:col-span-3">
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
         </Button>

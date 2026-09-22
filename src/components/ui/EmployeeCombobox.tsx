@@ -125,7 +125,7 @@ export function EmployeeCombobox(props: EmployeeComboboxProps) {
               className="h-8 w-full rounded-md border border-border bg-background px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
-          <div className="max-h-64 overflow-y-auto p-1">
+          <div className="max-h-64 scroll-smooth overflow-y-auto p-1">
             {results.length === 0 ? (
               <p className="px-3 py-4 text-center text-xs text-muted-foreground">No matching employee records found.</p>
             ) : (

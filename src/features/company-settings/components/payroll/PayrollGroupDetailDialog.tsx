@@ -80,7 +80,7 @@ export function PayrollGroupDetailDialog({
           <DialogTitle>{group.name}</DialogTitle>
           <DialogDescription>{group.description}</DialogDescription>
 
-          <div className="mt-4 grid grid-cols-2 gap-4 rounded-xl border border-border bg-muted/40 p-4 sm:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-border bg-muted/40 p-4 md:grid-cols-3">
             <div>
               <p className="text-xs text-muted-foreground">Payroll Frequency</p>
               <p className="mt-0.5 text-sm font-medium">{FREQUENCY_LABEL[group.frequency]}</p>

@@ -185,7 +185,7 @@ export function EmployeeProfilePage() {
             {editingSection === 'personal' ? (
               <EditPersonalInfoForm employee={employee} onSaved={stopEditing} onCancel={() => setEditingSection(null)} />
             ) : (
-              <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 md:grid-cols-3">
                 <Field label="First name" value={employee.personal.firstName} />
                 <Field label="Last name" value={employee.personal.lastName} />
                 <Field label="Birth date" value={formatDate(employee.personal.birthDate)} />
@@ -209,7 +209,7 @@ export function EmployeeProfilePage() {
             {editingSection === 'employment' ? (
               <EditEmploymentInfoForm employee={employee} onSaved={stopEditing} onCancel={() => setEditingSection(null)} />
             ) : (
-              <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 md:grid-cols-3">
                 <Field label="Position" value={employee.employment.position} />
                 <Field label="Department" value={employee.employment.department} />
                 <Field label="Branch" value={branch?.name} />
@@ -233,7 +233,7 @@ export function EmployeeProfilePage() {
               <EditCompensationForm employee={employee} onSaved={stopEditing} onCancel={() => setEditingSection(null)} />
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 md:grid-cols-3">
                   <Field label="Pay Rate Type" value={PAY_RATE_TYPE_LABEL[employee.compensation.payType]} />
                   <Field
                     label={rateFieldLabel(employee.compensation.payType)}
@@ -282,7 +282,7 @@ export function EmployeeProfilePage() {
               <Card.Title>Payroll Information</Card.Title>
               <Badge tone="neutral">Managed via Payroll Settings</Badge>
             </div>
-            <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 md:grid-cols-3">
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Payroll Group</p>
                 {canEditProfile ? (
@@ -356,7 +356,7 @@ export function EmployeeProfilePage() {
             {editingSection === 'government' ? (
               <EditGovernmentInfoForm employee={employee} onSaved={stopEditing} onCancel={() => setEditingSection(null)} />
             ) : (
-              <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 md:grid-cols-3">
                 <Field label="SSS No." value={employee.government.sssNo} />
                 <Field label="PhilHealth No." value={employee.government.philhealthNo} />
                 <Field label="Pag-IBIG No." value={employee.government.pagibigNo} />
@@ -385,7 +385,7 @@ export function EmployeeProfilePage() {
             {editingSection === 'bank' ? (
               <EditBankInfoForm employee={employee} onSaved={stopEditing} onCancel={() => setEditingSection(null)} />
             ) : (
-              <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 md:grid-cols-3">
                 <Field label="Bank name" value={employee.bank.bankName} />
                 <Field label="Account number" value={employee.bank.accountNumber} />
               </div>

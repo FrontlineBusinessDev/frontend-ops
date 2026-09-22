@@ -194,12 +194,12 @@ export function PayslipCard({
           <div className="min-w-0">
             <p className="font-display text-sm font-semibold tracking-tight">{company?.name}</p>
             {company?.registeredAddress && (
-              <p className="mt-1 max-w-[16rem] text-[11px] leading-snug text-muted-foreground print:text-foreground/70">
+              <p className="mt-1 break-words text-[11px] leading-snug text-muted-foreground print:text-foreground/70">
                 {formatAddress(company.registeredAddress)}
               </p>
             )}
-            {company?.email && <p className="text-[11px] text-muted-foreground print:text-foreground/70">{company.email}</p>}
-            {company?.website && <p className="text-[11px] text-muted-foreground print:text-foreground/70">{company.website}</p>}
+            {company?.email && <p className="break-words text-[11px] text-muted-foreground print:text-foreground/70">{company.email}</p>}
+            {company?.website && <p className="break-words text-[11px] text-muted-foreground print:text-foreground/70">{company.website}</p>}
           </div>
         </div>
 

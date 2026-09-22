@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { MobileDemoBar } from '@/components/layout/MobileDemoBar'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Topbar } from '@/components/layout/Topbar'
 
@@ -41,10 +42,11 @@ export function AppShell() {
       />
       <div className="flex min-w-0 flex-1 flex-col print:flex-none">
         <Topbar onOpenMobileNav={() => setMobileOpen(true)} />
-        <main className="flex-1 overflow-y-auto px-4 py-6 lg:px-8 lg:py-8 print:overflow-visible print:p-0">
+        <main className="flex-1 scroll-smooth overflow-y-auto px-4 pb-24 pt-6 sm:px-6 md:py-6 lg:px-8 lg:py-8 print:overflow-visible print:p-0">
           <Outlet />
         </main>
       </div>
+      <MobileDemoBar />
     </div>
   )
 }

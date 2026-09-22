@@ -1,9 +1,10 @@
+import { ResponsiveBar } from '@nivo/bar'
+import { ResponsiveLine } from '@nivo/line'
 import { useMemo, useState } from 'react'
 import {
   Area,
   AreaChart,
   Bar,
-  BarChart,
   CartesianGrid,
   ComposedChart,
   Legend,
@@ -15,12 +16,22 @@ import {
   YAxis,
 } from 'recharts'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Select } from '@/components/ui/Select'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
+import { EmployeeCombobox } from '@/components/ui/EmployeeCombobox'
+import { AnimatedChart } from '@/features/reports/components/AnimatedChart'
 import { usePayrollGroups } from '@/features/company-settings/hooks/usePayrollGroups'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
 import { useOvertimeRecords } from '@/features/overtime/hooks/useOvertime'
-import { ChartPane, downloadCsv, ReportViewShell, StatTile, TablePane, toCsv, ViewModeToggle } from '@/features/reports/components/shared'
+import {
+  ACTIVE_INACTIVE_PALETTE,
+  ATTENDANCE_PALETTE,
+  CHART_PALETTE_NO_RED,
+  EARNINGS_DEDUCTIONS_PALETTE,
+  NIVO_THEME,
+} from '@/features/reports/components/nivoTheme'
+import { ChartPane, downloadCsv, FilterLabel, ReportFilterBar, ReportViewShell, StatTile, TablePane, toCsv, ViewModeToggle } from '@/features/reports/components/shared'
 import type { ReportViewMode } from '@/features/reports/components/shared'
 import { useAllPayrollLines, useAttendanceSummary, useLeaveSummary } from '@/features/reports/hooks/useReports'
 import { useTenant } from '@/hooks/useTenant'
@@ -148,17 +159,39 @@ export function HeadcountAnalysisReport() {
           <ViewModeToggle value={mode} onChange={setMode} />
 
           <ChartPane mode={mode} className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={byDepartment.map(([dept, c]) => ({ dept, ...c }))} margin={{ left: 4, right: 8, top: 8 }} barGap={4}>
-                <CartesianGrid vertical={false} stroke="var(--color-border)" />
-                <XAxis dataKey="dept" tickLine={false} axisLine={false} fontSize={11} stroke="var(--color-muted-foreground)" />
-                <YAxis tickLine={false} axisLine={false} fontSize={11} stroke="var(--color-muted-foreground)" width={32} allowDecimals={false} />
-                <Tooltip contentStyle={CHART_TOOLTIP_STYLE} labelStyle={CHART_TOOLTIP_LABEL_STYLE} itemStyle={CHART_TOOLTIP_ITEM_STYLE} />
-                <Legend wrapperStyle={CHART_LEGEND_STYLE} />
-                <Bar dataKey="active" name="Active" fill="var(--color-success)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="inactive" name="Inactive" fill="var(--color-danger)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <AnimatedChart className="h-full w-full" chartKey={byDepartment.length}>
+              <ResponsiveBar
+                data={byDepartment.map(([dept, c]) => ({ dept, Active: c.active, Inactive: c.inactive }))}
+                keys={['Active', 'Inactive']}
+                indexBy="dept"
+                theme={NIVO_THEME}
+                colors={ACTIVE_INACTIVE_PALETTE}
+                margin={{ top: 40, right: 12, bottom: 40, left: 40 }}
+                padding={0.3}
+                innerPadding={2}
+                borderRadius={4}
+                enableLabel={false}
+                axisBottom={{ tickSize: 0, tickPadding: 8 }}
+                axisLeft={{ tickSize: 0, tickPadding: 8 }}
+                gridYValues={5}
+                legends={[
+                  {
+                    dataFrom: 'keys',
+                    anchor: 'top-left',
+                    direction: 'row',
+                    translateY: -28,
+                    itemWidth: 80,
+                    itemHeight: 20,
+                    symbolShape: 'circle',
+                    itemsSpacing: 12,
+                  },
+                ]}
+                animate
+                motionConfig="gentle"
+                role="img"
+                ariaLabel="Active vs. inactive headcount by department"
+              />
+            </AnimatedChart>
           </ChartPane>
 
           <TablePane mode={mode}>
@@ -279,57 +312,160 @@ export function CompensationAnalysisReport() {
 }
 
 /** Re-homed from Basic Reports — attendance/absenteeism is a workforce analytic, not a basic report. */
+function pct(n: number, total: number) {
+  return total > 0 ? Math.round((n / total) * 1000) / 10 : 0
+}
+
+/** Y-axis = Departments by default (spec'd default view). Selecting a Department narrows the
+ * Y-axis to that department's employees; selecting an Employee (searchable, takes precedence)
+ * narrows to just that one row — both without altering the underlying attendance calculation,
+ * only how the same per-employee counts are grouped/filtered for display. */
 export function AttendanceAbsenteeismReport() {
   const { rows, isLoading } = useAttendanceSummary()
   const [mode, setMode] = useState<ReportViewMode>('split')
+  const [department, setDepartment] = useState<string>('all')
+  const [employeeId, setEmployeeId] = useState<string | undefined>(undefined)
 
-  const chartData = useMemo(
-    () =>
-      rows.map((row) => {
-        const total = row.present + row.late + row.undertime + row.absent
-        const pct = (n: number) => (total > 0 ? Math.round((n / total) * 1000) / 10 : 0)
-        return {
-          name: fullName(row.employee.personal),
-          Present: pct(row.present),
-          Late: pct(row.late),
-          Undertime: pct(row.undertime),
-          Absent: pct(row.absent),
-        }
-      }),
+  const departmentOptions = useMemo(() => {
+    const names = [...new Set(rows.map((r) => r.employee.employment.department))].sort()
+    return [{ value: 'all', label: 'All Departments' }, ...names.map((d) => ({ value: d, label: d }))]
+  }, [rows])
+
+  const employeeOptions = useMemo(
+    () => rows.map((r) => ({ id: r.employee.id, name: fullName(r.employee.personal), employeeNumber: r.employee.employeeNumber, department: r.employee.employment.department })),
     [rows],
   )
 
+  const selectedEmployee = employeeId ? rows.find((r) => r.employee.id === employeeId) : undefined
+
+  const chartData = useMemo(() => {
+    if (selectedEmployee) {
+      const total = selectedEmployee.present + selectedEmployee.late + selectedEmployee.undertime + selectedEmployee.absent
+      return [
+        {
+          name: fullName(selectedEmployee.employee.personal),
+          Present: pct(selectedEmployee.present, total),
+          Late: pct(selectedEmployee.late, total),
+          Undertime: pct(selectedEmployee.undertime, total),
+          Absent: pct(selectedEmployee.absent, total),
+        },
+      ]
+    }
+
+    if (department !== 'all') {
+      return rows
+        .filter((r) => r.employee.employment.department === department)
+        .map((row) => {
+          const total = row.present + row.late + row.undertime + row.absent
+          return {
+            name: fullName(row.employee.personal),
+            Present: pct(row.present, total),
+            Late: pct(row.late, total),
+            Undertime: pct(row.undertime, total),
+            Absent: pct(row.absent, total),
+          }
+        })
+    }
+
+    const byDept = new Map<string, { present: number; late: number; undertime: number; absent: number }>()
+    for (const row of rows) {
+      const bucket = byDept.get(row.employee.employment.department) ?? { present: 0, late: 0, undertime: 0, absent: 0 }
+      bucket.present += row.present
+      bucket.late += row.late
+      bucket.undertime += row.undertime
+      bucket.absent += row.absent
+      byDept.set(row.employee.employment.department, bucket)
+    }
+    return [...byDept.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([name, b]) => {
+        const total = b.present + b.late + b.undertime + b.absent
+        return { name, Present: pct(b.present, total), Late: pct(b.late, total), Undertime: pct(b.undertime, total), Absent: pct(b.absent, total) }
+      })
+  }, [rows, department, selectedEmployee])
+
   return (
-    <ReportViewShell title="Attendance / Absenteeism Analysis" description="Present, late, undertime, and absence counts per employee.">
+    <ReportViewShell title="Attendance / Absenteeism Analysis" description="Present, late, undertime, and absence rate — by department by default, or drill into one department or employee.">
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : rows.length === 0 ? (
         <EmptyState title="No attendance data yet" />
       ) : (
         <div className="space-y-4">
+          <ReportFilterBar
+            onClear={
+              department !== 'all' || employeeId
+                ? () => {
+                    setDepartment('all')
+                    setEmployeeId(undefined)
+                  }
+                : undefined
+            }
+          >
+            <FilterLabel label="Department" className="w-48">
+              <Select
+                value={department}
+                onValueChange={(v) => {
+                  setDepartment(v)
+                  setEmployeeId(undefined)
+                }}
+                options={departmentOptions}
+              />
+            </FilterLabel>
+            <FilterLabel label="Employee" className="w-64">
+              <EmployeeCombobox
+                employees={employeeOptions}
+                value={employeeId}
+                onChange={setEmployeeId}
+                placeholder="Search employee by name or ID…"
+              />
+            </FilterLabel>
+          </ReportFilterBar>
+
           <ViewModeToggle value={mode} onChange={setMode} />
 
-          <ChartPane mode={mode} style={{ height: Math.max(240, chartData.length * 32) }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 8, top: 8 }}>
-                <CartesianGrid horizontal={false} stroke="var(--color-border)" />
-                <XAxis type="number" domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} tickLine={false} axisLine={false} fontSize={11} stroke="var(--color-muted-foreground)" />
-                <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} fontSize={11} width={110} stroke="var(--color-muted-foreground)" />
-                <Tooltip formatter={(v) => `${v}%`} contentStyle={CHART_TOOLTIP_STYLE} labelStyle={CHART_TOOLTIP_LABEL_STYLE} itemStyle={CHART_TOOLTIP_ITEM_STYLE} />
-                <Legend wrapperStyle={CHART_LEGEND_STYLE} />
-                <Bar dataKey="Present" stackId="a" fill="var(--color-success)" />
-                <Bar dataKey="Late" stackId="a" fill="var(--color-warning)" />
-                <Bar dataKey="Undertime" stackId="a" fill="var(--color-accent)" />
-                <Bar dataKey="Absent" stackId="a" fill="var(--color-danger)" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <ChartPane mode={mode} style={{ height: Math.max(240, chartData.length * 36) }}>
+            <AnimatedChart className="h-full w-full" chartKey={`${department}-${employeeId ?? 'none'}`}>
+              <ResponsiveBar
+                data={chartData}
+                keys={['Present', 'Late', 'Undertime', 'Absent']}
+                indexBy="name"
+                layout="horizontal"
+                theme={NIVO_THEME}
+                colors={ATTENDANCE_PALETTE}
+                margin={{ top: 40, right: 24, bottom: 40, left: 130 }}
+                padding={0.3}
+                valueScale={{ type: 'linear', min: 0, max: 100 }}
+                valueFormat={(v) => `${v}%`}
+                borderRadius={2}
+                enableLabel={false}
+                axisBottom={{ tickSize: 0, tickPadding: 8, format: (v) => `${v}%`, legend: 'Share of recorded attendance', legendPosition: 'middle', legendOffset: 32 }}
+                axisLeft={{ tickSize: 0, tickPadding: 8 }}
+                legends={[
+                  {
+                    dataFrom: 'keys',
+                    anchor: 'top-left',
+                    direction: 'row',
+                    translateY: -28,
+                    itemWidth: 74,
+                    itemHeight: 20,
+                    symbolShape: 'circle',
+                    itemsSpacing: 8,
+                  },
+                ]}
+                animate
+                motionConfig="gentle"
+                role="img"
+                ariaLabel="Attendance breakdown percentages"
+              />
+            </AnimatedChart>
           </ChartPane>
 
           <TablePane mode={mode}>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Employee</TableHead>
+                  <TableHead>{selectedEmployee ? 'Employee' : department !== 'all' ? 'Employee' : 'Department'}</TableHead>
                   <TableHead>Present</TableHead>
                   <TableHead>Late</TableHead>
                   <TableHead>Undertime</TableHead>
@@ -337,13 +473,13 @@ export function AttendanceAbsenteeismReport() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.employee.id}>
-                    <TableCell className="font-medium">{fullName(row.employee.personal)}</TableCell>
-                    <TableCell>{row.present}</TableCell>
-                    <TableCell>{row.late}</TableCell>
-                    <TableCell>{row.undertime}</TableCell>
-                    <TableCell>{row.absent}</TableCell>
+                {chartData.map((row) => (
+                  <TableRow key={row.name}>
+                    <TableCell className="font-medium">{row.name}</TableCell>
+                    <TableCell>{row.Present}%</TableCell>
+                    <TableCell>{row.Late}%</TableCell>
+                    <TableCell>{row.Undertime}%</TableCell>
+                    <TableCell>{row.Absent}%</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -641,8 +777,34 @@ export function PayrollCostByDimensionReport({ dimension }: { dimension: CostDim
     return [...map.entries()].sort((a, b) => b[1].gross - a[1].gross)
   }, [rows, branches, groups, dimension])
 
+  /** Same real per-line gross pay, just also grouped by period so the chart can show a
+   * period-over-period trend per dimension key instead of one all-time total per key. */
+  const trend = useMemo(() => {
+    const branchById = new Map(branches.map((b) => [b.id, b.name]))
+    const periodById = new Map(rows.map((r) => [r.period.id, r.period]))
+    const seriesByKey = new Map<string, Map<string, number>>()
+    for (const { employee, line, period } of rows) {
+      const key =
+        dimension === 'department'
+          ? employee.employment.department
+          : dimension === 'branch'
+            ? branchById.get(employee.branchId) ?? 'Unassigned'
+            : findEmployeePayrollGroup(groups, employee.id)?.name ?? 'Unassigned'
+      const perPeriod = seriesByKey.get(key) ?? new Map<string, number>()
+      perPeriod.set(period.id, (perPeriod.get(period.id) ?? 0) + line.grossPay)
+      seriesByKey.set(key, perPeriod)
+    }
+    const periods = [...periodById.values()].sort((a, b) => a.startDate.localeCompare(b.startDate))
+    return [...seriesByKey.entries()]
+      .map(([key, perPeriod]) => ({
+        id: key,
+        data: periods.map((p) => ({ x: p.label, y: Math.round(perPeriod.get(p.id) ?? 0) })),
+      }))
+      .sort((a, b) => b.data.reduce((s, d) => s + d.y, 0) - a.data.reduce((s, d) => s + d.y, 0))
+  }, [rows, branches, groups, dimension])
+
   return (
-    <ReportViewShell title={`Payroll Cost by ${label}`} description={`Total payroll cost across all periods, grouped by ${label.toLowerCase()}.`}>
+    <ReportViewShell title={`Payroll Cost by ${label}`} description={`Period-over-period payroll cost trend, grouped by ${label.toLowerCase()}.`}>
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : byDimension.length === 0 ? (
@@ -651,20 +813,56 @@ export function PayrollCostByDimensionReport({ dimension }: { dimension: CostDim
         <div className="space-y-4">
           <ViewModeToggle value={mode} onChange={setMode} />
 
-          <ChartPane mode={mode} style={{ height: Math.max(220, byDimension.length * 40) }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={byDimension.map(([key, bucket]) => ({ key, gross: bucket.gross }))}
-                layout="vertical"
-                margin={{ left: 8, right: 8, top: 8 }}
-              >
-                <CartesianGrid horizontal={false} stroke="var(--color-border)" />
-                <XAxis type="number" tickLine={false} axisLine={false} fontSize={11} stroke="var(--color-muted-foreground)" tickFormatter={(v: number) => formatCurrency(v)} />
-                <YAxis type="category" dataKey="key" tickLine={false} axisLine={false} fontSize={11} width={120} stroke="var(--color-muted-foreground)" />
-                <Tooltip formatter={(v) => formatCurrency(Number(v))} contentStyle={CHART_TOOLTIP_STYLE} labelStyle={CHART_TOOLTIP_LABEL_STYLE} itemStyle={CHART_TOOLTIP_ITEM_STYLE} />
-                <Bar dataKey="gross" name="Gross Pay" fill="var(--color-brand-500)" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+            {trend.map((series, idx) => (
+              <span key={series.id} className="flex items-center gap-1.5">
+                <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: CHART_PALETTE_NO_RED[idx % CHART_PALETTE_NO_RED.length] }} />
+                {series.id}
+              </span>
+            ))}
+          </div>
+
+          <ChartPane mode={mode} className="h-80">
+            <AnimatedChart className="h-full w-full" chartKey={dimension}>
+              <ResponsiveLine
+                data={trend}
+                theme={NIVO_THEME}
+                colors={CHART_PALETTE_NO_RED}
+                margin={{ top: 16, right: 24, bottom: 50, left: 70 }}
+                xScale={{ type: 'point' }}
+                yScale={{ type: 'linear', min: 0, max: 'auto', stacked: false }}
+                curve="monotoneX"
+                axisBottom={{ tickSize: 0, tickPadding: 10 }}
+                axisLeft={{ tickSize: 0, tickPadding: 8, format: (v) => formatCurrency(Number(v)) }}
+                enableGridX={false}
+                lineWidth={2.5}
+                pointSize={7}
+                pointColor={{ theme: 'background' }}
+                pointBorderWidth={2}
+                pointBorderColor={{ from: 'serieColor' }}
+                enablePointLabel={false}
+                useMesh
+                enableSlices="x"
+                sliceTooltip={({ slice }) => (
+                  <div className="rounded-xl border border-border bg-card p-2.5 text-xs shadow-soft-lg">
+                    <p className="mb-1 font-semibold">{slice.points[0]?.data.xFormatted}</p>
+                    {slice.points.map((point) => (
+                      <div key={point.id} className="flex items-center justify-between gap-4">
+                        <span className="flex items-center gap-1.5">
+                          <span className="size-2 rounded-full" style={{ backgroundColor: point.seriesColor }} />
+                          {point.seriesId}
+                        </span>
+                        <span className="font-medium tabular-nums">{formatCurrency(Number(point.data.y))}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                animate
+                motionConfig="gentle"
+                role="img"
+                ariaLabel={`Payroll cost trend by ${label.toLowerCase()}`}
+              />
+            </AnimatedChart>
           </ChartPane>
 
           <TablePane mode={mode}>
@@ -879,18 +1077,60 @@ export function EarningsVsDeductionsReport() {
         <div className="space-y-4">
           <ViewModeToggle value={mode} onChange={setMode} />
 
-          <ChartPane mode={mode} className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={byPeriod.map((p) => ({ label: p.period.label, earnings: p.earnings, deductions: p.deductions }))} margin={{ left: 4, right: 8, top: 8 }} barGap={4}>
-                <CartesianGrid vertical={false} stroke="var(--color-border)" />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} stroke="var(--color-muted-foreground)" />
-                <YAxis tickLine={false} axisLine={false} fontSize={11} stroke="var(--color-muted-foreground)" width={70} tickFormatter={(v: number) => formatCurrency(v)} />
-                <Tooltip formatter={(v) => formatCurrency(Number(v))} contentStyle={CHART_TOOLTIP_STYLE} labelStyle={CHART_TOOLTIP_LABEL_STYLE} itemStyle={CHART_TOOLTIP_ITEM_STYLE} />
-                <Legend wrapperStyle={CHART_LEGEND_STYLE} />
-                <Bar dataKey="earnings" name="Earnings" fill="var(--color-success)" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="deductions" name="Deductions" fill="var(--color-danger)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <ChartPane mode={mode} className="h-80">
+            <AnimatedChart className="h-full w-full" chartKey={byPeriod.length}>
+              <ResponsiveLine
+                data={[
+                  { id: 'Earnings', data: byPeriod.map((p) => ({ x: p.period.label, y: Math.round(p.earnings) })) },
+                  { id: 'Deductions', data: byPeriod.map((p) => ({ x: p.period.label, y: Math.round(p.deductions) })) },
+                ]}
+                theme={NIVO_THEME}
+                colors={EARNINGS_DEDUCTIONS_PALETTE}
+                margin={{ top: 40, right: 24, bottom: 50, left: 70 }}
+                xScale={{ type: 'point' }}
+                yScale={{ type: 'linear', min: 0, max: 'auto' }}
+                curve="monotoneX"
+                axisBottom={{ tickSize: 0, tickPadding: 10 }}
+                axisLeft={{ tickSize: 0, tickPadding: 8, format: (v) => formatCurrency(Number(v)) }}
+                enableGridX={false}
+                lineWidth={2.5}
+                pointSize={7}
+                pointColor={{ theme: 'background' }}
+                pointBorderWidth={2}
+                pointBorderColor={{ from: 'serieColor' }}
+                useMesh
+                enableSlices="x"
+                sliceTooltip={({ slice }) => (
+                  <div className="rounded-xl border border-border bg-card p-2.5 text-xs shadow-soft-lg">
+                    <p className="mb-1 font-semibold">{slice.points[0]?.data.xFormatted}</p>
+                    {slice.points.map((point) => (
+                      <div key={point.id} className="flex items-center justify-between gap-4">
+                        <span className="flex items-center gap-1.5">
+                          <span className="size-2 rounded-full" style={{ backgroundColor: point.seriesColor }} />
+                          {point.seriesId}
+                        </span>
+                        <span className="font-medium tabular-nums">{formatCurrency(Number(point.data.y))}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                legends={[
+                  {
+                    anchor: 'top-left',
+                    direction: 'row',
+                    translateY: -30,
+                    itemWidth: 100,
+                    itemHeight: 20,
+                    symbolShape: 'circle',
+                    itemsSpacing: 8,
+                  },
+                ]}
+                animate
+                motionConfig="gentle"
+                role="img"
+                ariaLabel="Earnings vs. deductions per period"
+              />
+            </AnimatedChart>
           </ChartPane>
 
           <TablePane mode={mode}>

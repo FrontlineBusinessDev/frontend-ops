@@ -121,24 +121,24 @@ export function EssProfilePage() {
               <Card.Title>Personal Information</Card.Title>
               <Badge tone="brand">Editable</Badge>
             </div>
-            <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 md:grid-cols-3">
               <Field label="First name" value={employee.personal.firstName} />
               <Field label="Last name" value={employee.personal.lastName} />
               <Field label="Birth date" value={formatDate(employee.personal.birthDate)} />
               <Field label="Civil status" value={employee.personal.civilStatus} />
             </div>
-            <form onSubmit={handleSubmit(onSubmit)} className="mt-5 grid grid-cols-2 gap-4 border-t border-border pt-5 sm:grid-cols-3">
+            <form onSubmit={handleSubmit(onSubmit)} className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-border pt-5 md:grid-cols-3">
               <FormField label="Contact number" required error={errors.contactNumber?.message}>
                 <Input {...register('contactNumber')} />
               </FormField>
               <FormField label="Personal email" error={errors.personalEmail?.message}>
                 <Input type="email" {...register('personalEmail')} />
               </FormField>
-              <FormField label="Address" required error={errors.address?.message} className="col-span-2 sm:col-span-3">
+              <FormField label="Address" required error={errors.address?.message} className="col-span-1 sm:col-span-2 md:col-span-3">
                 <Textarea {...register('address')} />
               </FormField>
 
-              <div className="col-span-2 flex justify-end sm:col-span-3">
+              <div className="col-span-1 flex justify-end sm:col-span-2 md:col-span-3">
                 <Button type="submit" size="sm" isLoading={isSubmitting} disabled={!isDirty}>
                   Save Changes
                 </Button>
@@ -157,7 +157,7 @@ export function EssProfilePage() {
               <Card.Title>Employment</Card.Title>
               <ViewOnlyBadge />
             </div>
-            <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 md:grid-cols-3">
               <Field label="Position" value={employee.employment.position} />
               <Field label="Department" value={employee.employment.department} />
               <Field label="Branch" value={branch?.name} />
@@ -174,7 +174,7 @@ export function EssProfilePage() {
               <Card.Title>Current Compensation</Card.Title>
               <ViewOnlyBadge />
             </div>
-            <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 md:grid-cols-3">
               <Field label="Basic pay" value={formatCurrency(employee.compensation.basicPay)} />
               <Field label="Pay frequency" value={employee.compensation.payType} />
             </div>
@@ -225,7 +225,7 @@ export function EssProfilePage() {
               <Card.Title>Government Information</Card.Title>
               <ViewOnlyBadge />
             </div>
-            <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 md:grid-cols-3">
               <Field label="SSS No." value={employee.government.sssNo} />
               <Field label="PhilHealth No." value={employee.government.philhealthNo} />
               <Field label="Pag-IBIG No." value={employee.government.pagibigNo} />
@@ -248,7 +248,7 @@ export function EssProfilePage() {
               <Card.Title>Bank/Payment</Card.Title>
               <ViewOnlyBadge />
             </div>
-            <div className="grid grid-cols-2 gap-5 sm:grid-cols-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 md:grid-cols-3">
               <Field label="Bank name" value={employee.bank.bankName} />
               <Field label="Account number" value={employee.bank.accountNumber} />
             </div>

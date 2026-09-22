@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 
+/* Manual (button-toggled) dark mode — `dark:` utilities apply from the `.dark` class on <html>
+   set by the theme store, not from the OS `prefers-color-scheme` media query. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-display: 'Poppins', 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
   --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
@@ -52,6 +56,13 @@
   --sidebar-muted: #93a5a1;
   --sidebar-border: rgb(255 255 255 / 0.08);
   --sidebar-active: rgb(255 255 255 / 0.08);
+
+  /* Chart-only categorical accents (Advanced Reports/@nivo) — extend the teal/amber brand
+     palette with indigo/blue/violet/slate so multi-series charts never need red. */
+  --chart-indigo: #5b5fc7;
+  --chart-blue: #3b7dd8;
+  --chart-violet: #7c5cbf;
+  --chart-slate: #64748b;
 }
 
 .dark {
@@ -81,6 +92,11 @@
   --sidebar-muted: #7c8b87;
   --sidebar-border: rgb(255 255 255 / 0.06);
   --sidebar-active: rgb(255 255 255 / 0.06);
+
+  --chart-indigo: #8184e0;
+  --chart-blue: #6fa4e8;
+  --chart-violet: #a690d9;
+  --chart-slate: #94a3b8;
 }
 
 @theme inline {
@@ -107,6 +123,10 @@
   --color-sidebar-muted: var(--sidebar-muted);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-active: var(--sidebar-active);
+  --color-chart-indigo: var(--chart-indigo);
+  --color-chart-blue: var(--chart-blue);
+  --color-chart-violet: var(--chart-violet);
+  --color-chart-slate: var(--chart-slate);
 }
 
 body {

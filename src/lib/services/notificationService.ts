@@ -1,7 +1,9 @@
+import { buildSampleLoans, buildSamplePayslips } from '@/features/ess/sampleData'
 import { getAttendanceAdjustments } from '@/lib/services/attendanceService'
 import { getLeaveRequests } from '@/lib/services/leaveService'
 import { getPayrollPeriods } from '@/lib/services/payrollService'
 import { roleHasCapability } from '@/lib/rbac/permissions'
+import { formatCurrency } from '@/lib/utils/format'
 import { db } from '@/mock-data'
 import type { SessionUser } from '@/types/domain'
 
@@ -91,14 +93,60 @@ export async function getNotifications(session: SessionUser): Promise<AppNotific
       (p) => p.status === 'finalized' && db.payrollLines.some((l) => l.periodId === p.id && l.employeeId === session.employeeId),
     )
     finalizedPeriods.forEach((p) => {
+      const line = db.payrollLines.find((l) => l.periodId === p.id && l.employeeId === session.employeeId)
       notifications.push({
         id: `payslip-ready-${p.id}`,
         message: `Your payslip for "${p.label}" is now available`,
         tone: 'success',
         timestamp: new Date().toISOString(),
         link: '/ess/payslips',
+        highlightId: line?.id,
       })
     })
+
+    const employee = db.employees.find((e) => e.id === session.employeeId)
+    if (employee) {
+      // Payroll hasn't been run yet this session (payroll periods/lines reset on every full
+      // reload) — surface the same illustrative payslip shown on `/ess/payslips` so the
+      // notification's highlight always lands on a visible row.
+      if (finalizedPeriods.length === 0) {
+        const latestSample = buildSamplePayslips(employee, employee.companyId).at(-1)!
+        notifications.push({
+          id: `payslip-ready-${latestSample.line.id}`,
+          message: `Your payslip for "${latestSample.period.label}" is now available`,
+          tone: 'success',
+          timestamp: new Date().toISOString(),
+          link: '/ess/payslips',
+          highlightId: latestSample.line.id,
+        })
+      }
+
+      // Loan payment confirmation — from real repayment history if this employee has one,
+      // else the same illustrative sample loan shown on `/ess/loans` when there's no real
+      // loan yet.
+      const loanWithHistory = db.loans.find((l) => l.employeeId === employee.id && l.repaymentHistory && l.repaymentHistory.length > 0)
+      if (loanWithHistory) {
+        const lastPayment = loanWithHistory.repaymentHistory!.at(-1)!
+        notifications.push({
+          id: `loan-payment-${loanWithHistory.id}`,
+          message: `Loan payment of ${formatCurrency(lastPayment.amount)} processed for "${loanWithHistory.label}"`,
+          tone: 'success',
+          timestamp: lastPayment.date,
+          link: '/ess/loans',
+          highlightId: loanWithHistory.id,
+        })
+      } else {
+        const sampleLoan = buildSampleLoans(employee.id, employee.companyId)[0]
+        notifications.push({
+          id: `loan-payment-${sampleLoan.id}`,
+          message: `Loan payment of ${formatCurrency(sampleLoan.monthlyDeduction)} processed for "${sampleLoan.label}"`,
+          tone: 'success',
+          timestamp: new Date().toISOString(),
+          link: '/ess/loans',
+          highlightId: sampleLoan.id,
+        })
+      }
+    }
   }
 
   return notifications.sort((a, b) => b.timestamp.localeCompare(a.timestamp))

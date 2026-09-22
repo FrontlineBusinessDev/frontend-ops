@@ -1,3 +1,4 @@
+import { getOtRateById } from '@/features/company-settings/payrollRatesStore'
 import { getEmployees } from '@/lib/services/employeeService'
 import { db } from '@/mock-data'
 import type { ApprovalStatus, Employee, OvertimeRecord, OvertimeType, SessionUser } from '@/types/domain'
@@ -23,10 +24,18 @@ export interface CreateOvertimeInput {
   reason?: string
 }
 
-const MULTIPLIER_BY_TYPE: Record<OvertimeType, number> = {
+/** Fallback only for the (practically unreachable) case the shared Payroll Settings rate store
+ * doesn't have an entry for a standard type — the store is always seeded with these ids. */
+const FALLBACK_MULTIPLIER_BY_TYPE: Record<OvertimeType, number> = {
   regular: 1.25,
   night_diff: 1.1,
   rest_day_holiday: 1.3,
+}
+
+/** Reads live from Company & Payroll Settings > Overtime & Holiday Rates, so an admin's rate edits
+ * immediately apply to newly filed overtime records. */
+function multiplierForType(type: OvertimeType): number {
+  return getOtRateById(type)?.multiplier ?? FALLBACK_MULTIPLIER_BY_TYPE[type]
 }
 
 function computeHours(startTime: string, endTime: string): number {
@@ -47,7 +56,7 @@ export async function createOvertimeRecord(session: SessionUser, input: CreateOv
     endTime: input.endTime,
     hours: computeHours(input.startTime, input.endTime),
     type: input.type,
-    multiplier: MULTIPLIER_BY_TYPE[input.type],
+    multiplier: multiplierForType(input.type),
     status: 'pending',
     reason: input.reason,
     requestedAt: new Date().toISOString(),

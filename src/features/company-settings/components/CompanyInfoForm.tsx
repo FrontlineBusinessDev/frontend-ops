@@ -61,7 +61,7 @@ function AddressFields({
   disabled: boolean
 }) {
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:grid-cols-3">
       <FormField label="Building / Unit" className="col-span-2 sm:col-span-1">
         <Input disabled={disabled} {...register(`${namePrefix}.buildingUnit`)} />
       </FormField>
@@ -102,8 +102,8 @@ function ContactFields({
   includePosition?: boolean
 }) {
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-      <FormField label="Contact person" className={includePosition ? '' : 'sm:col-span-2'}>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:grid-cols-4">
+      <FormField label="Contact person" className={includePosition ? '' : 'sm:col-span-2 md:col-span-2'}>
         <Input disabled={disabled} {...register(`${namePrefix}.name`)} />
       </FormField>
       {includePosition && (
@@ -194,7 +194,7 @@ export function CompanyInfoForm({ company, canEdit, onSaved }: { company: Compan
             </label>
           )}
         </div>
-        <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 md:grid-cols-3">
           <FormField label="Company Name / Registered Name" required error={errors.name?.message} className="col-span-2 sm:col-span-1">
             <Input disabled={!canEdit} {...register('name', { required: 'Required' })} />
           </FormField>
@@ -222,7 +222,7 @@ export function CompanyInfoForm({ company, canEdit, onSaved }: { company: Compan
           <FormField label="Company Contact Number">
             <Input disabled={!canEdit} {...register('contactNumber')} />
           </FormField>
-          <FormField label="Company Description" className="col-span-2 sm:col-span-3">
+          <FormField label="Company Description" className="col-span-1 sm:col-span-2 md:col-span-3">
             <Textarea disabled={!canEdit} {...register('description')} />
           </FormField>
         </div>
@@ -237,7 +237,7 @@ export function CompanyInfoForm({ company, canEdit, onSaved }: { company: Compan
               ? 'As a Corporation/Partnership, your SEC registration is the primary business registration on file.'
               : 'Government and business registration numbers, used for statutory reporting.'}
         </Card.Description>
-        <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 md:grid-cols-3">
           <FormField label="SEC Registration No." hint={companyType !== 'corporation' && companyType !== 'partnership' ? 'Not applicable for this company type' : undefined}>
             <Input disabled={!canEdit} {...register('registration.secNo')} />
           </FormField>

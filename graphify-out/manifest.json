@@ -24,9 +24,9 @@
     "semantic_hash": ""
   },
   "src/app/routes.tsx": {
-    "mtime": 1789708180.2046375,
-    "seen": 1789965693.1023347,
-    "ast_hash": "565b5de83d1d6f73bd47a92c2ab3c6f4",
+    "mtime": 1789974254.0305407,
+    "seen": 1790040674.26799,
+    "ast_hash": "c967b2af0e4148699b2715a85d67d932",
     "semantic_hash": ""
   },
   "src/components/layout/AppShell.tsx": {
@@ -66,9 +66,9 @@
     "semantic_hash": ""
   },
   "src/components/layout/navConfig.ts": {
-    "mtime": 1789963554.9594693,
-    "seen": 1789965693.1023552,
-    "ast_hash": "661a9999c3e0c191e3e027cc2247b6ba",
+    "mtime": 1789974245.8098638,
+    "seen": 1790040674.2680228,
+    "ast_hash": "d02a56106cbec1c7c4730b08faecc539",
     "semantic_hash": ""
   },
   "src/components/ui/Avatar.tsx": {
@@ -132,9 +132,9 @@
     "semantic_hash": ""
   },
   "src/components/ui/MetricCard.tsx": {
-    "mtime": 1789958607.4515765,
-    "seen": 1789965693.102368,
-    "ast_hash": "4fbcdcc83a7d76c22349f28e9df200d4",
+    "mtime": 1789975608.9103692,
+    "seen": 1790040674.2680748,
+    "ast_hash": "04453b1f4c65666fbd65f44b7c75cab5",
     "semantic_hash": ""
   },
   "src/components/ui/PlanGate.tsx": {
@@ -180,9 +180,9 @@
     "semantic_hash": ""
   },
   "src/components/ui/index.ts": {
-    "mtime": 1789957173.2294004,
-    "seen": 1789965693.1023762,
-    "ast_hash": "d6ee3d54a8504752f291d6be30561412",
+    "mtime": 1789969773.5040483,
+    "seen": 1790040674.2681074,
+    "ast_hash": "900fa325e27b4346804620ff13b153c2",
     "semantic_hash": ""
   },
   "src/features/attendance/components/AdjustmentRequestDialog.tsx": {
@@ -696,9 +696,9 @@
     "semantic_hash": ""
   },
   "src/features/payroll/PayrollPeriodDetailPage.tsx": {
-    "mtime": 1789955323.800494,
-    "seen": 1789965693.1024678,
-    "ast_hash": "d2a581f261a3d9ec3f1590406c6ef5cf",
+    "mtime": 1789974079.5465608,
+    "seen": 1790040674.2684703,
+    "ast_hash": "ceeda742eda7421b007c5d8ca33162ca",
     "semantic_hash": ""
   },
   "src/features/payroll/components/CreatePeriodDialog.tsx": {
@@ -708,9 +708,9 @@
     "semantic_hash": ""
   },
   "src/features/payroll/components/EmployeeComputationDrawer.tsx": {
-    "mtime": 1789955268.1650927,
-    "seen": 1789965693.10247,
-    "ast_hash": "36887a03f8ad1ce17bb7fce23c7141bc",
+    "mtime": 1789976075.3589318,
+    "seen": 1790040674.268478,
+    "ast_hash": "39344240e40c1495fa81f081b08e23cd",
     "semantic_hash": ""
   },
   "src/features/payroll/hooks/usePayroll.ts": {
@@ -738,9 +738,9 @@
     "semantic_hash": ""
   },
   "src/features/payslips/components/PayslipCard.tsx": {
-    "mtime": 1789965335.7291734,
-    "seen": 1789965693.1024747,
-    "ast_hash": "ff321136108e4a8089673c4b86b395ab",
+    "mtime": 1789976054.1112723,
+    "seen": 1790040674.268497,
+    "ast_hash": "3c426caf6c2178a5914301cfeadbda2f",
     "semantic_hash": ""
   },
   "src/features/payslips/routes.tsx": {
@@ -756,15 +756,15 @@
     "semantic_hash": ""
   },
   "src/features/reports/hooks/useReports.ts": {
-    "mtime": 1789612397.380026,
-    "seen": 1789965693.102478,
-    "ast_hash": "a44f6dca0b56a4a13619e6fdce698f9b",
+    "mtime": 1789966692.700765,
+    "seen": 1790040674.2685301,
+    "ast_hash": "b163e95a820eccfa30e317baa3789b32",
     "semantic_hash": ""
   },
   "src/features/reports/routes.tsx": {
-    "mtime": 1789612862.445655,
-    "seen": 1789965693.1024792,
-    "ast_hash": "290d9423b4f43d1967a6ca9f74554025",
+    "mtime": 1789973012.5530238,
+    "seen": 1790040674.268534,
+    "ast_hash": "2d83507b3e12577b96ced49365035988",
     "semantic_hash": ""
   },
   "src/features/statutory/components/PagibigCard.tsx": {
@@ -864,9 +864,9 @@
     "semantic_hash": ""
   },
   "src/lib/payroll/computationBreakdown.ts": {
-    "mtime": 1789955633.5457544,
-    "seen": 1789965693.1024973,
-    "ast_hash": "30e728e50627d18b93cba18a56c93583",
+    "mtime": 1789974009.2117493,
+    "seen": 1790040674.2686157,
+    "ast_hash": "c5b8c5693eff90dad7e98089ba4b392f",
     "semantic_hash": ""
   },
   "src/lib/payroll/groupAssignment.ts": {
@@ -900,9 +900,9 @@
     "semantic_hash": ""
   },
   "src/lib/rbac/permissions.ts": {
-    "mtime": 1789697821.7099433,
-    "seen": 1789965693.1025035,
-    "ast_hash": "8706cfcd0e6f0f2938d79fc7c398c491",
+    "mtime": 1789973885.4074388,
+    "seen": 1790040674.2686396,
+    "ast_hash": "5713b2be7d17fc9233c65e7f5ddd6e57",
     "semantic_hash": ""
   },
   "src/lib/services/attendanceService.ts": {
@@ -972,9 +972,9 @@
     "semantic_hash": ""
   },
   "src/lib/services/payrollService.ts": {
-    "mtime": 1789955152.542552,
-    "seen": 1789965693.1025155,
-    "ast_hash": "d1b1c37d723f1c8e9f00ca437871421a",
+    "mtime": 1789973959.3594394,
+    "seen": 1790040674.268689,
+    "ast_hash": "1e508652bb362f383f29ace00581b935",
     "semantic_hash": ""
   },
   "src/lib/services/payrollSettingsService.ts": {
@@ -984,9 +984,9 @@
     "semantic_hash": ""
   },
   "src/lib/services/reportService.ts": {
-    "mtime": 1789612390.244702,
-    "seen": 1789965693.1025174,
-    "ast_hash": "99157319a0934883da64998733945126",
+    "mtime": 1789966682.0706046,
+    "seen": 1790040674.2686963,
+    "ast_hash": "142e353a460a851e7cd1f0658a0f9588",
     "semantic_hash": ""
   },
   "src/lib/services/subscriptionService.ts": {
@@ -1056,9 +1056,9 @@
     "semantic_hash": ""
   },
   "src/mock-data/index.ts": {
-    "mtime": 1789950149.7260735,
-    "seen": 1789965693.1025307,
-    "ast_hash": "04f7bc6e247d478fd7ee4bf998f3929b",
+    "mtime": 1789973913.7550292,
+    "seen": 1790040674.2687495,
+    "ast_hash": "57c34567fce341132e4c76b8d44af0b6",
     "semantic_hash": ""
   },
   "src/mock-data/seed/branches.ts": {
@@ -1134,9 +1134,9 @@
     "semantic_hash": ""
   },
   "src/types/domain.ts": {
-    "mtime": 1789954848.9001436,
-    "seen": 1789965693.1025436,
-    "ast_hash": "4abd85aa6618dd538aa39dbbeaf005ff",
+    "mtime": 1789973872.9595957,
+    "seen": 1790040674.2687974,
+    "ast_hash": "92a7adb4233926144ac3aab01303a158",
     "semantic_hash": ""
   },
   "tsconfig.app.json": {
@@ -1215,6 +1215,114 @@
     "mtime": 1789608819.2468586,
     "seen": 1789965693.102557,
     "ast_hash": "3b4fcfcf393eca4d264dca4a4663bc37",
+    "semantic_hash": ""
+  },
+  "src/components/ui/EmployeeCombobox.tsx": {
+    "mtime": 1789969736.4797204,
+    "seen": 1790040674.2680545,
+    "ast_hash": "6bf8a4f59a2085d022c1d5e1fec49170",
+    "semantic_hash": ""
+  },
+  "src/features/bonuses/components/AddBonusDialog.tsx": {
+    "mtime": 1789974133.9750683,
+    "seen": 1790040674.2681558,
+    "ast_hash": "508f12f998751c6e62660ffa90415a0e",
+    "semantic_hash": ""
+  },
+  "src/features/bonuses/components/BonusDetailsDialog.tsx": {
+    "mtime": 1789974162.421804,
+    "seen": 1790040674.26816,
+    "ast_hash": "37eeac82d53b734cbfef75d31f6152ca",
+    "semantic_hash": ""
+  },
+  "src/features/bonuses/hooks/useBonuses.ts": {
+    "mtime": 1789974111.1176252,
+    "seen": 1790040674.268164,
+    "ast_hash": "019031effad99c283f05a2d2b773b895",
+    "semantic_hash": ""
+  },
+  "src/features/bonuses/routes.tsx": {
+    "mtime": 1789974186.9168637,
+    "seen": 1790040674.2681673,
+    "ast_hash": "f382e978824b624ddb80a806a305b828",
+    "semantic_hash": ""
+  },
+  "src/features/reports/components/AccountingReports.tsx": {
+    "mtime": 1789967212.5962386,
+    "seen": 1790040674.2685094,
+    "ast_hash": "07b7c8b80d601c64550eda3b2fa682f7",
+    "semantic_hash": ""
+  },
+  "src/features/reports/components/AdvancedReports.tsx": {
+    "mtime": 1789973002.7238028,
+    "seen": 1790040674.268513,
+    "ast_hash": "e76c8cddb9e63cdf96f04d2a85ba2e17",
+    "semantic_hash": ""
+  },
+  "src/features/reports/components/BasicReports.tsx": {
+    "mtime": 1789969896.6207,
+    "seen": 1790040674.2685165,
+    "ast_hash": "555f7b7ddf4dc023be0e144519f9f1ac",
+    "semantic_hash": ""
+  },
+  "src/features/reports/components/CustomReportBuilder.tsx": {
+    "mtime": 1789967001.5425944,
+    "seen": 1790040674.2685199,
+    "ast_hash": "e3dc2a88e57a2ac5d9eee93f20aeeade",
+    "semantic_hash": ""
+  },
+  "src/features/reports/components/StatutoryReports.tsx": {
+    "mtime": 1789969907.7238479,
+    "seen": 1790040674.268523,
+    "ast_hash": "9c310b121f43044e00d17b070042fb8f",
+    "semantic_hash": ""
+  },
+  "src/features/reports/components/shared.tsx": {
+    "mtime": 1789972904.500113,
+    "seen": 1790040674.2685263,
+    "ast_hash": "a3d8b39daca50f7a1c1625accc3015d6",
+    "semantic_hash": ""
+  },
+  "src/features/thirteenth-month/components/ComputationDrawer.tsx": {
+    "mtime": 1789974205.3168068,
+    "seen": 1790040674.2685692,
+    "ast_hash": "e6b2289aa754ca91224eda2224d06bb5",
+    "semantic_hash": ""
+  },
+  "src/features/thirteenth-month/hooks/useThirteenthMonth.ts": {
+    "mtime": 1789974193.3677466,
+    "seen": 1790040674.2685733,
+    "ast_hash": "b6348487c3a0fa0d13355b2809a7759e",
+    "semantic_hash": ""
+  },
+  "src/features/thirteenth-month/routes.tsx": {
+    "mtime": 1789974234.252838,
+    "seen": 1790040674.2685766,
+    "ast_hash": "00320ddf35ea5f31d42c28789b65f2f8",
+    "semantic_hash": ""
+  },
+  "src/lib/payroll/bonusMatching.ts": {
+    "mtime": 1789973891.4297974,
+    "seen": 1790040674.2686121,
+    "ast_hash": "ebbb2d59b0e6273954748e08f7fb35f4",
+    "semantic_hash": ""
+  },
+  "src/lib/services/bonusService.ts": {
+    "mtime": 1789973921.6791363,
+    "seen": 1790040674.2686505,
+    "ast_hash": "c308a9264268a90aec19abe147766c33",
+    "semantic_hash": ""
+  },
+  "src/lib/services/thirteenthMonthService.ts": {
+    "mtime": 1789973934.6702356,
+    "seen": 1790040674.2687035,
+    "ast_hash": "52f567f41b0adb8b2192162e11b2998b",
+    "semantic_hash": ""
+  },
+  "src/mock-data/generators/bonuses.ts": {
+    "mtime": 1789973898.7178817,
+    "seen": 1790040674.2687309,
+    "ast_hash": "f7d9f63f09a1c71d9631eb21a2e527d0",
     "semantic_hash": ""
   }
 }

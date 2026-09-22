@@ -8,6 +8,7 @@ import { CompanyInfoForm } from '@/features/company-settings/components/CompanyI
 import { DeductionsSection } from '@/features/company-settings/components/payroll/DeductionsSection'
 import { EarningsSection } from '@/features/company-settings/components/payroll/EarningsSection'
 import { PayrollCalendarSection } from '@/features/company-settings/components/payroll/PayrollCalendarSection'
+import { OvertimeHolidayRatesSection } from '@/features/company-settings/components/payroll/OvertimeHolidayRatesSection'
 import { PayrollGroupsSection } from '@/features/company-settings/components/payroll/PayrollGroupsSection'
 import { PayrollRulesSection } from '@/features/company-settings/components/payroll/PayrollRulesSection'
 import { WorkSchedulesSection } from '@/features/company-settings/components/payroll/WorkSchedulesSection'
@@ -64,6 +65,7 @@ export function CompanySettingsPage() {
               <TabsTrigger value="earnings">Earnings</TabsTrigger>
               <TabsTrigger value="deductions">Deductions</TabsTrigger>
               <TabsTrigger value="rules">Payroll Rules</TabsTrigger>
+              <TabsTrigger value="ot-holiday-rates">Overtime &amp; Holiday Rates</TabsTrigger>
               <TabsTrigger value="schedules">Work Schedules</TabsTrigger>
               <TabsTrigger value="calendar">Payroll Calendar</TabsTrigger>
             </TabsList>
@@ -89,6 +91,10 @@ export function CompanySettingsPage() {
 
             <TabsContent value="rules">
               <PayrollRulesSection rules={payrollRules} canEdit={canEditPayroll} onRefetch={refetch} />
+            </TabsContent>
+
+            <TabsContent value="ot-holiday-rates">
+              <OvertimeHolidayRatesSection />
             </TabsContent>
 
             <TabsContent value="schedules">

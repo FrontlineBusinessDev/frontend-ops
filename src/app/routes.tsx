@@ -18,6 +18,7 @@ import {
   EssHomePage,
   EssLeavePage,
   EssLoansPage,
+  EssOvertimePage,
   EssPayslipDetailPage,
   EssPayslipsPage,
   EssProfilePage,
@@ -193,6 +194,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireCapability capability="ess.view">
             <EssAttendancePage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'ess/overtime',
+        element: (
+          <RequireCapability capability="ess.view">
+            <EssOvertimePage />
           </RequireCapability>
         ),
       },

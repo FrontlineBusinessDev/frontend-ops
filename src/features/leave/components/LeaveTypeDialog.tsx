@@ -84,7 +84,7 @@ function LeaveTypeForm({
       <div>
         <p className="text-xs font-semibold tracking-tight">Annual credits per hierarchy tier</p>
         <p className="mt-0.5 text-xs text-muted-foreground">Used on the Leave Types &amp; Credits summary and future accrual rules.</p>
-        <div className="mt-2 grid grid-cols-3 gap-3">
+        <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {HIERARCHY_LEVELS.map((level) => (
             <FormField key={level} label={HIERARCHY_LABEL[level]}>
               <Input type="number" step="1" {...register(`tierCredits.${level}`, { valueAsNumber: true, min: 0 })} />

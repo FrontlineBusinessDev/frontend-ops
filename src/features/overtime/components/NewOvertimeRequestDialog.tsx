@@ -9,9 +9,10 @@ import { FormField } from '@/components/ui/FormField'
 import { Input, Textarea } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { useToast } from '@/components/ui/Toast'
+import { otRateOptionLabel, usePayrollRatesStore } from '@/features/company-settings/payrollRatesStore'
 import { useSession } from '@/hooks/useSession'
 import { createOvertimeRecord } from '@/lib/services/overtimeService'
-import type { Employee } from '@/types/domain'
+import type { Employee, OvertimeType } from '@/types/domain'
 
 const schema = z.object({
   employeeId: z.string().min(1, 'Select an employee'),
@@ -24,16 +25,19 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-const TYPE_OPTIONS = [
-  { value: 'regular', label: 'Regular Overtime (125%)' },
-  { value: 'rest_day_holiday', label: 'Rest Day / Holiday OT (130%-200%)' },
-  { value: 'night_diff', label: 'Night Differential (110%)' },
-]
+/** Only these three ids have a real `OvertimeType` counterpart the payroll engine can compute
+ * against — custom rate types added in Payroll Settings are ESS-application-only (see
+ * `OvertimeApplicationDialog.tsx`) until the engine supports arbitrary OT types. */
+const REAL_OVERTIME_TYPES: OvertimeType[] = ['regular', 'rest_day_holiday', 'night_diff']
 
 export function NewOvertimeRequestDialog({ employees, onCreated }: { employees: Employee[]; onCreated: () => void }) {
   const [open, setOpen] = useState(false)
   const { user } = useSession()
   const { notify } = useToast()
+  const otRates = usePayrollRatesStore((s) => s.otRates)
+  const typeOptions = otRates
+    .filter((r) => REAL_OVERTIME_TYPES.includes(r.id as OvertimeType))
+    .map((r) => ({ value: r.id, label: otRateOptionLabel(r) }))
 
   const {
     register,
@@ -85,7 +89,7 @@ export function NewOvertimeRequestDialog({ employees, onCreated }: { employees: 
             <Controller
               control={control}
               name="type"
-              render={({ field }) => <Select value={field.value} onValueChange={field.onChange} options={TYPE_OPTIONS} />}
+              render={({ field }) => <Select value={field.value} onValueChange={field.onChange} options={typeOptions} />}
             />
           </FormField>
           <FormField label="Date" required error={errors.date?.message} className="col-span-2">

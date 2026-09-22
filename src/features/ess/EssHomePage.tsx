@@ -1,5 +1,4 @@
 import {
-  ArrowRight,
   Bell,
   CalendarDays,
   CalendarPlus,
@@ -9,6 +8,7 @@ import {
   FileSearch,
   ReceiptText,
   UserCircle2,
+  Zap,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -18,6 +18,7 @@ import { Badge, StatusBadge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { ESS_ACCENTS, EssCardWatermark, EssMetricCard } from '@/features/ess/components/EssMetricCard'
 import { useSelfEmployee } from '@/features/ess/hooks/useSelfEmployee'
 import { useLeaveRequests, useLeaveTypes } from '@/features/leave/hooks/useLeave'
 import { useNotifications } from '@/features/notifications/hooks/useNotifications'
@@ -178,83 +179,52 @@ export function EssHomePage() {
 
       {/* Metric cards — one per Self-Service nav item that has a natural summary number */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link to="/ess/attendance">
-          <Card className="flex h-full flex-col gap-3 p-5 transition-shadow hover:shadow-soft-lg">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Clock className="size-4" />
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Attendance Today</p>
-              <p className="mt-1 font-display text-lg font-semibold">{todayRecord ? STATUS_LABEL[todayRecord.status] : 'No record'}</p>
-            </div>
-            <p className="mt-auto flex items-center gap-1 text-xs font-medium text-primary">
-              View attendance <ArrowRight className="size-3" />
-            </p>
-          </Card>
-        </Link>
-
-        <Link to="/ess/leave">
-          <Card className="flex h-full flex-col gap-3 p-5 transition-shadow hover:shadow-soft-lg">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-success/10 text-success">
-              <CalendarDays className="size-4" />
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Leave Credits</p>
-              <p className="mt-1 font-display text-lg font-semibold">{totalLeaveCredits} days</p>
-            </div>
-            <p className="mt-auto flex items-center gap-1 text-xs font-medium text-primary">
-              View leave <ArrowRight className="size-3" />
-            </p>
-          </Card>
-        </Link>
-
-        <Link to="/ess/loans">
-          <Card className="flex h-full flex-col gap-3 p-5 transition-shadow hover:shadow-soft-lg">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-accent/10 text-accent">
-              <CreditCard className="size-4" />
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Loans &amp; Deductions</p>
-              <p className="mt-1 font-display text-lg font-semibold">{formatCurrency(totalMonthlyDeduction)}</p>
-            </div>
-            <p className="mt-auto flex items-center gap-1 text-xs font-medium text-primary">
-              View details <ArrowRight className="size-3" />
-            </p>
-          </Card>
-        </Link>
-
-        <Link to="/ess/payslips">
-          <Card className="flex h-full flex-col gap-3 p-5 transition-shadow hover:shadow-soft-lg">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-warning/10 text-warning">
-              <ReceiptText className="size-4" />
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Last Payslip</p>
-              <p className="mt-1 font-display text-lg font-semibold">
-                {latestFinalizedLine ? formatCurrency(latestFinalizedLine.netPay) : '—'}
-              </p>
-              {latestPeriod && <p className="text-xs text-muted-foreground">{formatDate(latestPeriod.payDate)}</p>}
-            </div>
-            <p className="mt-auto flex items-center gap-1 text-xs font-medium text-primary">
-              View payslip <ArrowRight className="size-3" />
-            </p>
-          </Card>
-        </Link>
+        <EssMetricCard
+          to="/ess/attendance"
+          accent="teal"
+          icon={Clock}
+          label="Attendance Today"
+          value={todayRecord ? STATUS_LABEL[todayRecord.status] : 'No record'}
+          linkLabel="View attendance"
+        />
+        <EssMetricCard
+          to="/ess/leave"
+          accent="emerald"
+          icon={CalendarDays}
+          label="Leave Credits"
+          value={`${totalLeaveCredits} days`}
+          linkLabel="View leave"
+        />
+        <EssMetricCard
+          to="/ess/loans"
+          accent="amber"
+          icon={CreditCard}
+          label="Loans & Deductions"
+          value={formatCurrency(totalMonthlyDeduction)}
+          linkLabel="View details"
+        />
+        <EssMetricCard
+          to="/ess/payslips"
+          accent="indigo"
+          icon={ReceiptText}
+          label="Last Payslip"
+          value={latestFinalizedLine ? formatCurrency(latestFinalizedLine.netPay) : '—'}
+          hint={latestPeriod ? formatDate(latestPeriod.payDate) : undefined}
+          linkLabel="View payslip"
+        />
       </div>
 
       {/* My Attendance + My Leave */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <Card.Header>
-            <div className="flex items-center gap-2">
-              <Clock className="size-4 text-primary" />
-              <Card.Title>My Attendance</Card.Title>
-            </div>
+        <Card className="relative overflow-hidden border-slate-100 lg:col-span-2 dark:border-white/10" style={{ backgroundImage: ESS_ACCENTS.teal.gradient }}>
+          <EssCardWatermark icon={Clock} className={ESS_ACCENTS.teal.watermark} />
+          <Card.Header className="relative items-center">
+            <Card.Title>My Attendance</Card.Title>
             <Link to="/ess/attendance" className="text-xs font-medium text-primary">
               View all
             </Link>
           </Card.Header>
-          <Card.Body className="grid gap-6 pt-2 sm:grid-cols-2">
+          <Card.Body className="relative grid gap-6 pt-2 sm:grid-cols-2">
             <AttendanceCalendar records={monthRecords} />
             <div>
               {monthStats.late === 0 && monthStats.absent === 0 && monthStats.undertime === 0 && (
@@ -280,17 +250,15 @@ export function EssHomePage() {
           </Card.Body>
         </Card>
 
-        <Card>
-          <Card.Header>
-            <div className="flex items-center gap-2">
-              <CalendarDays className="size-4 text-primary" />
-              <Card.Title>My Leave</Card.Title>
-            </div>
+        <Card className="relative overflow-hidden border-slate-100 dark:border-white/10" style={{ backgroundImage: ESS_ACCENTS.emerald.gradient }}>
+          <EssCardWatermark icon={CalendarDays} className={ESS_ACCENTS.emerald.watermark} />
+          <Card.Header className="relative items-center">
+            <Card.Title>My Leave</Card.Title>
             <Link to="/ess/leave" className="text-xs font-medium text-primary">
               View all
             </Link>
           </Card.Header>
-          <Card.Body className="space-y-3 pt-2">
+          <Card.Body className="relative space-y-3 pt-2">
             {myLeaveRequests.length === 0 ? (
               <EmptyState title="No leave requests yet" description="File one from the Quick Actions below." />
             ) : (
@@ -314,17 +282,18 @@ export function EssHomePage() {
 
       {/* Quick Actions + Notifications + Payslip history */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <Card.Header>
+        <Card className="relative overflow-hidden border-slate-100 dark:border-white/10" style={{ backgroundImage: ESS_ACCENTS.indigo.gradient }}>
+          <EssCardWatermark icon={Zap} className={ESS_ACCENTS.indigo.watermark} />
+          <Card.Header className="relative">
             <Card.Title>Quick Actions</Card.Title>
           </Card.Header>
-          <Card.Body className="pt-2">
+          <Card.Body className="relative pt-2">
             <div className="grid grid-cols-2 gap-3">
               {QUICK_ACTIONS.map(({ label, icon: Icon, to }) => (
                 <Link
                   key={label}
                   to={to}
-                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-border bg-card p-4 text-center transition-colors hover:border-primary/40 hover:bg-primary/5"
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-slate-100 bg-card/80 p-4 text-center shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5 dark:border-white/10"
                 >
                   <Icon className="size-5 text-primary" />
                   <span className="text-xs font-medium leading-snug">{label}</span>
@@ -334,17 +303,15 @@ export function EssHomePage() {
           </Card.Body>
         </Card>
 
-        <Card>
-          <Card.Header>
-            <div className="flex items-center gap-2">
-              <Bell className="size-4 text-primary" />
-              <Card.Title>Recent Notifications</Card.Title>
-            </div>
+        <Card className="relative overflow-hidden border-slate-100 dark:border-white/10" style={{ backgroundImage: ESS_ACCENTS.amber.gradient }}>
+          <EssCardWatermark icon={Bell} className={ESS_ACCENTS.amber.watermark} />
+          <Card.Header className="relative items-center">
+            <Card.Title>Recent Notifications</Card.Title>
             <Link to="/notifications" className="text-xs font-medium text-primary">
               View all
             </Link>
           </Card.Header>
-          <Card.Body className="space-y-3 pt-2">
+          <Card.Body className="relative space-y-3 pt-2">
             {notifications.length === 0 ? (
               <EmptyState icon={FileSearch} title="No notifications yet" />
             ) : (
@@ -363,14 +330,15 @@ export function EssHomePage() {
           </Card.Body>
         </Card>
 
-        <Card>
-          <Card.Header>
+        <Card className="relative overflow-hidden border-slate-100 dark:border-white/10" style={{ backgroundImage: ESS_ACCENTS.indigo.gradient }}>
+          <EssCardWatermark icon={ReceiptText} className={ESS_ACCENTS.indigo.watermark} />
+          <Card.Header className="relative">
             <div>
               <Card.Title>Payslip History</Card.Title>
               <Card.Description>Gross vs. net pay, last {payHistory.length || 0} payslips</Card.Description>
             </div>
           </Card.Header>
-          <Card.Body className="h-56 pt-2">
+          <Card.Body className="relative h-56 pt-2">
             {payHistory.length === 0 ? (
               <EmptyState title="No payslips yet" />
             ) : (

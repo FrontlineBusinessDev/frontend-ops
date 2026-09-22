@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus } from 'lucide-react'
+import { Plus, Settings2 } from 'lucide-react'
 import { useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -20,6 +20,9 @@ import {
 } from '@/lib/payroll/payRate'
 import { formatCurrency } from '@/lib/utils/format'
 import { useToast } from '@/components/ui/Toast'
+import { MixedCompensationDialog } from '@/features/employees/components/MixedCompensationDialog'
+import { useMixedCompensationStore, summarizeMixedCompensation } from '@/features/employees/mixedCompensationStore'
+import type { MixedCompensationStructure } from '@/features/employees/mixedCompensationStore'
 
 const schema = z
   .object({
@@ -30,13 +33,17 @@ const schema = z
     branchId: z.string().min(1, 'Branch is required'),
     employmentType: z.enum(['regular', 'probationary', 'contractual', 'part_time']),
     dateHired: z.string().min(1, 'Date hired is required'),
-    payType: z.enum(['monthly', 'semi_monthly', 'daily', 'hourly', 'output_based']),
-    basicPay: z.number().positive('Rate amount must be greater than 0'),
+    payType: z.enum(['monthly', 'semi_monthly', 'daily', 'hourly', 'output_based', 'mixed']),
+    basicPay: z.number().optional(),
     outputUnit: z.string().optional(),
   })
   .refine((v) => v.payType !== 'output_based' || Boolean(v.outputUnit), {
     message: 'Output unit is required for Output-Based / Piece-Rate',
     path: ['outputUnit'],
+  })
+  .refine((v) => v.payType === 'mixed' || (v.basicPay !== undefined && v.basicPay > 0), {
+    message: 'Rate amount must be greater than 0',
+    path: ['basicPay'],
   })
 
 type FormValues = z.infer<typeof schema>
@@ -50,8 +57,15 @@ const EMPLOYMENT_TYPE_OPTIONS = [
 
 const OUTPUT_UNIT_SELECT_OPTIONS = OUTPUT_UNIT_OPTIONS.map((u) => ({ value: u, label: u }))
 
+/** UI-only addition for this modal — "Mixed Compensation" is never persisted as a real `PayRateType`
+ * (the payroll engine, reports, and payslips keep handling exactly the 5 standard types). See
+ * `mixedCompensationStore.ts`. */
+const PAY_RATE_TYPE_OPTIONS_WITH_MIXED = [...PAY_RATE_TYPE_OPTIONS, { value: 'mixed' as const, label: 'Mixed Compensation' }]
+
 export function AddEmployeeDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false)
+  const [mixedDialogOpen, setMixedDialogOpen] = useState(false)
+  const [mixedStructure, setMixedStructure] = useState<MixedCompensationStructure | undefined>(undefined)
   const { user } = useSession()
   const { branches } = useTenant()
   const { notify } = useToast()
@@ -62,6 +76,7 @@ export function AddEmployeeDialog({ onCreated }: { onCreated: () => void }) {
     control,
     watch,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -70,18 +85,57 @@ export function AddEmployeeDialog({ onCreated }: { onCreated: () => void }) {
 
   const payType = watch('payType')
   const basicPay = watch('basicPay')
-  const estimatedEquivalent = payType && basicPay > 0 ? estimatedEquivalentFor(payType, basicPay) : null
+  const isMixed = payType === 'mixed'
+  const estimatedEquivalent =
+    payType !== 'mixed' && basicPay && basicPay > 0 ? estimatedEquivalentFor(payType, basicPay) : null
+
+  function resetAll() {
+    reset()
+    setMixedStructure(undefined)
+  }
 
   async function onSubmit(values: FormValues) {
-    await createEmployee(user, { ...values, outputUnit: values.payType === 'output_based' ? values.outputUnit : null })
+    const base = {
+      firstName: values.firstName,
+      lastName: values.lastName,
+      department: values.department,
+      position: values.position,
+      branchId: values.branchId,
+      employmentType: values.employmentType,
+      dateHired: values.dateHired,
+    }
+
+    if (values.payType === 'mixed') {
+      if (!mixedStructure) return
+      const employee = await createEmployee(user, {
+        ...base,
+        payType: mixedStructure.baseType,
+        basicPay: mixedStructure.baseAmount,
+        outputUnit: null,
+      })
+      useMixedCompensationStore.getState().setStructure(employee.id, mixedStructure)
+    } else {
+      await createEmployee(user, {
+        ...base,
+        payType: values.payType,
+        basicPay: values.basicPay!,
+        outputUnit: values.payType === 'output_based' ? values.outputUnit : null,
+      })
+    }
     notify({ title: 'Employee added', description: `${values.firstName} ${values.lastName} was added to the roster.`, tone: 'success' })
-    reset()
+    resetAll()
     setOpen(false)
     onCreated()
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next)
+        if (!next) resetAll()
+      }}
+    >
       <DialogTrigger asChild>
         <Button icon={<Plus className="size-4" />}>Add Employee</Button>
       </DialogTrigger>
@@ -134,18 +188,51 @@ export function AddEmployeeDialog({ onCreated }: { onCreated: () => void }) {
             <Controller
               control={control}
               name="payType"
-              render={({ field }) => <Select value={field.value} onValueChange={field.onChange} options={PAY_RATE_TYPE_OPTIONS} />}
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={(v) => {
+                    field.onChange(v)
+                    if (v === 'mixed') {
+                      // RHF's `valueAsNumber` turns an emptied/unmounted number input into NaN, which
+                      // `z.number()` rejects outright — clear it so the mixed path never trips that.
+                      setValue('basicPay', undefined)
+                    } else {
+                      setMixedStructure(undefined)
+                    }
+                  }}
+                  options={PAY_RATE_TYPE_OPTIONS_WITH_MIXED}
+                />
+              )}
             />
           </FormField>
-          <FormField
-            label={rateFieldLabel(payType)}
-            required
-            error={errors.basicPay?.message}
-            hint={helperTextFor(payType)}
-          >
-            <Input type="number" step="0.01" {...register('basicPay', { valueAsNumber: true })} placeholder="25000" />
-          </FormField>
-          {payType === 'output_based' && (
+
+          {isMixed ? (
+            <div className="col-span-2">
+              <p className="mb-1.5 text-xs font-semibold tracking-tight text-foreground">
+                Mixed Compensation Breakdown<span className="ml-0.5 text-danger">*</span>
+              </p>
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2.5">
+                <p className="text-sm text-muted-foreground">
+                  {mixedStructure ? (
+                    <span className="font-medium text-foreground">{summarizeMixedCompensation(mixedStructure)}</span>
+                  ) : (
+                    'No breakdown configured yet.'
+                  )}
+                </p>
+                <Button type="button" size="sm" variant="secondary" icon={<Settings2 className="size-3.5" />} onClick={() => setMixedDialogOpen(true)}>
+                  Configure Mixed Compensation Breakdown
+                </Button>
+              </div>
+              {!mixedStructure && <p className="mt-1.5 text-xs text-danger">Configure the breakdown before saving.</p>}
+            </div>
+          ) : (
+            <FormField label={rateFieldLabel(payType)} required error={errors.basicPay?.message} hint={helperTextFor(payType)}>
+              <Input type="number" step="0.01" {...register('basicPay', { valueAsNumber: true })} placeholder="25000" />
+            </FormField>
+          )}
+
+          {!isMixed && payType === 'output_based' && (
             <FormField label="Output Unit" required error={errors.outputUnit?.message} className="col-span-2">
               <Controller
                 control={control}
@@ -164,12 +251,19 @@ export function AddEmployeeDialog({ onCreated }: { onCreated: () => void }) {
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" isLoading={isSubmitting}>
+            <Button type="submit" isLoading={isSubmitting} disabled={isMixed && !mixedStructure}>
               Save Employee
             </Button>
           </div>
         </form>
       </DialogContent>
+
+      <MixedCompensationDialog
+        open={mixedDialogOpen}
+        initialValue={mixedStructure}
+        onOpenChange={setMixedDialogOpen}
+        onSave={setMixedStructure}
+      />
     </Dialog>
   )
 }

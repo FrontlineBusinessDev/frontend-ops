@@ -59,7 +59,7 @@ export function PagibigCard({
   return (
     <Card className="p-6">
       <Card.Title className="mb-4">Pag-IBIG Contribution</Card.Title>
-      <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:grid-cols-3">
         <FormField label="Default Employee Contribution (PHP)">
           <Input type="number" step="1" disabled={!canEdit} {...register('pagibigEmployeeAmount', { valueAsNumber: true })} />
         </FormField>

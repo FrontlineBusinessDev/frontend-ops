@@ -6,7 +6,7 @@ export type Role =
   | 'manager'
   | 'employee'
 
-export type PlanTier = 'starter' | 'growth' | 'professional'
+export type PlanTier = 'basic' | 'standard' | 'professional' | 'enterprise'
 
 export type CompanyType = 'corporation' | 'partnership' | 'sole_proprietorship' | 'other'
 
@@ -51,6 +51,10 @@ export interface Company {
   email?: string
   contactNumber?: string
   planTier: PlanTier
+  /** Billing cadence for the current plan — the system only supports monthly billing today. */
+  billingInterval?: 'monthly'
+  /** ISO date of the next scheduled charge/renewal for the current plan, shown on the Subscription Overview card. */
+  nextRenewalDate?: string
   timezone: string
   payrollFrequency: 'semi_monthly' | 'monthly' | 'weekly'
   createdAt: string

@@ -8,11 +8,14 @@ export interface SubscriptionUsage {
   userCount: number
   employeeLimit: number | null
   userLimit: number | null
+  billingInterval: 'monthly'
+  nextRenewalDate: string | undefined
+  monthlyPricePhp: number | null
 }
 
 export async function getSubscriptionUsage(session: SessionUser): Promise<SubscriptionUsage> {
   const company = db.companies.find((c) => c.id === session.companyId)
-  const planTier = company?.planTier ?? 'starter'
+  const planTier = company?.planTier ?? 'basic'
   const details = PLAN_DETAILS[planTier]
 
   return {
@@ -21,6 +24,9 @@ export async function getSubscriptionUsage(session: SessionUser): Promise<Subscr
     userCount: db.users.filter((u) => u.companyId === session.companyId).length,
     employeeLimit: details.employeeLimit,
     userLimit: details.userLimit,
+    billingInterval: company?.billingInterval ?? 'monthly',
+    nextRenewalDate: company?.nextRenewalDate,
+    monthlyPricePhp: details.monthlyPricePhp,
   }
 }
 

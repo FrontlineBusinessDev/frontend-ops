@@ -46,8 +46,8 @@ export function LoanDetailsDialog({
               <StatusBadge status={loan.status} />
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-4 rounded-xl border border-border bg-muted/40 p-4 sm:grid-cols-4">
-              <div className="col-span-2 sm:col-span-4">
+            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-border bg-muted/40 p-4 md:grid-cols-4">
+              <div className="col-span-1 sm:col-span-2 md:col-span-4">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Category</p>
                 <p className="mt-1 text-sm font-medium">{TYPE_LABELS[loan.type] ?? loan.label}</p>
               </div>

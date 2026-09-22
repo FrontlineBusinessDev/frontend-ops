@@ -149,10 +149,10 @@ export function EmployeeComputationDrawer({
         </DialogDescription>
 
         {breakdown && (
-          <div className="mt-4 max-h-[75vh] space-y-5 overflow-y-auto pr-1">
+          <div className="mt-4 max-h-[75vh] scroll-smooth space-y-5 overflow-y-auto pr-1">
             {/* Employee Summary */}
             <Card className="p-4">
-              <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs md:grid-cols-4">
                 <div>
                   <p className="text-muted-foreground">Employee ID</p>
                   <p className="mt-0.5 font-medium">{employee.employeeNumber}</p>
@@ -202,7 +202,7 @@ export function EmployeeComputationDrawer({
             <div>
               <SectionTitle>Base Compensation & Work Basis</SectionTitle>
               <Card className="p-4">
-                <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs md:grid-cols-3">
                   <div>
                     <p className="text-muted-foreground">Base Compensation</p>
                     <p className="mt-0.5 font-medium">{formatBaseRate(employee.compensation.payType, employee.compensation.basicPay, employee.compensation.outputUnit)}</p>

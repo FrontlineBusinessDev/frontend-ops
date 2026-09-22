@@ -11,6 +11,16 @@
       rel="stylesheet"
     />
     <title>FBS OPS</title>
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem('fbs-ops-theme')
+          var theme = raw ? JSON.parse(raw).state.theme : null
+          if (!theme) theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+          if (theme === 'dark') document.documentElement.classList.add('dark')
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

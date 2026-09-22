@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils/cn'
 
 export const Table = forwardRef<HTMLTableElement, HTMLAttributes<HTMLTableElement>>(
   ({ className, ...props }, ref) => (
-    <div className="w-full overflow-x-auto rounded-2xl border border-border bg-card shadow-soft">
+    <div className="w-full scroll-smooth overflow-x-auto rounded-2xl border border-border bg-card shadow-soft">
       <table ref={ref} className={cn('w-full border-collapse text-sm', className)} {...props} />
     </div>
   ),
