@@ -31,6 +31,7 @@ export type Capability =
   | 'thirteenth_month.manage'
   | 'ess.view'
   | 'reports.view'
+  | 'insights.view'
   | 'approvals.view'
   | 'notifications.view'
   | 'notifications.send'
@@ -73,6 +74,7 @@ const ALL_ADMIN_CAPS: Capability[] = [
   'thirteenth_month.view',
   'thirteenth_month.manage',
   'reports.view',
+  'insights.view',
   'approvals.view',
   'notifications.view',
   'notifications.send',

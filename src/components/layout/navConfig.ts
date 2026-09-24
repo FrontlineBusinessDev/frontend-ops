@@ -15,6 +15,7 @@ import {
   ReceiptText,
   Settings,
   ShieldCheck,
+  Sparkles,
   Timer,
   UserCircle,
   Users,
@@ -81,7 +82,10 @@ export const ADMIN_NAV: NavGroup[] = [
   },
   {
     label: 'Analytics and Reports',
-    items: [{ label: 'Reports', path: '/reports', icon: LineChart, capability: 'reports.view' }],
+    items: [
+      { label: 'Reports', path: '/reports', icon: LineChart, capability: 'reports.view' },
+      { label: 'Insights & Decision Making Support', path: '/insights', icon: Sparkles, capability: 'insights.view' },
+    ],
   },
   {
     label: 'Settings',
