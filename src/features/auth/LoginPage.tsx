@@ -76,9 +76,9 @@ function IconField({
 
 function BrandingHero() {
   return (
-    <div className="relative hidden overflow-hidden bg-gradient-to-br from-brand-50 to-background px-10 py-12 lg:flex lg:flex-col lg:justify-between">
-      <div className="absolute -right-24 -top-24 size-72 rounded-full bg-brand-100/70 blur-2xl" />
-      <div className="absolute bottom-0 left-1/3 size-64 rounded-full bg-brand-200/50 blur-2xl" />
+    <div className="relative hidden overflow-hidden bg-gradient-to-br from-brand-50 to-background px-10 py-12 dark:from-brand-950 dark:to-background lg:flex lg:flex-col lg:justify-between">
+      <div className="absolute -right-24 -top-24 size-72 rounded-full bg-brand-100/70 blur-2xl dark:bg-brand-800/30" />
+      <div className="absolute bottom-0 left-1/3 size-64 rounded-full bg-brand-200/50 blur-2xl dark:bg-brand-900/40" />
 
       <div className="relative">
         <div className="flex items-center gap-3">
