@@ -206,6 +206,30 @@ export interface Employee {
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
+/** Pay-input submissions for employees paid by the hour or by output, awaiting admin sign-off before payroll. */
+export type CompensationApprovalType = 'hourly' | 'output'
+
+export interface CompensationApproval {
+  id: string
+  companyId: string
+  employeeId: string
+  type: CompensationApprovalType
+  workDate: string
+  /** Hours logged (hourly) or units completed (output). */
+  quantity: number
+  /** "hrs" for hourly entries, otherwise the employee's output unit (e.g. "Per Task"). */
+  unitLabel: string
+  rate: number
+  amount: number
+  description: string
+  status: ApprovalStatus
+  submittedAt: string
+  decidedBy?: string
+  decidedAt?: string
+  /** Set when a payroll run pays this entry — locks it to that period so it's never paid twice. */
+  payrollPeriodId?: string
+}
+
 export type ShiftType = 'day' | 'night' | 'split' | 'flexible'
 
 export interface Schedule {

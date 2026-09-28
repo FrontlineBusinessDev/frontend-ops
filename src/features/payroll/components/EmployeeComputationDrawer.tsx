@@ -7,11 +7,14 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 import { buildComputationBreakdown } from '@/lib/payroll/computationBreakdown'
 import type { AllocationDetail } from '@/lib/payroll/computationBreakdown'
 import { PAY_RATE_TYPE_LABEL, formatBaseRate } from '@/lib/payroll/payRate'
+import { HOURLY_WORK_LOG_LABEL, OUTPUT_WORK_LOG_LABEL } from '@/lib/payroll/rateBasis'
+import type { WorkLogsForPeriod } from '@/lib/payroll/rateBasis'
 import { formatCurrency, formatDate } from '@/lib/utils/format'
 import type {
   AttendanceRecord,
   BonusIncentive,
   Branch,
+  CompensationApproval,
   CompensationType,
   DeductionConfig,
   Employee,
@@ -77,6 +80,48 @@ function LineRow({
   )
 }
 
+function ApprovedWorkLogs({ workLogs, rate, unitWord }: { workLogs: WorkLogsForPeriod; rate: number; unitWord: string }) {
+  const entries = [...workLogs.payable].sort((a, b) => a.workDate.localeCompare(b.workDate))
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <p className="mb-2 text-xs font-semibold text-foreground">Approved work logs paid this period</p>
+      {entries.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No approved entries for this period.</p>
+      ) : (
+        <div className="max-h-48 overflow-y-auto rounded-lg border border-border">
+          <table className="w-full text-xs">
+            <thead className="bg-muted/50 text-muted-foreground">
+              <tr>
+                <th className="px-3 py-1.5 text-left font-medium">Work Date</th>
+                <th className="px-3 py-1.5 text-left font-medium">Entry</th>
+                <th className="px-3 py-1.5 text-right font-medium">Logged</th>
+                <th className="px-3 py-1.5 text-right font-medium">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((a) => (
+                <tr key={a.id} className="border-t border-border">
+                  <td className="whitespace-nowrap px-3 py-1.5">{formatDate(a.workDate)}</td>
+                  <td className="px-3 py-1.5">{a.description}</td>
+                  <td className="whitespace-nowrap px-3 py-1.5 text-right tabular-nums">
+                    {a.quantity} {unitWord}
+                  </td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{formatCurrency(Math.round(a.quantity * rate * 100) / 100)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {(workLogs.pendingCount > 0 || workLogs.rejectedCount > 0) && (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Excluded: {workLogs.pendingCount} pending, {workLogs.rejectedCount} rejected.
+        </p>
+      )}
+    </div>
+  )
+}
+
 function AllocationBadge({ allocation }: { allocation: AllocationDetail }) {
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
@@ -100,6 +145,7 @@ export function EmployeeComputationDrawer({
   loans,
   overtimeRecords,
   attendanceRecords,
+  compensationApprovals,
   statutoryConfig,
   approvedBonuses,
   thirteenthMonthLine,
@@ -115,6 +161,7 @@ export function EmployeeComputationDrawer({
   loans: LoanRecord[]
   overtimeRecords: OvertimeRecord[]
   attendanceRecords: AttendanceRecord[]
+  compensationApprovals?: CompensationApproval[]
   statutoryConfig: StatutoryConfig | undefined
   approvedBonuses?: BonusIncentive[]
   thirteenthMonthLine?: ThirteenthMonthLine
@@ -131,11 +178,15 @@ export function EmployeeComputationDrawer({
         loans,
         overtimeRecords,
         attendanceRecords,
+        compensationApprovals,
         statutoryConfig,
         approvedBonuses,
         thirteenthMonthLine,
       })
     : null
+  const workLogs = breakdown?.basicPayResult.workLogs
+  const workLogUnitWord =
+    employee.compensation.payType === 'hourly' ? 'hrs' : (employee.compensation.outputUnit ?? 'unit').replace(/^per\s+/i, '').toLowerCase()
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -228,6 +279,7 @@ export function EmployeeComputationDrawer({
                 <div className="mt-3 border-t border-border pt-3">
                   <LineRow label={breakdown?.basicPayResult.label ?? 'Basic Pay'} amount={breakdown?.basicPayResult.amount ?? 0} formula={breakdown?.basicPayResult.formula} emphasis />
                 </div>
+                {workLogs && <ApprovedWorkLogs workLogs={workLogs} rate={employee.compensation.basicPay} unitWord={workLogUnitWord} />}
               </Card>
             </div>
 
@@ -237,7 +289,16 @@ export function EmployeeComputationDrawer({
               <Card className="p-4">
                 {breakdown.earnings.map((e) => {
                   const isBonusEarning = (approvedBonuses ?? []).some((b) => b.name === e.label) || (thirteenthMonthLine && e.label === '13th Month Pay')
-                  return <LineRow key={e.label} label={e.label} amount={e.amount} formula={e.formula} badge={isBonusEarning ? 'Bonus' : undefined} />
+                  const isWorkLogEarning = e.label === HOURLY_WORK_LOG_LABEL || e.label === OUTPUT_WORK_LOG_LABEL
+                  return (
+                    <LineRow
+                      key={e.label}
+                      label={e.label}
+                      amount={e.amount}
+                      formula={e.formula}
+                      badge={isBonusEarning ? 'Bonus' : isWorkLogEarning ? 'Approved Logs' : undefined}
+                    />
+                  )
                 })}
                 <div className="mt-1 border-t border-border pt-2">
                   <LineRow label="Gross Pay" amount={breakdown.summary.grossPay} emphasis />

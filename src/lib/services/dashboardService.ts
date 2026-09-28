@@ -1,4 +1,5 @@
 import { getAttendanceAdjustments } from '@/lib/services/attendanceService'
+import { getCompensationApprovals } from '@/lib/services/compensationApprovalService'
 import { getLeaveRequests } from '@/lib/services/leaveService'
 import { getOvertimeRecords } from '@/lib/services/overtimeService'
 import { scopeForSession } from '@/lib/tenancy/tenantScope'
@@ -73,14 +74,16 @@ export interface PendingRequestsSummary {
   overtimePending: number
   nightDiffPending: number
   attendanceAdjustmentsPending: number
+  compensationApprovalsPending: number
 }
 
 /** Real, live counts of everything awaiting admin review — powers the Dashboard's "Pending Requests" widget. */
 export async function getPendingRequestsSummary(session: SessionUser): Promise<PendingRequestsSummary> {
-  const [leaveRequests, overtimeRecords, adjustments] = await Promise.all([
+  const [leaveRequests, overtimeRecords, adjustments, compensationApprovals] = await Promise.all([
     getLeaveRequests(session),
     getOvertimeRecords(session),
     getAttendanceAdjustments(session),
+    getCompensationApprovals(session),
   ])
 
   return {
@@ -88,6 +91,7 @@ export async function getPendingRequestsSummary(session: SessionUser): Promise<P
     overtimePending: overtimeRecords.filter((r) => r.status === 'pending' && r.type !== 'night_diff').length,
     nightDiffPending: overtimeRecords.filter((r) => r.status === 'pending' && r.type === 'night_diff').length,
     attendanceAdjustmentsPending: adjustments.filter((a) => a.status === 'pending').length,
+    compensationApprovalsPending: compensationApprovals.filter((a) => a.status === 'pending').length,
   }
 }
 

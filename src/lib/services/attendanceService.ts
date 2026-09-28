@@ -119,6 +119,64 @@ export async function importBiometricsRecords(
   return { fileName, importedCount }
 }
 
+export interface BiometricsPunch {
+  employeeId: string
+  date: string
+  timeIn: string
+  timeOut: string | null
+}
+
+function toMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number)
+  return h * 60 + m
+}
+
+function statusForPunch(timeIn: string, timeOut: string | null, startTime: string, endTime: string, graceMinutes: number): AttendanceRecord['status'] {
+  if (toMinutes(timeIn) > toMinutes(startTime) + graceMinutes) return 'late'
+  if (timeOut && toMinutes(timeOut) < toMinutes(endTime)) return 'undertime'
+  return 'present'
+}
+
+/** Applies punches parsed from an uploaded biometrics CSV — updates the matching day's record or creates one. */
+export async function applyBiometricsPunches(session: SessionUser, punches: BiometricsPunch[]): Promise<number> {
+  const employeeIds = await scopedEmployeeIds(session)
+  const schedules = await getSchedules(session)
+  const defaultSchedule = schedules[0]
+  if (!defaultSchedule) return 0
+
+  let applied = 0
+  for (const punch of punches) {
+    if (!employeeIds.has(punch.employeeId)) continue
+    const existing = db.attendanceRecords.find(
+      (r) => r.companyId === session.companyId && r.employeeId === punch.employeeId && r.date === punch.date,
+    )
+    const schedule =
+      schedules.find((s) => s.id === existing?.scheduleId) ??
+      schedules.find((s) => s.assignedEmployeeIds?.includes(punch.employeeId)) ??
+      defaultSchedule
+    const status = statusForPunch(punch.timeIn, punch.timeOut, schedule.startTime, schedule.endTime, schedule.gracePeriodMinutes ?? 0)
+
+    if (existing) {
+      existing.timeIn = punch.timeIn
+      existing.timeOut = punch.timeOut
+      existing.status = status
+    } else {
+      db.attendanceRecords.push({
+        id: `${punch.employeeId}_att_${punch.date}_import`,
+        companyId: session.companyId,
+        employeeId: punch.employeeId,
+        scheduleId: schedule.id,
+        date: punch.date,
+        timeIn: punch.timeIn,
+        timeOut: punch.timeOut,
+        status,
+      })
+    }
+    applied++
+  }
+  return applied
+}
+
 export async function getAttendanceAdjustments(session: SessionUser): Promise<AttendanceAdjustment[]> {
   const employeeIds = await scopedEmployeeIds(session)
   return db.attendanceAdjustments

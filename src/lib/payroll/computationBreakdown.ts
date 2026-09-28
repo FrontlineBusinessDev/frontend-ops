@@ -3,6 +3,7 @@ import { formatCurrency } from '@/lib/utils/format'
 import type {
   AttendanceRecord,
   BonusIncentive,
+  CompensationApproval,
   DeductionAllocationMethod,
   DeductionConfig,
   Employee,
@@ -182,18 +183,33 @@ export function buildComputationBreakdown(params: {
   loans: LoanRecord[]
   overtimeRecords: OvertimeRecord[]
   attendanceRecords: AttendanceRecord[]
+  /** Approvals-module work logs — hourly/output employees with logs in the period are paid from the approved ones. */
+  compensationApprovals?: CompensationApproval[]
   statutoryConfig: StatutoryConfig | undefined
   /** Approved Bonuses & Incentives that matched this employee/period — only used to label their earnings lines correctly (one-time full amount, not a ÷2 allowance). */
   approvedBonuses?: BonusIncentive[]
   /** This employee's line from a finalized 13th Month Pay batch paying out this period, if any. */
   thirteenthMonthLine?: ThirteenthMonthLine
 }): ComputationBreakdown {
-  const { employee, line, period, payrollGroup, deductionConfigs, loans, overtimeRecords, attendanceRecords, statutoryConfig, approvedBonuses = [], thirteenthMonthLine } = params
+  const {
+    employee,
+    line,
+    period,
+    payrollGroup,
+    deductionConfigs,
+    loans,
+    overtimeRecords,
+    attendanceRecords,
+    compensationApprovals = [],
+    statutoryConfig,
+    approvedBonuses = [],
+    thirteenthMonthLine,
+  } = params
   const configByName = new Map(deductionConfigs.map((c) => [c.name, c]))
   const bonusByName = new Map(approvedBonuses.map((b) => [b.name, b]))
 
   // ---- Earnings (real — the Basic/Output Pay line is recomputed via the exact same function the engine used, so it can never drift from `line.earnings`) ----
-  const basicPayResult = basicPayFor(employee, period, attendanceRecords)
+  const basicPayResult = basicPayFor(employee, period, attendanceRecords, compensationApprovals)
   const earnings: EarningItem[] = line.earnings.map((e) => {
     if (e.label === basicPayResult.label) {
       return { ...e, formula: basicPayResult.formula }

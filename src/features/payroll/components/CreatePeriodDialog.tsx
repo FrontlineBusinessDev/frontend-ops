@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { useToast } from '@/components/ui/Toast'
 import { usePayrollGroups } from '@/features/company-settings/hooks/usePayrollGroups'
+import { WorkLogsRangePreview } from '@/features/payroll/components/WorkLogsSummaryCard'
 import { useSession } from '@/hooks/useSession'
 import { createPayrollPeriod } from '@/lib/services/payrollService'
 
@@ -34,8 +35,10 @@ export function CreatePeriodDialog({ onCreated }: { onCreated: () => void }) {
     handleSubmit,
     control,
     reset,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { payrollGroupId: 'all' } })
+  const [startDate, endDate, selectedGroupId] = watch(['startDate', 'endDate', 'payrollGroupId'])
 
   const groupOptions = [
     { value: 'all', label: 'All Employees (no Payroll Group filter)' },
@@ -79,6 +82,14 @@ export function CreatePeriodDialog({ onCreated }: { onCreated: () => void }) {
           <FormField label="Pay date" required error={errors.payDate?.message}>
             <Input type="date" {...register('payDate')} />
           </FormField>
+
+          <div className="col-span-2">
+            <WorkLogsRangePreview
+              startDate={startDate}
+              endDate={endDate}
+              payrollGroupId={selectedGroupId === 'all' ? undefined : selectedGroupId}
+            />
+          </div>
 
           <div className="col-span-2 mt-2 flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setOpen(false)}>

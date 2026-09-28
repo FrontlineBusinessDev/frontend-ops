@@ -1,5 +1,5 @@
 import { formatCurrency } from '@/lib/utils/format'
-import type { AttendanceRecord, Employee, PayrollPeriod } from '@/types/domain'
+import type { AttendanceRecord, CompensationApproval, Employee, PayrollPeriod } from '@/types/domain'
 
 export const STANDARD_WORKING_DAYS_PER_YEAR = 261
 export const STANDARD_HOURS_PER_DAY = 8
@@ -41,12 +41,48 @@ export function mockOutputQuantity(employeeId: string, period: PayrollPeriod): R
   return { quantity: 150 + (seed % 200), unit: 'units', isFallback: true }
 }
 
+export interface WorkLogsForPeriod {
+  /** Every Approvals-module entry for this employee dated inside the period, any status. */
+  inRange: CompensationApproval[]
+  /** The approved entries this period pays. */
+  payable: CompensationApproval[]
+  pendingCount: number
+  rejectedCount: number
+}
+
+/**
+ * Approved hourly/output entries are payable in a draft period unless another run already paid
+ * them; once a period has been run, it pays exactly the entries that run locked to it — so the
+ * breakdown can't drift when more entries are approved afterward.
+ */
+export function workLogsForPeriod(employeeId: string, period: Pick<PayrollPeriod, 'id' | 'status' | 'startDate' | 'endDate'>, approvals: CompensationApproval[]): WorkLogsForPeriod {
+  const inRange = approvals.filter((a) => a.employeeId === employeeId && a.workDate >= period.startDate && a.workDate <= period.endDate)
+  const payable = inRange.filter(
+    (a) => a.status === 'approved' && (period.status === 'draft' ? !a.payrollPeriodId || a.payrollPeriodId === period.id : a.payrollPeriodId === period.id),
+  )
+  return {
+    inRange,
+    payable,
+    pendingCount: inRange.filter((a) => a.status === 'pending').length,
+    rejectedCount: inRange.filter((a) => a.status === 'rejected').length,
+  }
+}
+
 export interface BasicPayResult {
   amount: number
   basis: RateBasis | null
-  /** Human-readable label for the earning line at the rate's own display layer — "Basic Pay" for time-based rates, "Output Pay" for piece-rate. */
+  /** Human-readable label for the earning line — "Basic Pay" for time-based rates, "Output Pay" for piece-rate, or the approved-work-log labels below. */
   label: string
   formula: string
+  /** Present when the amount came from approved Approvals-module entries rather than attendance/placeholder data. */
+  workLogs?: WorkLogsForPeriod
+}
+
+export const HOURLY_WORK_LOG_LABEL = 'Hourly Compensation Pay'
+export const OUTPUT_WORK_LOG_LABEL = 'Output / Piece-Rate Pay'
+
+function outputUnitWord(employee: Employee): string {
+  return (employee.compensation.outputUnit ?? 'unit').replace(/^per\s+/i, '').toLowerCase()
 }
 
 /**
@@ -55,9 +91,45 @@ export interface BasicPayResult {
  * employee's configured rate — reused by both the payroll engine (`payrollService.ts`) and the
  * read-only computation breakdown, so the two can never drift apart.
  */
-export function basicPayFor(employee: Employee, period: PayrollPeriod, attendanceRecords: AttendanceRecord[]): BasicPayResult {
+export function basicPayFor(
+  employee: Employee,
+  period: PayrollPeriod,
+  attendanceRecords: AttendanceRecord[],
+  compensationApprovals: CompensationApproval[] = [],
+): BasicPayResult {
   const rate = employee.compensation.basicPay
-  switch (employee.compensation.payType) {
+  const payType = employee.compensation.payType
+
+  // Hourly / output-based employees who submitted work logs for this period are paid from the
+  // approved ones only (pending and rejected excluded). Employees with no logs in the period keep
+  // the attendance / placeholder basis below.
+  if (payType === 'hourly' || payType === 'output_based') {
+    const workLogs = workLogsForPeriod(employee.id, period, compensationApprovals)
+    if (workLogs.inRange.length > 0) {
+      const quantity = Math.round(workLogs.payable.reduce((sum, a) => sum + a.quantity, 0) * 100) / 100
+      const amount = Math.round(rate * quantity * 100) / 100
+      const entries = `${workLogs.payable.length} approved ${payType === 'hourly' ? 'timecard' : 'submission'}${workLogs.payable.length === 1 ? '' : 's'}`
+      if (payType === 'hourly') {
+        return {
+          amount,
+          basis: { quantity, unit: 'approved hours', isFallback: false },
+          label: HOURLY_WORK_LOG_LABEL,
+          formula: `Hourly Rate ${formatCurrency(rate)} × ${quantity} approved hour(s) from ${entries} = ${formatCurrency(amount)}`,
+          workLogs,
+        }
+      }
+      const unitWord = outputUnitWord(employee)
+      return {
+        amount,
+        basis: { quantity, unit: `approved ${unitWord}s`, isFallback: false },
+        label: OUTPUT_WORK_LOG_LABEL,
+        formula: `Piece Rate ${formatCurrency(rate)} × ${quantity} approved ${unitWord}(s) from ${entries} = ${formatCurrency(amount)}`,
+        workLogs,
+      }
+    }
+  }
+
+  switch (payType) {
     case 'monthly':
       return {
         amount: rate / 2,
@@ -84,7 +156,7 @@ export function basicPayFor(employee: Employee, period: PayrollPeriod, attendanc
     }
     case 'output_based': {
       const basis = mockOutputQuantity(employee.id, period)
-      const unitWord = (employee.compensation.outputUnit ?? 'unit').replace(/^per\s+/i, '').toLowerCase()
+      const unitWord = outputUnitWord(employee)
       const amount = Math.round(rate * basis.quantity * 100) / 100
       return {
         amount,

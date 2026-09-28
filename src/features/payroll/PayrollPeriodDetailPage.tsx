@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/Toast'
 import { usePayrollGroups } from '@/features/company-settings/hooks/usePayrollGroups'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
 import { EmployeeComputationDrawer } from '@/features/payroll/components/EmployeeComputationDrawer'
+import { WorkLogsSummaryCard } from '@/features/payroll/components/WorkLogsSummaryCard'
 import { usePayrollLines, usePayrollPeriods } from '@/features/payroll/hooks/usePayroll'
 import { usePermission } from '@/hooks/usePermission'
 import { useSession } from '@/hooks/useSession'
@@ -23,13 +24,23 @@ import { PAY_RATE_TYPE_LABEL, formatBaseRateShort } from '@/lib/payroll/payRate'
 import { basicPayFor } from '@/lib/payroll/rateBasis'
 import { getAttendanceRecords } from '@/lib/services/attendanceService'
 import { getBonuses } from '@/lib/services/bonusService'
+import { getCompensationApprovals } from '@/lib/services/compensationApprovalService'
 import { getLoans } from '@/lib/services/loanService'
 import { getOvertimeRecords } from '@/lib/services/overtimeService'
 import { approvePayroll, finalizePayroll, getStatutoryConfig, runPayroll } from '@/lib/services/payrollService'
 import { getDeductionConfigs } from '@/lib/services/payrollSettingsService'
 import { getThirteenthMonthLines, getThirteenthMonthRuns } from '@/lib/services/thirteenthMonthService'
 import { formatCurrency, formatDate } from '@/lib/utils/format'
-import type { AttendanceRecord, BonusIncentive, DeductionConfig, LoanRecord, OvertimeRecord, StatutoryConfig, ThirteenthMonthLine } from '@/types/domain'
+import type {
+  AttendanceRecord,
+  BonusIncentive,
+  CompensationApproval,
+  DeductionConfig,
+  LoanRecord,
+  OvertimeRecord,
+  StatutoryConfig,
+  ThirteenthMonthLine,
+} from '@/types/domain'
 
 export function PayrollPeriodDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -53,9 +64,16 @@ export function PayrollPeriodDetailPage() {
   const [statutoryConfig, setStatutoryConfig] = useState<StatutoryConfig | undefined>(undefined)
   const [bonuses, setBonuses] = useState<BonusIncentive[]>([])
   const [thirteenthMonthLines, setThirteenthMonthLines] = useState<ThirteenthMonthLine[]>([])
+  const [compensationApprovals, setCompensationApprovals] = useState<CompensationApproval[]>([])
 
   const period = periods.find((p) => p.id === id)
   const periodLabel = period?.label
+  const periodStatus = period?.status
+
+  // Re-read after each status change — running payroll locks approved entries to this period.
+  useEffect(() => {
+    getCompensationApprovals(user).then(setCompensationApprovals)
+  }, [user, periodStatus])
 
   useEffect(() => {
     getDeductionConfigs(user).then(setDeductionConfigs)
@@ -142,6 +160,8 @@ export function PayrollPeriodDetailPage() {
         }
       />
 
+      <WorkLogsSummaryCard period={period} />
+
       {isLoadingLines ? (
         <Skeleton className="h-72" />
       ) : lines.length === 0 ? (
@@ -189,7 +209,7 @@ export function PayrollPeriodDetailPage() {
                 const employeeGroup = employee ? findEmployeePayrollGroup(groups, employee.id) : undefined
                 const compensationType = compensationTypes.find((c) => c.id === employeeGroup?.compensationTypeId)
                 const branch = branches.find((b) => b.id === employee?.branchId)
-                const basicPayResult = employee ? basicPayFor(employee, period, attendanceRecords) : undefined
+                const basicPayResult = employee ? basicPayFor(employee, period, attendanceRecords, compensationApprovals) : undefined
                 const employeeApprovedBonuses = employee
                   ? bonuses.filter(
                       (b) => b.status === 'approved' && b.periodLabel.trim().toLowerCase() === period.label.trim().toLowerCase() && bonusAppliesToEmployee(b, employee),
@@ -233,6 +253,7 @@ export function PayrollPeriodDetailPage() {
                             loans={loans.filter((l) => l.employeeId === employee.id)}
                             overtimeRecords={overtimeRecords}
                             attendanceRecords={attendanceRecords}
+                            compensationApprovals={compensationApprovals}
                             statutoryConfig={statutoryConfig}
                             approvedBonuses={employeeApprovedBonuses}
                             thirteenthMonthLine={employeeThirteenthMonthLine}

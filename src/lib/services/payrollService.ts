@@ -1,5 +1,5 @@
 import { bonusAmountFor, bonusAppliesToEmployee } from '@/lib/payroll/bonusMatching'
-import { basicPayFor, monthlyEquivalentFor } from '@/lib/payroll/rateBasis'
+import { basicPayFor, monthlyEquivalentFor, workLogsForPeriod } from '@/lib/payroll/rateBasis'
 import { scopeToCompany } from '@/lib/tenancy/tenantScope'
 import { db } from '@/mock-data'
 import type { Employee, PayrollLine, PayrollPeriod, PayrollPeriodStatus, SessionUser, SssBracket, StatutoryConfig } from '@/types/domain'
@@ -67,7 +67,7 @@ function computeLine(session: SessionUser, period: PayrollPeriod, config: Statut
   // Daily/Hourly/Output-Based rates are inherently attendance/output-sensitive already (they only
   // pay for days/hours/units actually recorded), so — unlike Monthly/Semi-Monthly, which are a
   // fixed period amount regardless of attendance — they get no separate absence deduction below.
-  const basicPayResult = basicPayFor(employee, period, db.attendanceRecords)
+  const basicPayResult = basicPayFor(employee, period, db.attendanceRecords, db.compensationApprovals)
   const appliesAbsenceDeduction = employee.compensation.payType === 'monthly' || employee.compensation.payType === 'semi_monthly'
   const workingDaysInPeriod = 11 // half-month approximation for a semi-monthly period
   const dailyRate = employee.compensation.basicPay / (workingDaysInPeriod * 2)
@@ -183,8 +183,20 @@ export async function runPayroll(session: SessionUser, periodId: string): Promis
   )
 
   db.payrollLines = db.payrollLines.filter((l) => l.periodId !== periodId)
+  for (const approval of db.compensationApprovals) {
+    if (approval.payrollPeriodId === periodId) approval.payrollPeriodId = undefined
+  }
+
   const lines = activeEmployees.map((employee) => computeLine(session, period, config, employee))
   db.payrollLines.push(...lines)
+
+  // Lock the approved work logs this run paid to the period (computed while still 'draft', the
+  // same selection `computeLine` just used) so no other run can pay them again.
+  for (const employee of activeEmployees) {
+    for (const approval of workLogsForPeriod(employee.id, period, db.compensationApprovals).payable) {
+      approval.payrollPeriodId = period.id
+    }
+  }
 
   period.status = 'review'
   return lines

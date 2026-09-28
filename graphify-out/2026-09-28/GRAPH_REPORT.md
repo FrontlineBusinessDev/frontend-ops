@@ -1,16 +1,16 @@
-# Graph Report - OPS-frontend  (2026-09-28)
+# Graph Report - OPS-frontend  (2026-09-22)
 
 ## Corpus Check
-- 240 files · ~165,867 words
+- 214 files · ~151,282 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1559 nodes · 1631 edges · 243 communities (152 shown, 91 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 37 edges (avg confidence: 0.85)
+- 1360 nodes · 1398 edges · 193 communities (130 shown, 63 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 35 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `0bd182ca`
+- Built from commit: `d4a12e8e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -106,7 +106,7 @@
 - loans.ts
 - React + TypeScript + Vite
 - NotificationsBell.tsx
-- Topbar
+- Topbar.tsx
 - Avatar.tsx
 - Checkbox.tsx
 - Select.tsx
@@ -137,7 +137,7 @@
 - AttendanceFilterBar.tsx
 - groupUtil.ts
 - EarningsSection
-- mixedCompensationStore.ts
+- PayrollCalendarSection.tsx
 - company-settings/routes.tsx
 - PendingRequestsCard.tsx
 - EditBankInfoForm
@@ -146,7 +146,6 @@
 - EssLoansPage.tsx
 - AdvancedReports.tsx
 - LeaveRequestsList
-- EssOvertimePage.tsx
 - LoanDetailsDialog.tsx
 - notifications/routes.tsx
 - notificationService.ts
@@ -157,7 +156,6 @@
 - statutoryConfig.ts
 - tsconfig.json
 - app/routes.tsx
-- EssPayslipsPage.tsx
 - branches.ts
 - companies.ts
 - payrollRules.ts
@@ -178,60 +176,18 @@
 - AccountingReports.tsx
 - bonusMatching.ts
 - useHighlightTarget.ts
-- otApplicationStore.ts
-- approvals/routes.tsx
-- OvertimeHolidayRatesSection.tsx
-- payrollRatesStore.ts
-- biometricsImport.ts
-- sampleData.ts
-- EssAttendancePage.tsx
-- compensationApprovals.ts
-- MixedCompensationDialog.tsx
-- OvertimeApplicationDialog.tsx
-- WorkLogsSummaryCard.tsx
-- nivoTheme.ts
-- compensationApprovalService.ts
-- themeStore.ts
-- EssMetricCard.tsx
-- DemoSwitchers.tsx
-- insightsCatalog.ts
-- demoPlanStore.ts
-- date-fns
-- framer-motion
-- @hookform/resolvers
-- lucide-react
-- @nivo/bar
-- @nivo/core
-- @nivo/line
-- @radix-ui/react-avatar
-- @radix-ui/react-checkbox
-- @radix-ui/react-dialog
-- @radix-ui/react-dropdown-menu
-- @radix-ui/react-popover
-- @radix-ui/react-radio-group
-- @radix-ui/react-select
-- @radix-ui/react-slot
-- @radix-ui/react-tabs
-- @radix-ui/react-toast
-- @radix-ui/react-tooltip
-- react-dom
-- react-hook-form
-- tailwind-merge
-- @tanstack/react-table
-- zod
-- zustand
 
 ## God Nodes (most connected - your core abstractions)
-1. `react` - 110 edges
+1. `react` - 101 edges
 2. `compilerOptions` - 19 edges
 3. `compilerOptions` - 15 edges
 4. `fullName()` - 10 edges
-5. `ImportBiometricsDialog()` - 9 edges
-6. `buildComputationBreakdown()` - 9 edges
-7. `scopedEmployeeIds()` - 8 edges
-8. `CompensationApprovalsPage()` - 7 edges
-9. `CustomReportBuilder()` - 7 edges
-10. `findCompanyEmployee()` - 7 edges
+5. `buildComputationBreakdown()` - 9 edges
+6. `CustomReportBuilder()` - 7 edges
+7. `scopedEmployeeIds()` - 7 edges
+8. `findCompanyEmployee()` - 7 edges
+9. `logHistory()` - 7 edges
+10. `generateOvertimeRecords()` - 7 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `plugins` --extends--> `react`  [EXTRACTED]
@@ -240,15 +196,15 @@
 ## Import Cycles
 - None detected.
 
-## Communities (243 total, 91 thin omitted)
+## Communities (193 total, 63 thin omitted)
 
 ### Community 0 - "domain.ts"
 Cohesion: 0.03
-Nodes (72): ActivityLogEntry, Address, ApiKey, ApprovalStatus, AttendanceAdjustment, AttendanceRecord, AttendanceStatus, AuditEntry (+64 more)
+Nodes (70): ActivityLogEntry, Address, ApiKey, ApprovalStatus, AttendanceAdjustment, AttendanceRecord, AttendanceStatus, AuditEntry (+62 more)
 
 ### Community 1 - "dependencies"
-Cohesion: 0.22
-Nodes (9): clsx, dependencies, clsx, react, react-router-dom, recharts, react, react-router-dom (+1 more)
+Cohesion: 0.04
+Nodes (49): clsx, date-fns, @hookform/resolvers, lucide-react, dependencies, clsx, date-fns, @hookform/resolvers (+41 more)
 
 ### Community 3 - "devDependencies"
 Cohesion: 0.07
@@ -279,8 +235,8 @@ Cohesion: 0.17
 Nodes (17): AllocationDetail, allocationFormula(), buildComputationBreakdown(), ComputationBreakdown, ComputationSummary, cutoffIndexFor(), DeductionItem, EarningItem (+9 more)
 
 ### Community 10 - "attendanceService.ts"
-Cohesion: 0.15
-Nodes (18): applyBiometricsPunches(), BiometricsPunch, CreateAdjustmentInput, createAttendanceAdjustment(), FileAdjustmentInput, fileAttendanceAdjustment(), getAttendanceAdjustments(), getAttendanceForDate() (+10 more)
+Cohesion: 0.18
+Nodes (14): CreateAdjustmentInput, createAttendanceAdjustment(), FileAdjustmentInput, fileAttendanceAdjustment(), getAttendanceAdjustments(), getAttendanceForDate(), getAttendanceForEmployee(), getAttendanceRecords() (+6 more)
 
 ### Community 11 - "payrollService.ts"
 Cohesion: 0.16
@@ -291,8 +247,8 @@ Cohesion: 0.15
 Nodes (11): EstimatedEquivalent, formatBaseRate(), formatBaseRateShort(), HELPER_TEXT, OUTPUT_UNIT_OPTIONS, outputUnitWord(), PAY_RATE_TYPE_LABEL, PAY_RATE_TYPE_OPTIONS (+3 more)
 
 ### Community 13 - "overtimeService.ts"
-Cohesion: 0.20
-Nodes (14): computeHours(), CreateOvertimeInput, createOvertimeRecord(), daysAgo(), estimateHourlyRate(), exportOvertimeSummaryCsv(), FALLBACK_MULTIPLIER_BY_TYPE, getOvertimeRecords() (+6 more)
+Cohesion: 0.21
+Nodes (13): computeHours(), CreateOvertimeInput, createOvertimeRecord(), daysAgo(), estimateHourlyRate(), exportOvertimeSummaryCsv(), getOvertimeRecords(), getOvertimeSummary() (+5 more)
 
 ### Community 14 - "overtime/routes.tsx"
 Cohesion: 0.18
@@ -319,8 +275,8 @@ Cohesion: 0.22
 Nodes (7): ADJUSTMENT_SORT_OPTIONS, ADJUSTMENT_STATUS_OPTIONS, AttendancePage(), DAILY_SORT_OPTIONS, DAILY_STATUS_OPTIONS, shiftDate(), todayKey()
 
 ### Community 20 - "rateBasis.ts"
-Cohesion: 0.19
-Nodes (13): basicPayFor(), BasicPayResult, computePaidDays(), computePaidHours(), hashString(), HOURLY_WORK_LOG_LABEL, mockOutputQuantity(), OUTPUT_WORK_LOG_LABEL (+5 more)
+Cohesion: 0.27
+Nodes (9): basicPayFor(), BasicPayResult, computePaidDays(), computePaidHours(), hashString(), mockOutputQuantity(), RateBasis, STANDARD_HOURS_PER_DAY (+1 more)
 
 ### Community 21 - "leaveService.ts"
 Cohesion: 0.20
@@ -403,8 +359,8 @@ Cohesion: 0.29
 Nodes (4): CATEGORY_KEYWORDS, CATEGORY_LABEL, mode(), referenceProfile()
 
 ### Community 41 - "plans.ts"
-Cohesion: 0.20
-Nodes (9): FEATURE_LABELS, minimumPlanFor(), PLAN_DETAILS, PLAN_ORDER, PlanDetails, PlanFeature, planHasFeature(), PROFESSIONAL_FEATURES (+1 more)
+Cohesion: 0.29
+Nodes (7): FEATURE_LABELS, minimumPlanFor(), PLAN_DETAILS, PLAN_ORDER, PlanDetails, PlanFeature, planHasFeature()
 
 ### Community 42 - "guards.tsx"
 Cohesion: 0.25
@@ -451,8 +407,8 @@ Cohesion: 0.29
 Nodes (5): CALC_TYPE_OPTIONS, CATEGORY_OPTIONS, EarningDialog(), FormValues, schema
 
 ### Community 54 - "AddEmployeeDialog.tsx"
-Cohesion: 0.25
-Nodes (8): AddEmployeeDialog(), onSubmit(), resetAll(), EMPLOYMENT_TYPE_OPTIONS, FormValues, OUTPUT_UNIT_SELECT_OPTIONS, PAY_RATE_TYPE_OPTIONS_WITH_MIXED, schema
+Cohesion: 0.29
+Nodes (5): AddEmployeeDialog(), EMPLOYMENT_TYPE_OPTIONS, FormValues, OUTPUT_UNIT_SELECT_OPTIONS, schema
 
 ### Community 55 - "EssProfilePage.tsx"
 Cohesion: 0.29
@@ -484,7 +440,7 @@ Nodes (4): AddLoanDialog(), FormValues, schema, TYPE_OPTIONS
 
 ### Community 64 - "NewOvertimeRequestDialog.tsx"
 Cohesion: 0.33
-Nodes (4): FormValues, NewOvertimeRequestDialog(), REAL_OVERTIME_TYPES, schema
+Nodes (4): FormValues, NewOvertimeRequestDialog(), schema, TYPE_OPTIONS
 
 ### Community 65 - "PayslipCard.tsx"
 Cohesion: 0.29
@@ -574,10 +530,6 @@ Nodes (3): Checkbox, RadioGroup, RadioGroupItem
 Cohesion: 0.50
 Nodes (3): Select, SelectOption, SelectProps
 
-### Community 98 - "ImportBiometricsDialog"
-Cohesion: 0.27
-Nodes (8): ImportBiometricsDialog(), finish(), handleApply(), handleImport(), handleTrySample(), reset(), showPreview(), Preview
-
 ### Community 107 - "OvertimeDetailsDialog.tsx"
 Cohesion: 0.67
 Nodes (3): estimatedHourlyRate(), OvertimeDetailsDialog(), TYPE_LABEL
@@ -598,17 +550,9 @@ Nodes (3): compensationTypes, DEFAULT_TYPES_FOR(), FRONTLINE_TYPES
 Cohesion: 0.67
 Nodes (3): DEFAULT_GROUP_FOR(), FRONTLINE_GROUPS, payrollGroups
 
-### Community 127 - "mixedCompensationStore.ts"
-Cohesion: 0.20
-Nodes (10): BASE_UNIT_LONG, BASE_UNIT_SHORT, formatPesoShort(), MixedBaseType, MixedCompensationState, MixedCompensationStructure, MixedComponentType, summarizeMixedCompensationShort() (+2 more)
-
 ### Community 136 - "AdvancedReports.tsx"
 Cohesion: 0.09
-Nodes (15): AttendanceAbsenteeismReport(), CATEGORY_COLORS, CHART_LEGEND_STYLE, CHART_TOOLTIP_ITEM_STYLE, CHART_TOOLTIP_LABEL_STYLE, CHART_TOOLTIP_STYLE, CostDimension, estimateHourlyRate() (+7 more)
-
-### Community 138 - "EssOvertimePage.tsx"
-Cohesion: 0.25
-Nodes (8): ApplicationDetailsDialog(), EssOvertimePage(), LEGACY_MULTIPLIER, LEGACY_TYPE_LABEL, OT_STATUS_TONE, otTypeLabel(), otTypeMultiplier(), todayKey()
+Nodes (14): AttendanceAbsenteeismReport(), CATEGORY_COLORS, CHART_LEGEND_STYLE, CHART_TOOLTIP_ITEM_STYLE, CHART_TOOLTIP_LABEL_STYLE, CHART_TOOLTIP_STYLE, CostDimension, estimateHourlyRate() (+6 more)
 
 ### Community 177 - "BasicReports.tsx"
 Cohesion: 0.13
@@ -646,77 +590,25 @@ Nodes (5): BONUS_TYPE_LABEL, BonusesPage(), SORT_OPTIONS, STATUS_OPTIONS, TYPE_O
 Cohesion: 0.33
 Nodes (3): GenerateThirteenthMonthInput, generateThirteenthMonthRun(), monthsCreditedFor()
 
-### Community 193 - "otApplicationStore.ts"
-Cohesion: 0.25
-Nodes (10): computeTotalHours(), CreateOtApplicationInput, daysAgo(), OtApplication, OtApplicationState, OtApplicationStatus, OtApplicationType, seedApplications() (+2 more)
-
-### Community 194 - "approvals/routes.tsx"
-Cohesion: 0.29
-Nodes (6): CompensationApprovalsPage(), formatQuantity(), STATUS_OPTIONS, TYPE_OPTIONS, unitNoun(), useCompensationApprovals()
-
-### Community 195 - "OvertimeHolidayRatesSection.tsx"
-Cohesion: 0.29
-Nodes (5): OvertimeHolidayRatesSection(), handleAddCustomRate(), handleReset(), syncDrafts(), toPctDraft()
-
-### Community 196 - "payrollRatesStore.ts"
-Cohesion: 0.22
-Nodes (8): DEFAULT_HOLIDAY_RATES, DEFAULT_OT_RATES, formatMultiplierPct(), HolidayRateType, otRateOptionLabel(), OtRateType, PayrollRatesState, usePayrollRatesStore
-
-### Community 197 - "biometricsImport.ts"
-Cohesion: 0.28
-Nodes (7): BIOMETRICS_COLUMNS, BiometricsPreviewRow, LOG_TYPES, normalizeTime(), parseBiometricsCsv(), SAMPLE_PATTERNS, splitCsvLine()
-
-### Community 198 - "sampleData.ts"
-Cohesion: 0.22
-Nodes (5): ATTENDANCE_SHAPE, SAMPLE_PERIODS, SampleAttendanceRow, SampleAttendanceStatus, SamplePayslip
-
-### Community 199 - "EssAttendancePage.tsx"
-Cohesion: 0.29
-Nodes (5): EssAttendancePage(), hoursWorkedFor(), REAL_STATUS_TONE, SAMPLE_STATUS_LABEL, SAMPLE_STATUS_TONE
-
-### Community 200 - "compensationApprovals.ts"
-Cohesion: 0.43
-Nodes (7): generateCompensationApprovals(), OUTPUT_DESCRIPTIONS, recentSaturdays(), recentWorkdays(), REGULAR_HOURS_PATTERN, statusFor(), toDateKey()
-
-### Community 201 - "MixedCompensationDialog.tsx"
-Cohesion: 0.29
-Nodes (5): BASE_TYPE_OPTIONS, COMPONENT_TYPE_OPTIONS, MixedCompensationDialog(), RATE_FIELD_LABEL, RATE_PLACEHOLDER
-
-### Community 202 - "OvertimeApplicationDialog.tsx"
-Cohesion: 0.38
-Nodes (5): EMPTY_FORM, OvertimeApplicationDialog(), handleSubmit(), onOpenChange(), reset()
-
-### Community 203 - "WorkLogsSummaryCard.tsx"
-Cohesion: 0.57
-Nodes (6): hasAny(), PeriodScope, plural(), useWorkLogSummary(), WorkLogsRangePreview(), WorkLogsSummaryCard()
-
-### Community 204 - "nivoTheme.ts"
-Cohesion: 0.33
-Nodes (5): ACTIVE_INACTIVE_PALETTE, ATTENDANCE_PALETTE, CHART_PALETTE_NO_RED, EARNINGS_DEDUCTIONS_PALETTE, NIVO_THEME
-
-### Community 206 - "themeStore.ts"
-Cohesion: 0.47
-Nodes (5): applyThemeClass(), systemPrefersDark(), Theme, ThemeState, useThemeStore
-
 ## Knowledge Gaps
-- **589 isolated node(s):** `$schema`, `typescript`, `oxc`, `react/rules-of-hooks`, `warn` (+584 more)
+- **518 isolated node(s):** `$schema`, `typescript`, `oxc`, `react/rules-of-hooks`, `warn` (+513 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **91 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **63 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `react` connect `react` to `integrations/routes.tsx`, `overtime/routes.tsx`, `ui/index.ts`, `attendance/routes.tsx`, `LoginPage.tsx`, `CompanyInfoForm.tsx`, `PayrollGroupAssignDialog.tsx`, `plugins`, `Card.tsx`, `DeductionDialog.tsx`, `PayrollGroupDialog.tsx`, `PayrollRulesSection.tsx`, `ScheduleDialog.tsx`, `EmployeeProfilePage.tsx`, `reports/routes.tsx`, `EssHomePage.tsx`, `loans-deductions/routes.tsx`, `guards.tsx`, `Dialog.tsx`, `FiltersPopover.tsx`, `Table.tsx`, `Toast.tsx`, `CompensationTypeDialog.tsx`, `EarningDialog.tsx`, `AddEmployeeDialog.tsx`, `EssProfilePage.tsx`, `EmployeeComputationDrawer.tsx`, `Badge.tsx`, `FileAdjustmentDialog.tsx`, `AddHolidayDialog.tsx`, `EssLeavePage.tsx`, `AddLoanDialog.tsx`, `NewOvertimeRequestDialog.tsx`, `useReports.ts`, `InviteUserDialog.tsx`, `Button.tsx`, `Input.tsx`, `Tabs.tsx`, `AdjustmentRequestDialog.tsx`, `useAttendance.ts`, `AddBranchDialog.tsx`, `PayrollGroupDetailDialog.tsx`, `EmployeeListPage.tsx`, `LeaveRequestDialog.tsx`, `LeaveTypeDialog.tsx`, `leave/routes.tsx`, `CreatePeriodDialog.tsx`, `PayrollPeriodDetailPage`, `NotificationsBell.tsx`, `Avatar.tsx`, `Checkbox.tsx`, `Select.tsx`, `ImportBiometricsDialog`, `MiniCalendarPicker.tsx`, `AssignEmployeesDialog`, `useDashboardData.ts`, `useOnboardingChecklist.ts`, `PagibigCard.tsx`, `PhilhealthCard.tsx`, `SssBracketCard.tsx`, `WithholdingTaxCard.tsx`, `AppShell.tsx`, `PageHeader.tsx`, `useBranches.ts`, `AdvancedReports.tsx`, `EssOvertimePage.tsx`, `useOvertime.ts`, `usePayroll.ts`, `EssPayslipsPage.tsx`, `BasicReports.tsx`, `shared.tsx`, `CustomReportBuilder.tsx`, `EmployeeCombobox.tsx`, `StatutoryReports.tsx`, `AddBonusDialog.tsx`, `bonuses/routes.tsx`, `thirteenth-month/routes.tsx`, `AccountingReports.tsx`, `useUsers.ts`, `useHighlightTarget.ts`, `approvals/routes.tsx`, `OvertimeHolidayRatesSection.tsx`, `EssAttendancePage.tsx`, `MixedCompensationDialog.tsx`, `OvertimeApplicationDialog.tsx`, `WorkLogsSummaryCard.tsx`, `insights/routes.tsx`, `useIntegrations.ts`, `useThirteenthMonth.ts`?**
-  _High betweenness centrality (0.180) - this node is a cross-community bridge._
+- **Why does `react` connect `react` to `integrations/routes.tsx`, `overtime/routes.tsx`, `ui/index.ts`, `attendance/routes.tsx`, `LoginPage.tsx`, `CompanyInfoForm.tsx`, `PayrollGroupAssignDialog.tsx`, `plugins`, `Card.tsx`, `DeductionDialog.tsx`, `PayrollGroupDialog.tsx`, `PayrollRulesSection.tsx`, `ScheduleDialog.tsx`, `EmployeeProfilePage.tsx`, `reports/routes.tsx`, `EssHomePage.tsx`, `loans-deductions/routes.tsx`, `guards.tsx`, `Dialog.tsx`, `FiltersPopover.tsx`, `Table.tsx`, `Toast.tsx`, `CompensationTypeDialog.tsx`, `EarningDialog.tsx`, `AddEmployeeDialog.tsx`, `EssProfilePage.tsx`, `EmployeeComputationDrawer.tsx`, `Badge.tsx`, `FileAdjustmentDialog.tsx`, `AddHolidayDialog.tsx`, `EssLeavePage.tsx`, `AddLoanDialog.tsx`, `NewOvertimeRequestDialog.tsx`, `useReports.ts`, `InviteUserDialog.tsx`, `Button.tsx`, `Input.tsx`, `Tabs.tsx`, `AdjustmentRequestDialog.tsx`, `useAttendance.ts`, `AddBranchDialog.tsx`, `PayrollGroupDetailDialog.tsx`, `EmployeeListPage.tsx`, `LeaveRequestDialog.tsx`, `LeaveTypeDialog.tsx`, `leave/routes.tsx`, `CreatePeriodDialog.tsx`, `PayrollPeriodDetailPage`, `NotificationsBell.tsx`, `Avatar.tsx`, `Checkbox.tsx`, `Select.tsx`, `ImportBiometricsDialog`, `MiniCalendarPicker.tsx`, `AssignEmployeesDialog`, `useDashboardData.ts`, `useOnboardingChecklist.ts`, `PagibigCard.tsx`, `PhilhealthCard.tsx`, `SssBracketCard.tsx`, `WithholdingTaxCard.tsx`, `AppShell.tsx`, `PageHeader.tsx`, `useBranches.ts`, `PayrollCalendarSection.tsx`, `AdvancedReports.tsx`, `useLeave.ts`, `useOvertime.ts`, `usePayroll.ts`, `BasicReports.tsx`, `shared.tsx`, `CustomReportBuilder.tsx`, `EmployeeCombobox.tsx`, `StatutoryReports.tsx`, `AddBonusDialog.tsx`, `bonuses/routes.tsx`, `thirteenth-month/routes.tsx`, `AccountingReports.tsx`, `useUsers.ts`, `useHighlightTarget.ts`?**
+  _High betweenness centrality (0.207) - this node is a cross-community bridge._
 - **What connects `$schema`, `typescript`, `oxc` to the rest of the system?**
-  _589 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _518 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `domain.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.0273972602739726 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.028169014084507043 - nodes in this community are weakly interconnected._
+- **Should `dependencies` be split into smaller, more focused modules?**
+  _Cohesion score 0.04081632653061224 - nodes in this community are weakly interconnected._
 - **Should `react` be split into smaller, more focused modules?**
   _Cohesion score 0.05263157894736842 - nodes in this community are weakly interconnected._
 - **Should `devDependencies` be split into smaller, more focused modules?**
   _Cohesion score 0.06896551724137931 - nodes in this community are weakly interconnected._
 - **Should `compilerOptions` be split into smaller, more focused modules?**
   _Cohesion score 0.08 - nodes in this community are weakly interconnected._
-- **Should `payrollSettingsService.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.09486166007905138 - nodes in this community are weakly interconnected._

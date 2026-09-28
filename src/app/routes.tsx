@@ -26,6 +26,7 @@ import {
 import { NotificationsPage } from '@/features/notifications/routes'
 import { ReportDetailPage, ReportsPage } from '@/features/reports/routes'
 import { InsightsPage } from '@/features/insights/routes'
+import { CompensationApprovalsPage } from '@/features/approvals/routes'
 import { UserAccessPage } from '@/features/user-access/routes'
 import { CompanySettingsPage } from '@/features/company-settings/routes'
 import { OnboardingPage } from '@/features/onboarding/routes'
@@ -83,6 +84,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireCapability capability="overtime.view">
             <OvertimePage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'approvals',
+        element: (
+          <RequireCapability capability="compensation_approvals.manage">
+            <CompensationApprovalsPage />
           </RequireCapability>
         ),
       },

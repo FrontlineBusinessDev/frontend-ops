@@ -2,6 +2,7 @@ import {
   Building2,
   CalendarClock,
   CalendarDays,
+  ClipboardCheck,
   Clock,
   CreditCard,
   Gauge,
@@ -62,6 +63,7 @@ export const ADMIN_NAV: NavGroup[] = [
         feature: 'overtime_night_diff',
       },
       { label: 'Loans & Deductions', path: '/loans-deductions', icon: CreditCard, capability: 'loans.view', feature: 'loans_deductions' },
+      { label: 'Approvals', path: '/approvals', icon: ClipboardCheck, capability: 'compensation_approvals.manage' },
     ],
   },
   {

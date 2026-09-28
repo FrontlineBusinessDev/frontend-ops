@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronRight, Clock3, ClipboardEdit, Moon } from 'lucide-react'
+import { CalendarDays, ChevronRight, Clock3, ClipboardCheck, ClipboardEdit, Moon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
@@ -10,6 +10,7 @@ const ROWS = [
   { key: 'overtimePending', label: 'Overtime Requests', to: '/overtime', icon: Clock3 } as const,
   { key: 'nightDiffPending', label: 'Night Differential Requests', to: '/overtime', icon: Moon } as const,
   { key: 'attendanceAdjustmentsPending', label: 'Attendance Adjustments', to: '/attendance', icon: ClipboardEdit } as const,
+  { key: 'compensationApprovalsPending', label: 'Hourly & Output Approvals', to: '/approvals', icon: ClipboardCheck } as const,
 ]
 
 export function PendingRequestsCard() {
@@ -23,13 +24,13 @@ export function PendingRequestsCard() {
       </Card.Header>
       <Card.Body className="pt-2">
         {isLoading || !summary ? (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {Array.from({ length: ROWS.length }).map((_, i) => (
               <Skeleton key={i} className="h-20" />
             ))}
           </div>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {ROWS.map(({ key, label, to, icon: Icon }) => {
               const count = summary[key]
               return (

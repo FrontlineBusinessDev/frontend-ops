@@ -11,6 +11,7 @@ export type Capability =
   | 'overtime.view'
   | 'overtime.log'
   | 'overtime.approve'
+  | 'compensation_approvals.manage'
   | 'leave.view'
   | 'leave.request'
   | 'leave.approve'
@@ -55,6 +56,7 @@ const ALL_ADMIN_CAPS: Capability[] = [
   'overtime.view',
   'overtime.log',
   'overtime.approve',
+  'compensation_approvals.manage',
   'leave.view',
   'leave.request',
   'leave.approve',
