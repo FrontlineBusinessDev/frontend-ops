@@ -1,9 +1,24 @@
-import { BarChart3, Download, FileText, Rows3, SquareStack, X } from 'lucide-react'
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
+import { BarChart3, Check, ChevronDown, Download, FileText, Printer, Rows3, SquareStack, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import {
+  downloadReportWorkbook,
+  formatGeneratedAt,
+  installReportPrintSetup,
+  isReportPrintSetupActive,
+  printReport,
+  type ExcelExport,
+  type PageOrientation,
+  type PaperSize,
+  type ReportMetaItem,
+} from '@/features/reports/reportExport'
+import { useSession } from '@/hooks/useSession'
+import { useTenant } from '@/hooks/useTenant'
 import { cn } from '@/lib/utils/cn'
 
 export function toCsv(rows: string[][]): string {
@@ -57,39 +72,208 @@ export function ReportCategorySection({ category, tab }: { category: ReportCateg
   )
 }
 
-/** Wraps a selected report's view: title/description, an Export to Excel/CSV + PDF action pair, and print-hidden chrome around the printable content. */
+/** Wraps a selected report's view: title/description, an Export to Excel (.xlsx) + PDF action pair, print-hidden chrome, and a print-only document header. */
 export function ReportViewShell({
   title,
   description,
-  onExportCsv,
+  meta = [],
+  orientation: defaultOrientation = 'portrait',
+  onExportExcel,
   children,
 }: {
   title: string
   description?: string
-  onExportCsv?: () => void
+  /** Report context (coverage period, department, employee…) shown in the PDF header and Excel row 3. */
+  meta?: ReportMetaItem[]
+  /** Default PDF orientation — wide tables start in landscape; the user can switch in the PDF menu. */
+  orientation?: PageOrientation
+  onExportExcel?: () => ExcelExport | Promise<ExcelExport>
   children: React.ReactNode
 }) {
+  const { user } = useSession()
+  const { company } = useTenant()
+  const [orientation, setOrientation] = useState<PageOrientation>(defaultOrientation)
+  const [generatedAt, setGeneratedAt] = useState(() => new Date())
+  const [exporting, setExporting] = useState(false)
+  const companyName = company?.name ?? 'Frontline Business Solutions'
+  const printOptions = useRef<{ paper: PaperSize; orientation: PageOrientation }>({ paper: 'letter', orientation: defaultOrientation })
+
+  useEffect(() => {
+    printOptions.current.orientation = orientation
+  }, [orientation])
+
+  // Browser-initiated prints (Ctrl+P) get the same page setup and a fresh "Generated" timestamp.
+  useEffect(() => {
+    let cleanup: (() => void) | null = null
+    const onBeforePrint = () => {
+      setGeneratedAt(new Date())
+      if (!isReportPrintSetupActive()) cleanup = installReportPrintSetup(printOptions.current)
+    }
+    const onAfterPrint = () => {
+      cleanup?.()
+      cleanup = null
+    }
+    window.addEventListener('beforeprint', onBeforePrint)
+    window.addEventListener('afterprint', onAfterPrint)
+    return () => {
+      window.removeEventListener('beforeprint', onBeforePrint)
+      window.removeEventListener('afterprint', onAfterPrint)
+      cleanup?.()
+    }
+  }, [])
+
+  function onPrint(paper: PaperSize) {
+    printOptions.current.paper = paper
+    flushSync(() => setGeneratedAt(new Date()))
+    printReport({ paper, orientation })
+  }
+
+  async function onExcel() {
+    if (!onExportExcel) return
+    setExporting(true)
+    try {
+      downloadReportWorkbook({ companyName, title, meta, generatedBy: user.name, data: await onExportExcel() })
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
-    <Card className="p-5">
+    <Card className="report-print p-5">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3 print:hidden">
         <div>
           <p className="font-display text-base font-semibold tracking-tight">{title}</p>
           {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </div>
         <div className="flex items-center gap-2">
-          {onExportCsv && (
-            <Button size="sm" variant="secondary" icon={<Download className="size-3.5" />} onClick={onExportCsv}>
+          {onExportExcel && (
+            <Button size="sm" variant="secondary" icon={<Download className="size-3.5" />} onClick={onExcel} disabled={exporting}>
               Export to Excel
             </Button>
           )}
-          <Button size="sm" variant="secondary" icon={<FileText className="size-3.5" />} onClick={() => window.print()}>
-            Export to PDF
-          </Button>
+          <PdfExportMenu orientation={orientation} onOrientationChange={setOrientation} onPrint={onPrint} />
         </div>
       </div>
-      <p className="mb-3 hidden font-display text-base font-semibold tracking-tight print:block">{title}</p>
+
+      <ReportPrintHeader
+        companyName={companyName}
+        logoUrl={company?.logoUrl}
+        title={title}
+        description={description}
+        meta={meta}
+        generatedAt={generatedAt}
+        generatedBy={user.name}
+      />
       {children}
     </Card>
+  )
+}
+
+const MENU_ITEM = 'flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm outline-none data-[highlighted]:bg-muted'
+const MENU_LABEL = 'px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground'
+
+function PdfExportMenu({
+  orientation,
+  onOrientationChange,
+  onPrint,
+}: {
+  orientation: PageOrientation
+  onOrientationChange: (o: PageOrientation) => void
+  onPrint: (paper: PaperSize) => void
+}) {
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <Button size="sm" variant="secondary" icon={<FileText className="size-3.5" />}>
+          Export to PDF
+          <ChevronDown className="size-3.5 opacity-60" />
+        </Button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content align="end" sideOffset={6} className="z-50 w-56 rounded-xl border border-border bg-card p-1 shadow-soft-lg">
+          <DropdownMenu.Label className={MENU_LABEL}>Orientation</DropdownMenu.Label>
+          <DropdownMenu.RadioGroup value={orientation} onValueChange={(v) => onOrientationChange(v as PageOrientation)}>
+            {(['portrait', 'landscape'] as const).map((o) => (
+              <DropdownMenu.RadioItem key={o} value={o} onSelect={(e) => e.preventDefault()} className={MENU_ITEM}>
+                <span className="flex size-3.5 items-center justify-center">
+                  <DropdownMenu.ItemIndicator>
+                    <Check className="size-3.5 text-primary" />
+                  </DropdownMenu.ItemIndicator>
+                </span>
+                {o === 'portrait' ? 'Portrait' : 'Landscape'}
+              </DropdownMenu.RadioItem>
+            ))}
+          </DropdownMenu.RadioGroup>
+          <DropdownMenu.Separator className="my-1 h-px bg-border" />
+          <DropdownMenu.Label className={MENU_LABEL}>Paper size</DropdownMenu.Label>
+          <DropdownMenu.Item onSelect={() => onPrint('letter')} className={MENU_ITEM}>
+            <Printer className="size-3.5 text-muted-foreground" />
+            Letter
+            <span className="ml-auto text-xs text-muted-foreground">8.5 × 11 in</span>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item onSelect={() => onPrint('a4')} className={MENU_ITEM}>
+            <Printer className="size-3.5 text-muted-foreground" />
+            A4
+            <span className="ml-auto text-xs text-muted-foreground">210 × 297 mm</span>
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  )
+}
+
+/** Standardized document header block — rendered only on paper / PDF. */
+function ReportPrintHeader({
+  companyName,
+  logoUrl,
+  title,
+  description,
+  meta,
+  generatedAt,
+  generatedBy,
+}: {
+  companyName: string
+  logoUrl?: string
+  title: string
+  description?: string
+  meta: ReportMetaItem[]
+  generatedAt: Date
+  generatedBy: string
+}) {
+  const initials = companyName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('')
+  const details: ReportMetaItem[] = [...meta, { label: 'Generated', value: formatGeneratedAt(generatedAt) }, { label: 'Generated by', value: generatedBy }]
+
+  return (
+    <div className="report-print-header mb-4 hidden print:block">
+      <div className="flex items-center justify-between gap-4 border-b-2 border-[#1e6f5e] pb-2.5">
+        <div className="flex items-center gap-3">
+          {logoUrl ? (
+            <img src={logoUrl} alt="" className="size-10 rounded-lg object-contain" />
+          ) : (
+            <div className="flex size-10 items-center justify-center rounded-lg bg-[#1e6f5e] text-sm font-bold text-white">{initials}</div>
+          )}
+          <div>
+            <p className="text-[13pt] font-bold leading-tight text-[#111827]">{companyName}</p>
+            <p className="text-[8pt] text-[#6b7280]">Payroll &amp; HR Reports</p>
+          </div>
+        </div>
+        <p className="text-right text-[7.5pt] font-semibold uppercase tracking-wide text-[#6b7280]">Confidential</p>
+      </div>
+      <p className="mt-3 text-[15pt] font-bold leading-tight text-[#111827]">{title}</p>
+      {description && <p className="mt-0.5 text-[8.5pt] text-[#4b5563]">{description}</p>}
+      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[8pt] text-[#374151]">
+        {details.map((d) => (
+          <p key={d.label}>
+            <span className="font-semibold text-[#111827]">{d.label}:</span> {d.value}
+          </p>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -173,7 +357,7 @@ export function TablePane({ mode, className, style, children }: ViewPaneProps) {
 
 export function StatTile({ label, value, icon: Icon }: { label: string; value: string; icon?: LucideIcon }) {
   return (
-    <div className="rounded-xl border border-border p-4">
+    <div className="stat-tile rounded-xl border border-border p-4">
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
         {Icon && <Icon className="size-3.5 text-muted-foreground" />}

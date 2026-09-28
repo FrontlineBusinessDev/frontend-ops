@@ -57,7 +57,7 @@ export function PayrollGroupsSection({
       {groups.length === 0 ? (
         <EmptyState title="No payroll groups yet" icon={Users} />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {groups.map((group) => {
             const compensationType = compensationTypes.find((c) => c.id === group.compensationTypeId)
             const schedule = schedules.find((s) => s.id === group.workScheduleId)
@@ -100,9 +100,9 @@ export function PayrollGroupsSection({
                   </div>
                 </dl>
 
-                <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
                   <Badge tone="brand">{group.employeeIds.length} Employees</Badge>
-                  <div className="flex gap-1.5">
+                  <div className="flex flex-wrap gap-1.5">
                     <PayrollGroupDetailDialog
                       group={group}
                       groups={groups}

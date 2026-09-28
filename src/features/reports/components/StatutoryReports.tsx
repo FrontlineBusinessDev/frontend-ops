@@ -1,13 +1,18 @@
+import { Info, Search } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { EmployeeCombobox } from '@/components/ui/EmployeeCombobox'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
-import { downloadCsv, FilterLabel, ReportFilterBar, ReportViewShell, StatTile, toCsv } from '@/features/reports/components/shared'
-import { useAllPayrollLines } from '@/features/reports/hooks/useReports'
+import { FilterLabel, ReportFilterBar, ReportViewShell, StatTile } from '@/features/reports/components/shared'
+import type { ExcelExport } from '@/features/reports/reportExport'
+import { useAllPayrollLines, useStatutoryContributionData } from '@/features/reports/hooks/useReports'
+import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format'
+import type { Employee } from '@/types/domain'
 
 function fullName(personal: { firstName: string; lastName: string }) {
   return `${personal.firstName} ${personal.lastName}`
@@ -47,18 +52,24 @@ export function StatutoryContributionReport({ type }: { type: ContributionType }
     { ee: 0, er: 0 },
   )
 
-  function onExport() {
-    const period = periods.find((p) => p.id === activePeriodId)
+  const activePeriod = periods.find((p) => p.id === activePeriodId)
+
+  function onExport(): ExcelExport {
     const header = ['Employee', 'Employee Share', 'Employer Share', 'Total Remittance']
     const dataRows = periodRows.map((r) => {
       const { ee, er } = shareFor(type, r.line)
-      return [fullName(r.employee.personal), String(ee), String(er), String(ee + er)]
+      return [fullName(r.employee.personal), ee, er, ee + er]
     })
-    downloadCsv(`${type}-contribution-${period?.label ?? 'period'}.csv`, toCsv([header, ...dataRows]))
+    return { filename: `${type}-contribution-${activePeriod?.label ?? 'period'}`, rows: [header, ...dataRows], sumFooter: true }
   }
 
   return (
-    <ReportViewShell title={meta.title} description={meta.description} onExportCsv={periodRows.length > 0 ? onExport : undefined}>
+    <ReportViewShell
+      title={meta.title}
+      description={meta.description}
+      meta={activePeriod ? [{ label: 'Payroll Period', value: activePeriod.label }, { label: 'Form', value: meta.formLabel }] : []}
+      onExportExcel={periodRows.length > 0 ? onExport : undefined}
+    >
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : periods.length === 0 ? (
@@ -141,6 +152,10 @@ export function Bir2316Report() {
     <ReportViewShell
       title="BIR Form 2316"
       description="Annual Certificate of Compensation Payment / Tax Withheld, per employee."
+      meta={[
+        ...(employee ? [{ label: 'Employee', value: `${fullName(employee.personal)} (${employee.employeeNumber})` }] : []),
+        ...(activeYear ? [{ label: 'Tax Year', value: activeYear }] : []),
+      ]}
     >
       {employeesLoading || isLoading ? (
         <Skeleton className="h-64" />
@@ -227,17 +242,18 @@ export function Bir1601CReport() {
   )
   const employeeCount = new Set(monthRows.map((r) => r.employee.id)).size
 
-  function onExport() {
-    const header = ['Employee', 'Gross Compensation', 'Tax Withheld']
-    const dataRows = monthRows.map((r) => [fullName(r.employee.personal), String(r.line.grossPay), String(r.line.withholdingTax)])
-    downloadCsv(`bir-1601c-${activeMonth}.csv`, toCsv([header, ...dataRows]))
+  function onExport(): ExcelExport {
+    const header = ['Employee', 'Payroll Period', 'Gross Compensation', 'Tax Withheld']
+    const dataRows = monthRows.map((r) => [fullName(r.employee.personal), r.period.label, r.line.grossPay, r.line.withholdingTax])
+    return { filename: `bir-1601c-${activeMonth}`, rows: [header, ...dataRows], sumFooter: true }
   }
 
   return (
     <ReportViewShell
       title="BIR Form 1601-C"
       description="Monthly Remittance Return of Income Taxes Withheld on Compensation."
-      onExportCsv={monthRows.length > 0 ? onExport : undefined}
+      meta={activeMonth ? [{ label: 'Month', value: monthLabel(activeMonth) }] : []}
+      onExportExcel={monthRows.length > 0 ? onExport : undefined}
     >
       {isLoading ? (
         <Skeleton className="h-64" />
@@ -275,6 +291,296 @@ export function Bir1601CReport() {
                   </TableRow>
                 ))}
               </TableBody>
+            </Table>
+          )}
+        </div>
+      )}
+    </ReportViewShell>
+  )
+}
+
+interface ContributionTotals {
+  sssEe: number
+  sssEr: number
+  phEe: number
+  phEr: number
+  hdmfEe: number
+  hdmfEr: number
+  tax: number
+}
+
+interface ConsolidatedRow extends ContributionTotals {
+  employee: Employee
+  periodLabel: string
+}
+
+const ZERO_TOTALS: ContributionTotals = { sssEe: 0, sssEr: 0, phEe: 0, phEr: 0, hdmfEe: 0, hdmfEr: 0, tax: 0 }
+
+function addTotals(a: ContributionTotals, b: ContributionTotals): ContributionTotals {
+  return {
+    sssEe: a.sssEe + b.sssEe,
+    sssEr: a.sssEr + b.sssEr,
+    phEe: a.phEe + b.phEe,
+    phEr: a.phEr + b.phEr,
+    hdmfEe: a.hdmfEe + b.hdmfEe,
+    hdmfEr: a.hdmfEr + b.hdmfEr,
+    tax: a.tax + b.tax,
+  }
+}
+
+/** Employee-side statutory deductions include withholding tax; the employer side is contributions only. */
+function employeeTotal(t: ContributionTotals) {
+  return t.sssEe + t.phEe + t.hdmfEe + t.tax
+}
+
+function employerTotal(t: ContributionTotals) {
+  return t.sssEr + t.phEr + t.hdmfEr
+}
+
+function monthLabel(yearMonth: string) {
+  return new Date(`${yearMonth}-01T00:00:00`).toLocaleString('en-US', { month: 'long', year: 'numeric' })
+}
+
+const VIEW_OPTIONS = [
+  { value: 'period', label: 'Payroll Period' },
+  { value: 'month', label: 'Month' },
+]
+
+const AGENCY_GROUPS = [
+  { label: 'SSS', ee: 'sssEe', er: 'sssEr' },
+  { label: 'PhilHealth', ee: 'phEe', er: 'phEr' },
+  { label: 'Pag-IBIG', ee: 'hdmfEe', er: 'hdmfEr' },
+] as const
+
+function MoneyCell({ value, className }: { value: number; className?: string }) {
+  return <TableCell className={cn('whitespace-nowrap text-right tabular-nums', className)}>{formatCurrency(value)}</TableCell>
+}
+
+function ContributionCells({ t, strong }: { t: ContributionTotals; strong?: boolean }) {
+  const emphasis = strong ? 'font-semibold' : 'font-medium'
+  return (
+    <>
+      {AGENCY_GROUPS.map((g) => (
+        <GroupCells key={g.label} ee={t[g.ee]} er={t[g.er]} emphasis={emphasis} />
+      ))}
+      <MoneyCell value={t.tax} className="border-l border-border" />
+      <MoneyCell value={employeeTotal(t)} className={cn('border-l border-border', emphasis)} />
+      <MoneyCell value={employerTotal(t)} className={emphasis} />
+    </>
+  )
+}
+
+function GroupCells({ ee, er, emphasis }: { ee: number; er: number; emphasis: string }) {
+  return (
+    <>
+      <MoneyCell value={ee} className="border-l border-border" />
+      <MoneyCell value={er} />
+      <MoneyCell value={ee + er} className={emphasis} />
+    </>
+  )
+}
+
+/** SSS, PhilHealth, Pag-IBIG and withholding tax side by side per employee, for one payroll period or a whole month. */
+export function ConsolidatedStatutoryReport() {
+  const { rows, isSample, isLoading } = useStatutoryContributionData()
+  const [view, setView] = useState<'period' | 'month'>('period')
+  const [periodId, setPeriodId] = useState<string | undefined>(undefined)
+  const [month, setMonth] = useState<string | undefined>(undefined)
+  const [department, setDepartment] = useState('all')
+  const [search, setSearch] = useState('')
+
+  const periods = useMemo(() => {
+    const seen = new Map<string, (typeof rows)[number]['period']>()
+    for (const r of rows) seen.set(r.period.id, r.period)
+    return [...seen.values()].sort((a, b) => b.startDate.localeCompare(a.startDate))
+  }, [rows])
+  const months = useMemo(() => [...new Set(periods.map((p) => p.startDate.slice(0, 7)))].sort((a, b) => b.localeCompare(a)), [periods])
+  const departments = useMemo(() => [...new Set(rows.map((r) => r.employee.employment.department))].sort(), [rows])
+
+  const activePeriod = periods.find((p) => p.id === periodId) ?? periods[0]
+  const activeMonth = month ?? months[0]
+  const scopeLabel = view === 'period' ? (activePeriod?.label ?? '') : activeMonth ? monthLabel(activeMonth) : ''
+
+  const tableRows = useMemo(() => {
+    const inScope = rows.filter((r) => (view === 'period' ? r.period.id === activePeriod?.id : r.period.startDate.slice(0, 7) === activeMonth))
+    const byEmployee = new Map<string, ConsolidatedRow>()
+    for (const { employee, line } of inScope) {
+      const current = byEmployee.get(employee.id) ?? { employee, periodLabel: scopeLabel, ...ZERO_TOTALS }
+      byEmployee.set(employee.id, {
+        ...current,
+        ...addTotals(current, {
+          sssEe: line.sssEmployeeShare,
+          sssEr: line.sssEmployerShare,
+          phEe: line.philhealthEmployeeShare,
+          phEr: line.philhealthEmployerShare,
+          hdmfEe: line.pagibigEmployeeShare,
+          hdmfEr: line.pagibigEmployerShare,
+          tax: line.withholdingTax,
+        }),
+      })
+    }
+    const query = search.trim().toLowerCase()
+    return [...byEmployee.values()]
+      .filter((r) => department === 'all' || r.employee.employment.department === department)
+      .filter((r) => !query || `${fullName(r.employee.personal)} ${r.employee.employeeNumber}`.toLowerCase().includes(query))
+      .sort((a, b) => a.employee.personal.lastName.localeCompare(b.employee.personal.lastName))
+  }, [rows, view, activePeriod?.id, activeMonth, scopeLabel, department, search])
+
+  const totals = tableRows.reduce<ContributionTotals>((acc, r) => addTotals(acc, r), ZERO_TOTALS)
+  const hasExtraFilters = department !== 'all' || search.trim().length > 0
+
+  function clearFilters() {
+    setDepartment('all')
+    setSearch('')
+  }
+
+  function onExport(): ExcelExport {
+    const header = [
+      'Employee ID',
+      'Employee Name',
+      view === 'period' ? 'Payroll Period' : 'Month',
+      ...AGENCY_GROUPS.flatMap((g) => [`${g.label} EE`, `${g.label} ER`, `${g.label} Total`]),
+      'Withholding Tax',
+      'Total Employee Deductions',
+      'Total Employer Contributions',
+    ]
+    const toCells = (t: ContributionTotals) =>
+      [...AGENCY_GROUPS.flatMap((g) => [t[g.ee], t[g.er], t[g.ee] + t[g.er]]), t.tax, employeeTotal(t), employerTotal(t)].map((n) => Math.round(n * 100) / 100)
+    const body = tableRows.map((r) => [r.employee.employeeNumber, fullName(r.employee.personal), r.periodLabel, ...toCells(r)])
+    const footer = ['TOTAL', `${tableRows.length} employees`, scopeLabel, ...toCells(totals)]
+    const slug = scopeLabel.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase()
+    return { filename: `consolidated-statutory-${slug}${isSample ? '-sample' : ''}`, rows: [header, ...body], footer }
+  }
+
+  const reportMeta = [
+    { label: view === 'period' ? 'Payroll Period' : 'Month', value: scopeLabel },
+    { label: 'Department', value: department === 'all' ? 'All' : department },
+    ...(search.trim() ? [{ label: 'Employee Search', value: `“${search.trim()}”` }] : []),
+    ...(isSample ? [{ label: 'Data', value: 'Sample (payroll not yet run)' }] : []),
+  ]
+
+  return (
+    <ReportViewShell
+      title="Overall Statutory Contribution Report"
+      description="Unified summary of SSS, PhilHealth, Pag-IBIG, and Tax deductions per employee."
+      meta={periods.length > 0 ? reportMeta : []}
+      orientation="landscape"
+      onExportExcel={tableRows.length > 0 ? onExport : undefined}
+    >
+      {isLoading ? (
+        <Skeleton className="h-64" />
+      ) : periods.length === 0 ? (
+        <EmptyState title="No payroll history yet" description="Run at least one payroll period to generate this report." />
+      ) : (
+        <div className="space-y-4">
+          {isSample && (
+            <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-xs">
+              <Info className="mt-0.5 size-3.5 shrink-0 text-warning" />
+              <p className="text-foreground">
+                <span className="font-semibold">Sample data.</span> No payroll has been run yet, so these figures are computed by the payroll
+                engine for the last {periods.length} cutoffs and aren&apos;t saved. Run a payroll period to see actual contributions.
+              </p>
+            </div>
+          )}
+
+          <ReportFilterBar onClear={hasExtraFilters ? clearFilters : undefined}>
+            <FilterLabel label="View By" className="w-40">
+              <Select value={view} onValueChange={(v) => setView(v as 'period' | 'month')} options={VIEW_OPTIONS} />
+            </FilterLabel>
+            {view === 'period' ? (
+              <FilterLabel label="Payroll Period" className="w-56">
+                <Select value={activePeriod?.id} onValueChange={setPeriodId} options={periods.map((p) => ({ value: p.id, label: p.label }))} />
+              </FilterLabel>
+            ) : (
+              <FilterLabel label="Month" className="w-48">
+                <Select value={activeMonth} onValueChange={setMonth} options={months.map((m) => ({ value: m, label: monthLabel(m) }))} />
+              </FilterLabel>
+            )}
+            <FilterLabel label="Department" className="w-44">
+              <Select
+                value={department}
+                onValueChange={setDepartment}
+                options={[{ value: 'all', label: 'All Departments' }, ...departments.map((d) => ({ value: d, label: d }))]}
+              />
+            </FilterLabel>
+            <FilterLabel label="Employee" className="w-56">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name or ID…" className="pl-9" />
+              </div>
+            </FilterLabel>
+          </ReportFilterBar>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatTile label="Employees" value={String(tableRows.length)} />
+            <StatTile label="Total Employee Deductions" value={formatCurrency(employeeTotal(totals))} />
+            <StatTile label="Total Employer Contributions" value={formatCurrency(employerTotal(totals))} />
+            <StatTile label="Total Remittance (EE + ER)" value={formatCurrency(employeeTotal(totals) + employerTotal(totals))} />
+            <StatTile label="SSS (EE + ER)" value={formatCurrency(totals.sssEe + totals.sssEr)} />
+            <StatTile label="PhilHealth (EE + ER)" value={formatCurrency(totals.phEe + totals.phEr)} />
+            <StatTile label="Pag-IBIG (EE + ER)" value={formatCurrency(totals.hdmfEe + totals.hdmfEr)} />
+            <StatTile label="Withholding Tax (BIR)" value={formatCurrency(totals.tax)} />
+          </div>
+
+          {tableRows.length === 0 ? (
+            <EmptyState title="No employees match these filters" description="Try another department or clear the search." />
+          ) : (
+            <Table className="print:text-[9px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead rowSpan={2} className="align-bottom">
+                    Employee
+                  </TableHead>
+                  <TableHead rowSpan={2} className="align-bottom">
+                    {view === 'period' ? 'Period' : 'Month'}
+                  </TableHead>
+                  {AGENCY_GROUPS.map((g) => (
+                    <TableHead key={g.label} colSpan={3} className="border-l border-border text-center">
+                      {g.label}
+                    </TableHead>
+                  ))}
+                  <TableHead rowSpan={2} className="border-l border-border text-right align-bottom">
+                    Withholding Tax
+                  </TableHead>
+                  <TableHead colSpan={2} className="border-l border-border text-center">
+                    Total Statutory
+                  </TableHead>
+                </TableRow>
+                <TableRow>
+                  {AGENCY_GROUPS.flatMap((g) => [
+                    <TableHead key={`${g.label}-ee`} className="border-l border-border pt-0 text-right">
+                      Employee
+                    </TableHead>,
+                    <TableHead key={`${g.label}-er`} className="pt-0 text-right">
+                      Employer
+                    </TableHead>,
+                    <TableHead key={`${g.label}-total`} className="pt-0 text-right">
+                      Total
+                    </TableHead>,
+                  ])}
+                  <TableHead className="border-l border-border pt-0 text-right">Employee</TableHead>
+                  <TableHead className="pt-0 text-right">Employer</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tableRows.map((r) => (
+                  <TableRow key={r.employee.id}>
+                    <TableCell className="whitespace-nowrap">
+                      <p className="text-sm font-medium leading-tight">{fullName(r.employee.personal)}</p>
+                      <p className="text-xs leading-tight text-muted-foreground">{r.employee.employeeNumber}</p>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">{r.periodLabel}</TableCell>
+                    <ContributionCells t={r} />
+                  </TableRow>
+                ))}
+              </TableBody>
+              <tfoot className="border-t-2 border-border bg-muted/50">
+                <TableRow>
+                  <TableCell className="whitespace-nowrap font-semibold">Total ({tableRows.length})</TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">{scopeLabel}</TableCell>
+                  <ContributionCells t={totals} strong />
+                </TableRow>
+              </tfoot>
             </Table>
           )}
         </div>

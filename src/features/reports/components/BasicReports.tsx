@@ -12,7 +12,8 @@ import { usePayrollGroups } from '@/features/company-settings/hooks/usePayrollGr
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
 import { useOvertimeRecords } from '@/features/overtime/hooks/useOvertime'
 import { useLoans } from '@/features/loans-deductions/hooks/useLoans'
-import { downloadCsv, FilterLabel, ReportFilterBar, ReportViewShell, StatTile, toCsv } from '@/features/reports/components/shared'
+import { FilterLabel, ReportFilterBar, ReportViewShell, StatTile } from '@/features/reports/components/shared'
+import { parseCsv, type ExcelExport, type ReportMetaItem } from '@/features/reports/reportExport'
 import {
   useAllPayrollLines,
   useEmployeeMasterlist,
@@ -31,6 +32,25 @@ import type { DeductionConfig, Employee, PayrollGroup } from '@/types/domain'
 
 function fullName(personal: { firstName: string; lastName: string }) {
   return `${personal.firstName} ${personal.lastName}`
+}
+
+/** Department / Branch / Employee filter context for the export header. */
+function employeeFilterMeta(
+  { employeeIds, department, branchId }: { employeeIds: string[]; department: string; branchId: string },
+  branches: { id: string; name: string }[],
+): ReportMetaItem[] {
+  return [
+    { label: 'Department', value: department === 'all' ? 'All' : department },
+    { label: 'Branch', value: branchId === 'all' ? 'All' : (branches.find((b) => b.id === branchId)?.name ?? branchId) },
+    ...(employeeIds.length > 0 ? [{ label: 'Employees', value: `${employeeIds.length} selected` }] : []),
+  ]
+}
+
+/** Keep only the CSV rows (after the header) whose `column` value belongs to the on-screen, filtered employees. */
+function filterCsvRows(rows: string[][], column: string, allowed: Set<string>): string[][] {
+  const [header = [], ...body] = rows
+  const index = header.indexOf(column)
+  return index < 0 ? rows : [header, ...body.filter((r) => allowed.has(r[index]))]
 }
 
 function comboboxOptions(employees: Employee[]) {
@@ -78,13 +98,19 @@ export function EmployeeMasterListReport() {
     setBranchId('all')
   }
 
-  async function onExport() {
-    downloadCsv('employee-masterlist.csv', await exportEmployeeMasterlistCsv(user))
+  async function onExport(): Promise<ExcelExport> {
+    const rows = parseCsv(await exportEmployeeMasterlistCsv(user))
     notify({ title: 'Employee masterlist exported', tone: 'success' })
+    return { filename: 'employee-masterlist', rows: filterCsvRows(rows, 'Employee #', new Set(filteredEmployees.map((e) => e.employeeNumber))) }
   }
 
   return (
-    <ReportViewShell title="Employee Master List" description="Full profile and demographic export for every employee." onExportCsv={onExport}>
+    <ReportViewShell
+      title="Employee Master List"
+      description="Full profile and demographic export for every employee."
+      meta={employeeFilterMeta({ employeeIds, department, branchId }, branches)}
+      onExportExcel={onExport}
+    >
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : employees.length === 0 ? (
@@ -141,7 +167,7 @@ export function EmployeeCompensationReport() {
   const { employees, isLoading } = useEmployees()
   const { groups } = usePayrollGroups()
 
-  function onExport() {
+  function onExport(): ExcelExport {
     const header = ['Employee', 'Position', 'Pay Rate Type', 'Base Rate', 'Allowances', 'Pay Frequency']
     const rows = employees.map((e) => {
       const group = findEmployeePayrollGroup(groups, e.id)
@@ -151,18 +177,19 @@ export function EmployeeCompensationReport() {
         e.employment.position,
         PAY_RATE_TYPE_LABEL[e.compensation.payType],
         formatBaseRateShort(e.compensation.payType, e.compensation.basicPay, e.compensation.outputUnit),
-        String(allowances),
+        allowances,
         group ? FREQUENCY_LABEL[group.frequency] : '',
       ]
     })
-    downloadCsv('employee-compensation-report.csv', toCsv([header, ...rows]))
+    return { filename: 'employee-compensation-report', rows: [header, ...rows], columnTypes: { Allowances: 'currency' } }
   }
 
   return (
     <ReportViewShell
       title="Employee Compensation Report"
       description="Breakdown of basic rates, allowances, and pay frequency per employee."
-      onExportCsv={onExport}
+      meta={[{ label: 'Employees', value: `All (${employees.length})` }]}
+      onExportExcel={onExport}
     >
       {isLoading ? (
         <Skeleton className="h-64" />
@@ -207,24 +234,40 @@ export function PayrollRegisterReport() {
   const [periodId, setPeriodId] = useState<string | undefined>(undefined)
   const { report, isLoading } = usePayrollRegister(periodId ?? periods[0]?.id)
 
-  function onExport() {
-    if (!report) return
+  function onExport(): ExcelExport {
     const header = ['Employee', 'Gross Pay', 'SSS', 'PhilHealth', 'Pag-IBIG', 'Withholding Tax', 'Total Deductions', 'Net Pay']
-    const rows = report.rows.map((r) => [
+    const rows = (report?.rows ?? []).map((r) => [
       fullName(r.employee.personal),
-      String(r.grossPay),
-      String(r.sssEmployeeShare),
-      String(r.philhealthEmployeeShare),
-      String(r.pagibigEmployeeShare),
-      String(r.withholdingTax),
-      String(r.totalDeductions),
-      String(r.netPay),
+      r.grossPay,
+      r.sssEmployeeShare,
+      r.philhealthEmployeeShare,
+      r.pagibigEmployeeShare,
+      r.withholdingTax,
+      r.totalDeductions,
+      r.netPay,
     ])
-    downloadCsv(`payroll-register-${report.period?.label ?? 'period'}.csv`, toCsv([header, ...rows]))
+    return {
+      filename: `payroll-register-${report?.period?.label ?? 'period'}`,
+      rows: [header, ...rows],
+      sumFooter: true,
+      columnTypes: { SSS: 'currency', PhilHealth: 'currency', 'Pag-IBIG': 'currency' },
+    }
   }
 
   return (
-    <ReportViewShell title="Payroll Register" description="Detailed payroll breakdown per employee for a pay period." onExportCsv={report ? onExport : undefined}>
+    <ReportViewShell
+      title="Payroll Register"
+      description="Detailed payroll breakdown per employee for a pay period."
+      meta={
+        report?.period
+          ? [
+              { label: 'Payroll Period', value: report.period.label },
+              { label: 'Pay Date', value: formatDate(report.period.payDate) },
+            ]
+          : []
+      }
+      onExportExcel={report ? onExport : undefined}
+    >
       {periodsLoading ? (
         <Skeleton className="h-72" />
       ) : periods.length === 0 ? (
@@ -304,22 +347,19 @@ export function PayrollSummaryReport() {
     { gross: 0, deductions: 0, net: 0 },
   )
 
-  function onExport() {
+  function onExport(): ExcelExport {
     const header = ['Period', 'Pay Date', 'Status', 'Employees', 'Gross Pay', 'Total Deductions', 'Net Pay']
-    const dataRows = byPeriod.map((p) => [
-      p.period.label,
-      p.period.payDate,
-      p.period.status,
-      String(p.employees),
-      String(p.gross),
-      String(p.deductions),
-      String(p.net),
-    ])
-    downloadCsv('payroll-summary.csv', toCsv([header, ...dataRows]))
+    const dataRows = byPeriod.map((p) => [p.period.label, p.period.payDate, p.period.status, p.employees, p.gross, p.deductions, p.net])
+    return { filename: 'payroll-summary', rows: [header, ...dataRows], sumFooter: true }
   }
 
   return (
-    <ReportViewShell title="Payroll Summary" description="High-level payroll totals for every period." onExportCsv={byPeriod.length > 0 ? onExport : undefined}>
+    <ReportViewShell
+      title="Payroll Summary"
+      description="High-level payroll totals for every period."
+      meta={[{ label: 'Coverage', value: `All payroll periods (${byPeriod.length})` }]}
+      onExportExcel={byPeriod.length > 0 ? onExport : undefined}
+    >
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : byPeriod.length === 0 ? (
@@ -373,18 +413,27 @@ export function PayrollSummaryPerEmployeeReport() {
   const activeEmployeeId = employeeId ?? employees[0]?.id
   const employeeRows = rows.filter((r) => r.employee.id === activeEmployeeId).sort((a, b) => a.period.startDate.localeCompare(b.period.startDate))
 
-  function onExport() {
-    const employee = employees.find((e) => e.id === activeEmployeeId)
+  const activeEmployee = employees.find((e) => e.id === activeEmployeeId)
+
+  function onExport(): ExcelExport {
     const header = ['Period', 'Pay Date', 'Gross Pay', 'Total Deductions', 'Net Pay']
-    const dataRows = employeeRows.map((r) => [r.period.label, r.period.payDate, String(r.line.grossPay), String(r.line.totalDeductions), String(r.line.netPay)])
-    downloadCsv(`payroll-summary-${employee?.employeeNumber ?? 'employee'}.csv`, toCsv([header, ...dataRows]))
+    const dataRows = employeeRows.map((r) => [r.period.label, r.period.payDate, r.line.grossPay, r.line.totalDeductions, r.line.netPay])
+    return { filename: `payroll-summary-${activeEmployee?.employeeNumber ?? 'employee'}`, rows: [header, ...dataRows], sumFooter: true }
   }
 
   return (
     <ReportViewShell
       title="Payroll Summary per Employee"
       description="Compare one employee's pay across every period they've been run in."
-      onExportCsv={employeeRows.length > 0 ? onExport : undefined}
+      meta={
+        activeEmployee
+          ? [
+              { label: 'Employee', value: `${fullName(activeEmployee.personal)} (${activeEmployee.employeeNumber})` },
+              { label: 'Department', value: activeEmployee.employment.department },
+            ]
+          : []
+      }
+      onExportExcel={employeeRows.length > 0 ? onExport : undefined}
     >
       {employeesLoading || isLoading ? (
         <Skeleton className="h-64" />
@@ -587,13 +636,24 @@ export function OvertimeReportView() {
     setBranchId('all')
   }
 
-  async function onExport() {
-    downloadCsv('overtime-report.csv', await exportOvertimeSummaryCsv(user))
+  async function onExport(): Promise<ExcelExport> {
+    const rows = parseCsv(await exportOvertimeSummaryCsv(user))
     notify({ title: 'Overtime report exported', tone: 'success' })
+    return {
+      filename: 'overtime-report',
+      rows: filterCsvRows(rows, 'Employee ID', new Set(filteredRows.map((r) => r.employee.employeeNumber))),
+      sumFooter: true,
+      columnTypes: { Hours: 'number' },
+    }
   }
 
   return (
-    <ReportViewShell title="Overtime Report" description="Overtime and night differential hours & estimated cost per employee." onExportCsv={onExport}>
+    <ReportViewShell
+      title="Overtime Report"
+      description="Overtime and night differential hours & estimated cost per employee."
+      meta={employeeFilterMeta({ employeeIds, department, branchId }, branches)}
+      onExportExcel={onExport}
+    >
       {recordsLoading || employeesLoading ? (
         <Skeleton className="h-64" />
       ) : rows.length === 0 ? (
@@ -659,17 +719,22 @@ export function LoansDeductionsReportView() {
   const employeeById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees])
   const activeLoans = loans.filter((l) => l.status === 'active')
 
-  function onExport() {
+  function onExport(): ExcelExport {
     const header = ['Employee', 'Loan Type', 'Label', 'Principal', 'Balance', 'Monthly Deduction', 'Status']
     const rows = loans.map((l) => {
       const employee = employeeById.get(l.employeeId)
-      return [employee ? fullName(employee.personal) : l.employeeId, l.type, l.label, String(l.principal), String(l.balance), String(l.monthlyDeduction), l.status]
+      return [employee ? fullName(employee.personal) : l.employeeId, l.type, l.label, l.principal, l.balance, l.monthlyDeduction, l.status]
     })
-    downloadCsv('loans-deductions-report.csv', toCsv([header, ...rows]))
+    return { filename: 'loans-deductions-report', rows: [header, ...rows], sumFooter: true }
   }
 
   return (
-    <ReportViewShell title="Loans & Deductions Report" description="Active company loans and recurring deduction configuration." onExportCsv={onExport}>
+    <ReportViewShell
+      title="Loans & Deductions Report"
+      description="Active company loans and recurring deduction configuration."
+      meta={[{ label: 'Loans', value: `${loans.length} total · ${activeLoans.length} active` }]}
+      onExportExcel={onExport}
+    >
       {loansLoading || employeesLoading ? (
         <Skeleton className="h-64" />
       ) : (

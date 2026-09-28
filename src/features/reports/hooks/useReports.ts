@@ -6,7 +6,9 @@ import {
   getEmployeeMasterlist,
   getLeaveSummary,
   getPayrollRegister,
+  getStatutoryContributionData,
   type AttendanceSummaryRow,
+  type StatutoryContributionData,
   type LeaveSummaryRow,
   type PayrollLineWithContext,
   type PayrollRegisterReport,
@@ -89,4 +91,16 @@ export function useAllPayrollLines() {
   }, [user])
 
   return { rows: rows ?? [], isLoading: rows === null }
+}
+
+/** Real payroll lines, or an engine-computed sample when no payroll has been run — powers the consolidated statutory report. */
+export function useStatutoryContributionData() {
+  const { user } = useSession()
+  const [data, setData] = useState<StatutoryContributionData | null>(null)
+
+  useEffect(() => {
+    getStatutoryContributionData(user).then(setData)
+  }, [user])
+
+  return { rows: data?.rows ?? [], isSample: data?.isSample ?? false, isLoading: data === null }
 }

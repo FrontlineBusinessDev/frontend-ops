@@ -166,6 +166,12 @@ function computeLine(session: SessionUser, period: PayrollPeriod, config: Statut
   }
 }
 
+/** Computes a line exactly as `runPayroll` would, without saving it or changing any state — for report previews. */
+export function previewPayrollLine(session: SessionUser, period: PayrollPeriod, employee: Employee): PayrollLine | undefined {
+  const config = db.statutoryConfigs.find((c) => c.companyId === session.companyId)
+  return config ? computeLine(session, period, config, employee) : undefined
+}
+
 /** Computes payroll lines for every active employee and moves the period from draft to review. */
 export async function runPayroll(session: SessionUser, periodId: string): Promise<PayrollLine[]> {
   const period = db.payrollPeriods.find((p) => p.id === periodId && p.companyId === session.companyId)

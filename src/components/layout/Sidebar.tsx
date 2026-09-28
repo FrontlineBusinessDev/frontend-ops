@@ -153,14 +153,14 @@ export function Sidebar({ collapsed, onToggleCollapsed, mobileOpen, onCloseMobil
       <div className="lg:hidden">
         <div
           className={cn(
-            'fixed inset-0 z-40 bg-black/40 transition-opacity duration-200',
+            'fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 print:hidden',
             mobileOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
           )}
           onClick={onCloseMobile}
           aria-hidden="true"
         />
         <aside
-          className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar px-3 py-5 shadow-soft-lg transition-transform duration-300 ease-[var(--ease-editorial)]"
+          className="fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar px-3 py-5 shadow-soft-lg transition-transform print:hidden duration-300 ease-[var(--ease-editorial)]"
           style={{ transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)' }}
         >
           <div className="flex items-center justify-between pb-6">

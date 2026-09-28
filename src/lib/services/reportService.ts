@@ -1,5 +1,5 @@
 import { getEmployees } from '@/lib/services/employeeService'
-import { getPayrollLines, getPayrollPeriods } from '@/lib/services/payrollService'
+import { getPayrollLines, getPayrollPeriods, previewPayrollLine } from '@/lib/services/payrollService'
 import { db } from '@/mock-data'
 import type { AttendanceStatus, Employee, PayrollLine, PayrollPeriod, SessionUser } from '@/types/domain'
 
@@ -151,4 +151,81 @@ export async function getAllPayrollLines(session: SessionUser): Promise<PayrollL
     }
   }
   return rows.sort((a, b) => a.period.startDate.localeCompare(b.period.startDate))
+}
+
+const SAMPLE_CUTOFF_COUNT = 3
+
+function toDateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+/** The most recent semi-monthly cutoffs (1st–15th, 16th–end of month) that have fully ended, newest first. */
+function recentCompletedCutoffs(count: number): { startDate: string; endDate: string; label: string }[] {
+  const cutoffs: { startDate: string; endDate: string; label: string }[] = []
+  const today = new Date()
+  let year = today.getFullYear()
+  let month = today.getMonth()
+  let secondHalf = today.getDate() > 15
+  while (cutoffs.length < count) {
+    // Step back to the cutoff before the one containing today, then keep stepping back.
+    if (secondHalf) {
+      secondHalf = false
+    } else {
+      secondHalf = true
+      month -= 1
+      if (month < 0) {
+        month = 11
+        year -= 1
+      }
+    }
+    const lastDay = new Date(year, month + 1, 0).getDate()
+    const start = new Date(year, month, secondHalf ? 16 : 1)
+    const end = new Date(year, month, secondHalf ? lastDay : 15)
+    const monthName = start.toLocaleString('en-US', { month: 'short' })
+    cutoffs.push({
+      startDate: toDateKey(start),
+      endDate: toDateKey(end),
+      label: `${monthName} ${start.getDate()} – ${end.getDate()}, ${year}`,
+    })
+  }
+  return cutoffs
+}
+
+export interface StatutoryContributionData {
+  rows: PayrollLineWithContext[]
+  /** True when no payroll has been run yet and `rows` are an engine-computed preview, not saved payroll. */
+  isSample: boolean
+}
+
+/**
+ * Real payroll lines when any payroll has been run. Otherwise, a preview of the last few completed
+ * cutoffs computed by the real payroll engine (same statutory brackets and tax table) without
+ * saving anything — so the consolidated report is never empty in a fresh demo, while no fake
+ * periods leak into the rest of the app.
+ */
+export async function getStatutoryContributionData(session: SessionUser): Promise<StatutoryContributionData> {
+  const real = await getAllPayrollLines(session)
+  if (real.length > 0) return { rows: real, isSample: false }
+
+  const employees = (await getEmployees(session)).filter((e) => e.employment.status === 'active')
+  const rows: PayrollLineWithContext[] = []
+  for (const cutoff of recentCompletedCutoffs(SAMPLE_CUTOFF_COUNT)) {
+    const payDate = new Date(`${cutoff.endDate}T00:00:00`)
+    payDate.setDate(payDate.getDate() + 5)
+    const period: PayrollPeriod = {
+      id: `sample_${cutoff.startDate}`,
+      companyId: session.companyId,
+      label: cutoff.label,
+      startDate: cutoff.startDate,
+      endDate: cutoff.endDate,
+      payDate: toDateKey(payDate),
+      // Draft, so hourly/output employees are costed from their approved (not-yet-locked) work logs.
+      status: 'draft',
+    }
+    for (const employee of employees) {
+      const line = previewPayrollLine(session, period, employee)
+      if (line) rows.push({ period, line, employee })
+    }
+  }
+  return { rows: rows.sort((a, b) => a.period.startDate.localeCompare(b.period.startDate)), isSample: true }
 }

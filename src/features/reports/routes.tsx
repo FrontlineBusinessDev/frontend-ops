@@ -32,7 +32,7 @@ import {
 } from '@/features/reports/components/BasicReports'
 import { CustomReportBuilder } from '@/features/reports/components/CustomReportBuilder'
 import { ReportCategorySection, type ReportCategory } from '@/features/reports/components/shared'
-import { Bir1601CReport, Bir2316Report, StatutoryContributionReport } from '@/features/reports/components/StatutoryReports'
+import { Bir1601CReport, Bir2316Report, ConsolidatedStatutoryReport, StatutoryContributionReport } from '@/features/reports/components/StatutoryReports'
 import { useSubscriptionUsage } from '@/features/subscription/hooks/useSubscription'
 
 const BASIC_CATEGORIES: ReportCategory[] = [
@@ -68,6 +68,11 @@ const BASIC_CATEGORIES: ReportCategory[] = [
       { id: 'sss-contribution', label: 'SSS Contribution Report', description: 'Monthly SSS R3/R5 remittance summary.' },
       { id: 'philhealth-contribution', label: 'PhilHealth Contribution Report', description: 'Monthly ER2/RF-1 remittance report.' },
       { id: 'pagibig-contribution', label: 'Pag-IBIG Contribution Report', description: 'Monthly MCRF remittance report.' },
+      {
+        id: 'consolidated-statutory',
+        label: 'Overall Statutory Contribution Report',
+        description: 'Unified summary of SSS, PhilHealth, Pag-IBIG, and Tax deductions per employee.',
+      },
     ],
   },
 ]
@@ -140,6 +145,8 @@ function renderBasicReport(id: string) {
       return <StatutoryContributionReport type="philhealth" />
     case 'pagibig-contribution':
       return <StatutoryContributionReport type="pagibig" />
+    case 'consolidated-statutory':
+      return <ConsolidatedStatutoryReport />
     default:
       return null
   }

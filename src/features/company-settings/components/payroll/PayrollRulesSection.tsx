@@ -82,7 +82,7 @@ export function PayrollRulesSection({ rules, canEdit, onRefetch }: { rules?: Pay
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <p className="text-sm font-medium">Payroll Rules</p>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="p-5">
           <Card.Title>Rounding Rules</Card.Title>
           <div className="mt-4 grid grid-cols-2 gap-3">

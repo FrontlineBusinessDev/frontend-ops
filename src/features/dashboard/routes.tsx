@@ -54,7 +54,7 @@ function DefaultDashboard() {
         <MetricCard label="On Leave Today" value={String(stats.onLeaveToday)} icon={CalendarCheck} hint={`${stats.attendanceRate}% attendance rate`} />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <Card.Header>
             <div>

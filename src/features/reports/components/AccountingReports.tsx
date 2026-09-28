@@ -3,7 +3,8 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
-import { downloadCsv, ReportViewShell, toCsv } from '@/features/reports/components/shared'
+import { ReportViewShell } from '@/features/reports/components/shared'
+import type { ExcelExport } from '@/features/reports/reportExport'
 import { useAllPayrollLines } from '@/features/reports/hooks/useReports'
 import { formatCurrency } from '@/lib/utils/format'
 
@@ -81,19 +82,24 @@ export function DebitCreditReport() {
 
   const grandTotal = accounts.reduce((acc, a) => ({ debit: acc.debit + a.debit, credit: acc.credit + a.credit }), { debit: 0, credit: 0 })
 
-  function onExport() {
-    const period = periods.find((p) => p.id === activePeriodId)
+  const activePeriod = periods.find((p) => p.id === activePeriodId)
+
+  function onExport(): ExcelExport {
     const header = ['Account Title', 'Debit (PHP)', 'Credit (PHP)']
-    const dataRows = accounts.map((a) => [a.account, a.debit ? String(a.debit) : '', a.credit ? String(a.credit) : ''])
-    dataRows.push(['Total', String(grandTotal.debit), String(grandTotal.credit)])
-    downloadCsv(`payroll-debit-credit-${period?.label ?? 'period'}.csv`, toCsv([header, ...dataRows]))
+    const dataRows = accounts.map((a) => [a.account, a.debit || '', a.credit || ''])
+    return {
+      filename: `payroll-debit-credit-${activePeriod?.label ?? 'period'}`,
+      rows: [header, ...dataRows],
+      footer: ['Total', grandTotal.debit, grandTotal.credit],
+    }
   }
 
   return (
     <ReportViewShell
       title="Payroll Summary — Debit & Credit"
       description="Accounting-oriented summary of payroll transactions, formatted as formal Debit/Credit journal accounts."
-      onExportCsv={periodLines.length > 0 ? onExport : undefined}
+      meta={activePeriod ? [{ label: 'Payroll Period', value: activePeriod.label }] : []}
+      onExportExcel={periodLines.length > 0 ? onExport : undefined}
     >
       {isLoading ? (
         <Skeleton className="h-64" />

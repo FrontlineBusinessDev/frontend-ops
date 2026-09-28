@@ -9,7 +9,8 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
 import { useToast } from '@/components/ui/Toast'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
-import { downloadCsv, ReportViewShell, toCsv } from '@/features/reports/components/shared'
+import { ReportViewShell } from '@/features/reports/components/shared'
+import type { ExcelExport } from '@/features/reports/reportExport'
 import { useAllPayrollLines } from '@/features/reports/hooks/useReports'
 import { useTenant } from '@/hooks/useTenant'
 import { PAY_RATE_TYPE_LABEL, formatBaseRateShort } from '@/lib/payroll/payRate'
@@ -116,11 +117,17 @@ export function CustomReportBuilder() {
     setSelectedColumns((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))
   }
 
-  function onExportCsv() {
+  function onExportExcel(): ExcelExport {
     const header = activeColumns.map((c) => c.label)
     const dataRows = rows.map((r) => activeColumns.map((c) => c.value(r)))
-    downloadCsv('custom-report.csv', toCsv([header, ...dataRows]))
+    return { filename: 'custom-report', rows: [header, ...dataRows] }
   }
+
+  const reportMeta = [
+    { label: 'Department', value: department === 'all' ? 'All' : department },
+    { label: 'Branch', value: branchId === 'all' ? 'All' : (branches.find((b) => b.id === branchId)?.name ?? branchId) },
+    { label: 'Status', value: status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1) },
+  ]
 
   function saveTemplate() {
     if (!templateName.trim()) return
@@ -156,7 +163,9 @@ export function CustomReportBuilder() {
     <ReportViewShell
       title="Custom Report Builder"
       description="Choose columns and filters, save the combination as a template, then export."
-      onExportCsv={onExportCsv}
+      meta={reportMeta}
+      orientation={activeColumns.length > 6 ? 'landscape' : 'portrait'}
+      onExportExcel={onExportExcel}
     >
       {employeesLoading || payrollLoading ? (
         <Skeleton className="h-72" />

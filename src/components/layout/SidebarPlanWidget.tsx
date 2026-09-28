@@ -1,6 +1,6 @@
 import { ArrowUp, Building2, HelpCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useSubscriptionUsage } from '@/features/subscription/hooks/useSubscription'
+import { useActivePlanTier } from '@/hooks/useActivePlanTier'
 import { usePermission } from '@/hooks/usePermission'
 import { PLAN_DETAILS, PLAN_ORDER } from '@/lib/plans'
 import type { PlanTier } from '@/types/domain'
@@ -8,26 +8,19 @@ import type { PlanTier } from '@/types/domain'
 /** Sidebar footer widget shown to Company Admins in place of the old static tagline — a compact
  * plan/usage summary with upgrade CTAs to the next tier(s), mirroring the full Subscription page
  * (`src/features/subscription/routes.tsx`) without duplicating its upgrade-confirmation logic;
- * CTAs just deep-link there. */
+ * CTAs just deep-link there. Follows the Demo Portal Preview tier when one is selected, so the
+ * plan name, limits and upgrade options match the navigation being previewed. */
 export function SidebarPlanWidget() {
-  const { usage } = useSubscriptionUsage()
+  const { tier, isPreview } = useActivePlanTier()
   const canManage = usePermission('subscription.manage')
 
-  if (!usage) {
-    return (
-      <div className="mt-4 rounded-xl border border-sidebar-border bg-white/5 p-3">
-        <div className="h-16 animate-pulse rounded-lg bg-white/5" />
-      </div>
-    )
-  }
-
-  const currentIndex = PLAN_ORDER.indexOf(usage.planTier)
+  const currentIndex = PLAN_ORDER.indexOf(tier)
   const nextTiers = PLAN_ORDER.slice(currentIndex + 1) as PlanTier[]
-  const currentPlan = PLAN_DETAILS[usage.planTier]
+  const currentPlan = PLAN_DETAILS[tier]
 
   const limitsSummary = [
-    `${usage.employeeLimit ?? 'Unlimited'} employees`,
-    `${usage.userLimit ?? 'Unlimited'} users`,
+    currentPlan.employeeLimit === null ? 'Unlimited employees' : `${currentPlan.employeeLimit} employees`,
+    currentPlan.userLimit === null ? 'Unlimited users' : `${currentPlan.userLimit} users`,
   ].join(' · ')
 
   return (
@@ -38,13 +31,20 @@ export function SidebarPlanWidget() {
             <Building2 className="size-3.5" />
           </div>
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-sidebar-muted/70">Current Plan</p>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-sidebar-muted/70">{isPreview ? 'Previewing Plan' : 'Current Plan'}</p>
             <p className="text-sm font-semibold text-sidebar-foreground">{currentPlan.label}</p>
           </div>
         </div>
+        {isPreview && (
+          <span className="rounded-md border border-dashed border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning">
+            Demo
+          </span>
+        )}
       </div>
 
-      <p className="text-[11px] leading-snug text-sidebar-muted">Limit: {limitsSummary}</p>
+      <p className="text-[11px] leading-snug text-sidebar-muted">
+        {currentPlan.employeeLimit === null && currentPlan.userLimit === null ? limitsSummary : `Limit: ${limitsSummary}`}
+      </p>
 
       {canManage && nextTiers.length > 0 && (
         <div className="space-y-1.5">
@@ -72,7 +72,7 @@ export function SidebarPlanWidget() {
         className="flex items-center gap-1.5 text-[11px] text-sidebar-muted transition-colors hover:text-sidebar-foreground"
       >
         <HelpCircle className="size-3 shrink-0" />
-        Need help? Visit Settings
+        Need help? View Subscription
       </Link>
     </div>
   )

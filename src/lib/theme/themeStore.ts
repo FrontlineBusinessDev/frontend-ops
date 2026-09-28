@@ -41,3 +41,10 @@ export const useThemeStore = create<ThemeState>()(
     },
   ),
 )
+
+// Printouts (payslips, reports) always render on a light page — dark mode would print as a solid
+// dark block. Drop the class for the print job and restore the user's theme afterwards.
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeprint', () => applyThemeClass('light'))
+  window.addEventListener('afterprint', () => applyThemeClass(useThemeStore.getState().theme))
+}

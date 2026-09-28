@@ -186,7 +186,7 @@ export function PayslipCard({
   ]
 
   return (
-    <Card className="mx-auto max-w-4xl overflow-hidden p-0 print:m-0 print:max-w-none print:rounded-none print:border-0 print:shadow-none">
+    <Card className="mx-auto max-w-4xl overflow-hidden p-0 print:m-0 print:max-w-none print:[zoom:0.8] print:rounded-none print:border-0 print:shadow-none">
       {/* 3-column header: company / employee / pay period */}
       <div className="grid grid-cols-1 gap-6 border-b border-border p-6 sm:grid-cols-3 print:border-black/30">
         <div className="flex min-w-0 items-start gap-3">

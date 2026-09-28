@@ -40,9 +40,13 @@ export function AppShell() {
         mobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
       />
-      <div className="flex min-w-0 flex-1 flex-col print:flex-none">
+      <div className="flex min-w-0 flex-1 flex-col print:w-full print:flex-none">
         <Topbar onOpenMobileNav={() => setMobileOpen(true)} />
-        <main className="flex-1 scroll-smooth overflow-y-auto px-4 pb-24 pt-6 sm:px-6 md:py-6 lg:px-8 lg:py-8 print:overflow-visible print:p-0">
+        {/* data-portal scopes admin-only layout rules in globals.css (sticky table headers, pinned dialog actions). */}
+        <main
+          data-portal={location.pathname.startsWith('/ess') ? 'ess' : 'admin'}
+          className="flex-1 scroll-smooth overflow-y-auto px-4 pb-24 pt-6 sm:px-6 md:py-6 lg:px-8 lg:py-8 print:overflow-visible print:p-0"
+        >
           <Outlet />
         </main>
       </div>

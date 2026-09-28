@@ -31,11 +31,14 @@ import {
   EARNINGS_DEDUCTIONS_PALETTE,
   NIVO_THEME,
 } from '@/features/reports/components/nivoTheme'
-import { ChartPane, downloadCsv, FilterLabel, ReportFilterBar, ReportViewShell, StatTile, TablePane, toCsv, ViewModeToggle } from '@/features/reports/components/shared'
+import { ChartPane, FilterLabel, ReportFilterBar, ReportViewShell, StatTile, TablePane, ViewModeToggle } from '@/features/reports/components/shared'
+import type { ExcelExport } from '@/features/reports/reportExport'
 import type { ReportViewMode } from '@/features/reports/components/shared'
 import { useAllPayrollLines, useAttendanceSummary, useLeaveSummary } from '@/features/reports/hooks/useReports'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useTenant } from '@/hooks/useTenant'
 import { findEmployeePayrollGroup } from '@/lib/payroll/groupAssignment'
+import { cn } from '@/lib/utils/cn'
 import { PAY_RATE_TYPE_LABEL } from '@/lib/payroll/payRate'
 import { formatCurrency } from '@/lib/utils/format'
 
@@ -320,9 +323,13 @@ function pct(n: number, total: number) {
  * Y-axis to that department's employees; selecting an Employee (searchable, takes precedence)
  * narrows to just that one row — both without altering the underlying attendance calculation,
  * only how the same per-employee counts are grouped/filtered for display. */
+const ATTENDANCE_KEYS = ['Present', 'Late', 'Undertime', 'Absent'] as const
+
 export function AttendanceAbsenteeismReport() {
   const { rows, isLoading } = useAttendanceSummary()
   const [mode, setMode] = useState<ReportViewMode>('split')
+  // A single-row chart legend of four statuses doesn't fit a phone-width card; wrap it in HTML instead.
+  const isPhone = useMediaQuery('(max-width: 639px)')
   const [department, setDepartment] = useState<string>('all')
   const [employeeId, setEmployeeId] = useState<string | undefined>(undefined)
 
@@ -424,16 +431,26 @@ export function AttendanceAbsenteeismReport() {
 
           <ViewModeToggle value={mode} onChange={setMode} />
 
+          {isPhone && (
+            <div className={cn('flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground', mode === 'table' && 'hidden')}>
+              {ATTENDANCE_KEYS.map((key, i) => (
+                <span key={key} className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full" style={{ backgroundColor: ATTENDANCE_PALETTE[i] }} />
+                  {key}
+                </span>
+              ))}
+            </div>
+          )}
           <ChartPane mode={mode} style={{ height: Math.max(240, chartData.length * 36) }}>
             <AnimatedChart className="h-full w-full" chartKey={`${department}-${employeeId ?? 'none'}`}>
               <ResponsiveBar
                 data={chartData}
-                keys={['Present', 'Late', 'Undertime', 'Absent']}
+                keys={[...ATTENDANCE_KEYS]}
                 indexBy="name"
                 layout="horizontal"
                 theme={NIVO_THEME}
                 colors={ATTENDANCE_PALETTE}
-                margin={{ top: 40, right: 24, bottom: 40, left: 130 }}
+                margin={isPhone ? { top: 12, right: 16, bottom: 40, left: 96 } : { top: 40, right: 24, bottom: 40, left: 130 }}
                 padding={0.3}
                 valueScale={{ type: 'linear', min: 0, max: 100 }}
                 valueFormat={(v) => `${v}%`}
@@ -441,7 +458,7 @@ export function AttendanceAbsenteeismReport() {
                 enableLabel={false}
                 axisBottom={{ tickSize: 0, tickPadding: 8, format: (v) => `${v}%`, legend: 'Share of recorded attendance', legendPosition: 'middle', legendOffset: 32 }}
                 axisLeft={{ tickSize: 0, tickPadding: 8 }}
-                legends={[
+                legends={isPhone ? [] : [
                   {
                     dataFrom: 'keys',
                     anchor: 'top-left',
@@ -994,14 +1011,19 @@ export function LaborCostAnalysisReport() {
     return [...map.values()].sort((a, b) => a.period.startDate.localeCompare(b.period.startDate))
   }, [rows])
 
-  function onExport() {
+  function onExport(): ExcelExport {
     const header = ['Period', 'Gross Pay', 'Employer Contributions', 'Total Labor Cost']
-    const dataRows = byPeriod.map((p) => [p.period.label, String(p.grossPay), String(p.employerContributions), String(p.grossPay + p.employerContributions)])
-    downloadCsv('labor-cost-analysis.csv', toCsv([header, ...dataRows]))
+    const dataRows = byPeriod.map((p) => [p.period.label, p.grossPay, p.employerContributions, p.grossPay + p.employerContributions])
+    return { filename: 'labor-cost-analysis', rows: [header, ...dataRows], sumFooter: true }
   }
 
   return (
-    <ReportViewShell title="Labor Cost Analysis" description="Total labor cost per period — gross pay plus employer-side statutory contributions." onExportCsv={byPeriod.length > 0 ? onExport : undefined}>
+    <ReportViewShell
+      title="Labor Cost Analysis"
+      description="Total labor cost per period — gross pay plus employer-side statutory contributions."
+      meta={[{ label: 'Coverage', value: `All payroll periods (${byPeriod.length})` }]}
+      onExportExcel={byPeriod.length > 0 ? onExport : undefined}
+    >
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : byPeriod.length === 0 ? (

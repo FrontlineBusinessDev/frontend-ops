@@ -215,7 +215,7 @@ export function EssHomePage() {
       </div>
 
       {/* My Attendance + My Leave */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="relative overflow-hidden border-slate-100 lg:col-span-2 dark:border-white/10" style={{ backgroundImage: ESS_ACCENTS.teal.gradient }}>
           <EssCardWatermark icon={Clock} className={ESS_ACCENTS.teal.watermark} />
           <Card.Header className="relative items-center">
@@ -281,7 +281,7 @@ export function EssHomePage() {
       </div>
 
       {/* Quick Actions + Notifications + Payslip history */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="relative overflow-hidden border-slate-100 dark:border-white/10" style={{ backgroundImage: ESS_ACCENTS.indigo.gradient }}>
           <EssCardWatermark icon={Zap} className={ESS_ACCENTS.indigo.watermark} />
           <Card.Header className="relative">

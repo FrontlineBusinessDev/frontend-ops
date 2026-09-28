@@ -121,7 +121,7 @@ export function AdminDashboard() {
 
       <PendingRequestsCard />
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <Card.Header>
             <div>
@@ -195,7 +195,7 @@ export function AdminDashboard() {
         </Button>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <Card.Header>
             <Card.Title>Recent Employees</Card.Title>
