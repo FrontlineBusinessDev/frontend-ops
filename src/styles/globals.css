@@ -175,6 +175,124 @@ body {
   }
 }
 
+/* Company Admin soft card theme — pastel gradients + corner watermarks matching the Employee Dashboard. Scoped to
+   main[data-card-theme='soft'] (set in AppShell for the company_admin role only), so HR/Manager/
+   Super Admin/ESS views and portaled dialogs keep the plain card. Rules only apply while a Card
+   still has its default bg-card / border-border classes, so a page's own bg-* / border-* override wins. */
+:root {
+  /* Ultra-soft, translucent gradients over the card's white — the Tailwind equivalents are
+     bg-gradient-to-br from-slate-50/80 via-indigo-50/30 to-purple-50/50 (lavender),
+     from-emerald-50/40 via-emerald-50/30 to-teal-50/20 (sage), from-rose-50/50 via-orange-50/30 to-amber-50/40 (peach). */
+  --soft-tint-lavender: linear-gradient(to bottom right, rgb(248 250 252 / 0.8), rgb(238 242 255 / 0.3), rgb(250 245 255 / 0.5));
+  --soft-tint-sage: linear-gradient(to bottom right, rgb(236 253 245 / 0.4), rgb(236 253 245 / 0.3), rgb(240 253 250 / 0.2));
+  --soft-tint-peach: linear-gradient(to bottom right, rgb(255 241 242 / 0.5), rgb(255 247 237 / 0.3), rgb(255 251 235 / 0.4));
+  --soft-card-border: rgb(241 245 249 / 0.8); /* slate-100/80 */
+}
+
+.dark {
+  --soft-tint-lavender: linear-gradient(to bottom right, color-mix(in srgb, var(--chart-slate) 6%, transparent), color-mix(in srgb, var(--chart-indigo) 5%, transparent), color-mix(in srgb, var(--chart-violet) 8%, transparent));
+  --soft-tint-sage: linear-gradient(to bottom right, color-mix(in srgb, var(--success) 7%, transparent), color-mix(in srgb, var(--success) 5%, transparent), color-mix(in srgb, var(--color-brand-300) 4%, transparent));
+  --soft-tint-peach: linear-gradient(to bottom right, color-mix(in srgb, var(--danger) 6%, transparent), color-mix(in srgb, var(--accent) 5%, transparent), color-mix(in srgb, var(--warning) 6%, transparent));
+  --soft-card-border: rgb(255 255 255 / 0.1);
+}
+
+main[data-card-theme='soft'] [data-slot='card'].bg-card {
+  background-image: var(--soft-tint-lavender);
+}
+
+/* Rotate lavender → sage → peach across cards laid out side by side in a grid (unless a card sets data-tint). */
+main[data-card-theme='soft'] .grid > [data-slot='card'].bg-card:not([data-tint]):nth-child(3n + 2) {
+  background-image: var(--soft-tint-sage);
+}
+
+main[data-card-theme='soft'] .grid > [data-slot='card'].bg-card:not([data-tint]):nth-child(3n + 3) {
+  background-image: var(--soft-tint-peach);
+}
+
+/* Explicit tint for a card whose meaning calls for one: <Card data-tint="sage">. */
+main[data-card-theme='soft'] [data-slot='card'][data-tint='lavender'] {
+  background-image: var(--soft-tint-lavender);
+}
+
+main[data-card-theme='soft'] [data-slot='card'][data-tint='sage'] {
+  background-image: var(--soft-tint-sage);
+}
+
+main[data-card-theme='soft'] [data-slot='card'][data-tint='peach'] {
+  background-image: var(--soft-tint-peach);
+}
+
+/* Cards nested inside another card stay plain white tiles on the tinted parent. */
+main[data-card-theme='soft'] [data-slot='card'] [data-slot='card'].bg-card {
+  background-image: none;
+}
+
+/* Corner watermark (rendered by Card only in the soft theme). Hidden anywhere outside the themed
+   <main> — e.g. cards inside portaled dialogs — and colored to match the card's tint. */
+[data-slot='card-watermark'] {
+  display: none;
+}
+
+main[data-card-theme='soft'] [data-slot='card-watermark'] {
+  display: block;
+  color: color-mix(in srgb, var(--chart-indigo) 10%, transparent);
+}
+
+main[data-card-theme='soft'] :is(.grid > [data-slot='card'].bg-card:not([data-tint]):nth-child(3n + 2), [data-slot='card'][data-tint='sage']) > [data-slot='card-watermark'] {
+  color: color-mix(in srgb, var(--success) 10%, transparent);
+}
+
+main[data-card-theme='soft'] :is(.grid > [data-slot='card'].bg-card:not([data-tint]):nth-child(3n + 3), [data-slot='card'][data-tint='peach']) > [data-slot='card-watermark'] {
+  color: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+/* Standalone data tables keep a white surface for readability, with the same soft border. */
+main[data-card-theme='soft'] [data-slot='card'].border-border,
+main[data-card-theme='soft'] [data-slot='metric-card'],
+main[data-card-theme='soft'] .rounded-2xl.border-border:has(> table) {
+  border-color: var(--soft-card-border);
+}
+
+/* Metric cards: tone → tint, no accent top rule, and the footer becomes a plain "View … →" text link. */
+main[data-card-theme='soft'] [data-slot='metric-card'] {
+  border-top-width: 1px;
+  background-image: var(--soft-tint-lavender);
+}
+
+main[data-card-theme='soft'] [data-slot='metric-card'][data-tone='success'] {
+  background-image: var(--soft-tint-sage);
+}
+
+main[data-card-theme='soft'] [data-slot='metric-card']:is([data-tone='warning'], [data-tone='accent']) {
+  background-image: var(--soft-tint-peach);
+}
+
+main[data-card-theme='soft'] [data-slot='metric-card-footer'] {
+  justify-content: flex-start;
+  gap: 0.25rem;
+  border-top-width: 0;
+  background-color: transparent;
+  padding-top: 0;
+  padding-bottom: 1.25rem;
+}
+
+main[data-card-theme='soft'] a[data-slot='metric-card-footer']:hover {
+  background-color: transparent;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+main[data-card-theme='soft'] [data-slot='metric-card-footer'] > svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+@media print {
+  main[data-card-theme='soft'] :is([data-slot='card'], [data-slot='metric-card']) {
+    background-image: none !important;
+  }
+}
+
 /* Print output (e.g. the Payslip print/PDF view) — standard page size/margins, and force
    light backgrounds (like the Net Pay highlight) to actually print instead of being
    stripped by the browser's default print color handling. Sidebar/header hide via their

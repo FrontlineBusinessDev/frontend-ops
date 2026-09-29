@@ -28,7 +28,7 @@ const TONE_CLASSES: Record<MetricCardTone, { watermark: string; footerText: stri
 export function MetricCard({ label, value, hint, icon: Icon, tone = 'default', footer, className }: MetricCardProps) {
   const t = TONE_CLASSES[tone]
   return (
-    <Card className={cn('relative flex h-full flex-col overflow-hidden border-t-2 p-0', t.accentBorder, t.tint, className)}>
+    <Card data-slot="metric-card" data-tone={tone} watermark={null} className={cn('relative flex h-full flex-col overflow-hidden border-t-2 p-0', t.accentBorder, t.tint, className)}>
       {Icon && <Icon className={cn('pointer-events-none absolute -right-3 -top-3 size-20', t.watermark)} aria-hidden="true" />}
       <div className="relative flex flex-1 flex-col gap-2 p-5">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
@@ -39,13 +39,14 @@ export function MetricCard({ label, value, hint, icon: Icon, tone = 'default', f
         (footer.to ? (
           <Link
             to={footer.to}
+            data-slot="metric-card-footer"
             className="flex items-center justify-between border-t border-border bg-muted/50 px-5 py-2.5 text-xs font-medium transition-colors hover:bg-muted"
           >
             <span className={t.footerText}>{footer.label}</span>
             <ArrowRight className={cn('size-3.5 shrink-0', t.footerText)} />
           </Link>
         ) : (
-          <div className="flex items-center justify-between border-t border-border bg-muted/50 px-5 py-2.5 text-xs font-medium text-muted-foreground">
+          <div data-slot="metric-card-footer" className="flex items-center justify-between border-t border-border bg-muted/50 px-5 py-2.5 text-xs font-medium text-muted-foreground">
             <span>{footer.label}</span>
             <ArrowRight className="size-3.5 shrink-0 opacity-40" />
           </div>

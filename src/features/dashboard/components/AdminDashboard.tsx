@@ -1,5 +1,6 @@
 import {
   CalendarClock,
+  CalendarDays,
   CalendarPlus,
   Clock3,
   FileBarChart2,
@@ -9,6 +10,7 @@ import {
   UserPlus,
   Users,
   Wallet,
+  Zap,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -44,6 +46,14 @@ const QUICK_ACTIONS = [
   { label: 'Add Overtime', icon: Clock3, to: '/attendance' },
   { label: 'Generate Report', icon: FileBarChart2, to: '/reports' },
 ]
+
+function ViewAllLink({ to }: { to: string }) {
+  return (
+    <Link to={to} className="text-xs font-medium text-primary hover:underline">
+      View all
+    </Link>
+  )
+}
 
 export function AdminDashboard() {
   const { overview, isLoading } = useAdminDashboardOverview()
@@ -122,14 +132,15 @@ export function AdminDashboard() {
       <PendingRequestsCard />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <Card.Header>
+        <Card data-tint="lavender" watermark={Wallet} className="relative overflow-hidden lg:col-span-2">
+          <Card.Header className="relative items-center">
             <div>
               <Card.Title>Payroll Summary</Card.Title>
               <Card.Description>Gross pay vs. net pay, last 6 months</Card.Description>
             </div>
+            <ViewAllLink to="/payroll" />
           </Card.Header>
-          <Card.Body className="h-64 pt-2">
+          <Card.Body className="relative h-64 pt-2">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={payrollChart} margin={{ left: 4, right: 8, top: 8 }} barGap={4}>
                 <CartesianGrid vertical={false} stroke="var(--color-border)" />
@@ -159,11 +170,11 @@ export function AdminDashboard() {
           </Card.Body>
         </Card>
 
-        <Card>
-          <Card.Header>
+        <Card data-tint="sage" watermark={CalendarDays} className="relative overflow-hidden">
+          <Card.Header className="relative">
             <Card.Title>Upcoming Payroll Calendar</Card.Title>
           </Card.Header>
-          <Card.Body className="pt-2">
+          <Card.Body className="relative pt-2">
             <ol className="relative space-y-5 border-l border-border pl-5">
               {payrollCalendar.map((event) => (
                 <li key={event.id} className="relative">
@@ -180,9 +191,9 @@ export function AdminDashboard() {
         </Card>
       </div>
 
-      <Card className="flex flex-col items-center gap-4 overflow-hidden p-6 sm:flex-row sm:justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+      <Card data-tint="peach" watermark={Sparkles} className="relative flex flex-col items-center gap-4 overflow-hidden p-6 sm:flex-row sm:justify-between">
+        <div className="relative flex items-center gap-4">
+          <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-card/80 text-primary shadow-sm">
             <Sparkles className="size-6" />
           </div>
           <div>
@@ -190,17 +201,18 @@ export function AdminDashboard() {
             <p className="text-sm text-muted-foreground">Everything you need to run payroll accurately, in one place.</p>
           </div>
         </div>
-        <Button asChild>
+        <Button asChild className="relative">
           <Link to="/employees">View Employees</Link>
         </Button>
       </Card>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
-          <Card.Header>
+        <Card data-tint="sage" watermark={Users} className="relative overflow-hidden lg:col-span-1">
+          <Card.Header className="relative items-center">
             <Card.Title>Recent Employees</Card.Title>
+            <ViewAllLink to="/employees" />
           </Card.Header>
-          <Card.Body className="pt-2">
+          <Card.Body className="relative pt-2">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -229,17 +241,17 @@ export function AdminDashboard() {
           </Card.Body>
         </Card>
 
-        <Card className="lg:col-span-1">
-          <Card.Header>
+        <Card data-tint="lavender" watermark={Zap} className="relative overflow-hidden lg:col-span-1">
+          <Card.Header className="relative">
             <Card.Title>Quick Actions</Card.Title>
           </Card.Header>
-          <Card.Body className="pt-2">
+          <Card.Body className="relative pt-2">
             <div className="grid grid-cols-2 gap-3">
               {QUICK_ACTIONS.map(({ label, icon: Icon, to }) => (
                 <Link
                   key={label}
                   to={to}
-                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-border bg-card p-4 text-center transition-colors hover:border-primary/40 hover:bg-primary/5"
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-slate-100 bg-card p-4 text-center shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5 dark:border-white/10"
                 >
                   <Icon className="size-5 text-primary" />
                   <span className="text-xs font-medium leading-snug">{label}</span>
@@ -249,13 +261,13 @@ export function AdminDashboard() {
           </Card.Body>
         </Card>
 
-        <Card className="lg:col-span-1">
-          <Card.Header>
+        <Card data-tint="peach" watermark={Megaphone} className="relative overflow-hidden lg:col-span-1">
+          <Card.Header className="relative">
             <Card.Title>Latest Announcements</Card.Title>
           </Card.Header>
-          <Card.Body className="space-y-3 pt-2">
+          <Card.Body className="relative space-y-3 pt-2">
             {announcements.map((announcement) => (
-              <div key={announcement.id} className="flex items-start gap-2.5 rounded-lg bg-muted/60 p-3">
+              <div key={announcement.id} className="flex items-start gap-2.5 rounded-lg bg-card/70 p-3">
                 <Megaphone className="mt-0.5 size-4 shrink-0 text-primary" />
                 <div>
                   <p className="text-sm font-medium leading-snug">{announcement.title}</p>

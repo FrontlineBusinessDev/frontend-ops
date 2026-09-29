@@ -17,12 +17,12 @@ export function PendingRequestsCard() {
   const { summary, isLoading } = usePendingRequestsSummary()
 
   return (
-    <Card>
-      <Card.Header>
+    <Card data-tint="sage" watermark={ClipboardCheck} className="relative overflow-hidden">
+      <Card.Header className="relative">
         <Card.Title>Pending Requests</Card.Title>
         <Card.Description>Open items waiting on your review.</Card.Description>
       </Card.Header>
-      <Card.Body className="pt-2">
+      <Card.Body className="relative pt-2">
         {isLoading || !summary ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {Array.from({ length: ROWS.length }).map((_, i) => (
@@ -37,9 +37,9 @@ export function PendingRequestsCard() {
                 <Link
                   key={key}
                   to={to}
-                  className="flex items-center gap-3 rounded-xl border border-border p-3.5 transition-colors hover:border-primary/40 hover:bg-primary/5"
+                  className="flex items-center gap-3 rounded-xl border border-slate-100 bg-card p-3.5 shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5 dark:border-white/10"
                 >
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success">
                     <Icon className="size-4" />
                   </div>
                   <div className="min-w-0 flex-1">

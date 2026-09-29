@@ -93,7 +93,8 @@ export const ADMIN_NAV: NavGroup[] = [
     label: 'Settings',
     items: [
       { label: 'Company & Payroll Settings', path: '/company-settings', icon: Settings, capability: 'settings.company.edit' },
-      { label: 'Branches', path: '/branches', icon: Building2, capability: 'branches.manage', feature: 'multi_branch' },
+      // Not plan-gated: Branches stays unlocked on every tier while the Company Admin portal is used for demos/testing.
+      { label: 'Branches', path: '/branches', icon: Building2, capability: 'branches.manage' },
       { label: 'Users & Access', path: '/user-access', icon: ShieldCheck, capability: 'users.manage' },
       { label: 'Onboarding', path: '/onboarding', icon: CalendarClock, capability: 'onboarding.manage' },
       { label: 'Subscription & Plan', path: '/subscription', icon: Gauge, capability: 'subscription.manage' },
