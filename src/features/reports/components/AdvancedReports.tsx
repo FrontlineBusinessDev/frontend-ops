@@ -40,6 +40,7 @@ import { useTenant } from '@/hooks/useTenant'
 import { findEmployeePayrollGroup } from '@/lib/payroll/groupAssignment'
 import { cn } from '@/lib/utils/cn'
 import { PAY_RATE_TYPE_LABEL } from '@/lib/payroll/payRate'
+import { hourlyRateFor } from '@/lib/payroll/rateBasis'
 import { formatCurrency } from '@/lib/utils/format'
 
 function fullName(personal: { firstName: string; lastName: string }) {
@@ -573,10 +574,6 @@ export function LeaveUtilizationReport() {
   )
 }
 
-function estimateHourlyRate(basicPay: number): number {
-  return basicPay / (22 * 8)
-}
-const OT_MULTIPLIER: Record<string, number> = { regular: 1.25, night_diff: 1.1, rest_day_holiday: 1.3 }
 
 function monthLabel(monthKey: string) {
   const [year, month] = monthKey.split('-').map(Number)
@@ -598,7 +595,8 @@ export function OvertimeCostAnalysisReport() {
       const monthKey = r.date.slice(0, 7)
       const bucket = map.get(monthKey) ?? { hours: 0, cost: 0 }
       bucket.hours += r.hours
-      bucket.cost += r.hours * estimateHourlyRate(employee.compensation.basicPay) * (OT_MULTIPLIER[r.type] ?? 1)
+      // Same basis as the payroll engine: hourly rate × the record's own OT rate multiplier.
+      bucket.cost += r.hours * hourlyRateFor(employee) * r.multiplier
       map.set(monthKey, bucket)
     }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]))

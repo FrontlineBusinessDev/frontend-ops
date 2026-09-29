@@ -11,7 +11,9 @@ import { useSession } from '@/hooks/useSession'
 import { updatePayrollRules } from '@/lib/services/payrollSettingsService'
 import type { PayrollRules } from '@/types/domain'
 
-type FormValues = Omit<PayrollRules, 'companyId'>
+// Overtime rules live exclusively on the Overtime & Holiday Rates tab, so they're not part of this form
+// (saving Payroll Rules never touches them).
+type FormValues = Omit<PayrollRules, 'companyId' | 'overtimePreApprovalRequired' | 'overtimeDefaultMultiplier' | 'overtimeRestDayMultiplier' | 'overtimeHolidayMultiplier'>
 
 const ROUNDING_METHOD_OPTIONS = [
   { value: 'nearest', label: 'Round to Nearest' },
@@ -41,10 +43,6 @@ function toFormValues(rules?: PayrollRules): FormValues {
     lateGracePeriodMinutes: rules?.lateGracePeriodMinutes ?? 10,
     lateDeductionMethod: rules?.lateDeductionMethod ?? 'per_minute',
     latePerMinuteDeduction: rules?.latePerMinuteDeduction ?? 0,
-    overtimePreApprovalRequired: rules?.overtimePreApprovalRequired ?? true,
-    overtimeDefaultMultiplier: rules?.overtimeDefaultMultiplier ?? 1.25,
-    overtimeRestDayMultiplier: rules?.overtimeRestDayMultiplier ?? 1.3,
-    overtimeHolidayMultiplier: rules?.overtimeHolidayMultiplier ?? 2,
     absenceDailyRateBasis: rules?.absenceDailyRateBasis ?? 'basic_pay_divided_by_working_days',
     absenceUnpaidHandling: rules?.absenceUnpaidHandling ?? 'deduct_daily_rate',
     prorationNewEmployee: rules?.prorationNewEmployee ?? true,
@@ -111,25 +109,6 @@ export function PayrollRulesSection({ rules, canEdit, onRefetch }: { rules?: Pay
         </Card>
 
         <Card className="p-5">
-          <Card.Title>Overtime</Card.Title>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <label className="col-span-2 flex items-center justify-between text-sm">
-              Pre-approval required
-              <Controller control={control} name="overtimePreApprovalRequired" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} disabled={!canEdit} />} />
-            </label>
-            <FormField label="Default multiplier">
-              <Input type="number" step="0.01" disabled={!canEdit} {...register('overtimeDefaultMultiplier')} />
-            </FormField>
-            <FormField label="Rest day multiplier">
-              <Input type="number" step="0.01" disabled={!canEdit} {...register('overtimeRestDayMultiplier')} />
-            </FormField>
-            <FormField label="Holiday multiplier">
-              <Input type="number" step="0.01" disabled={!canEdit} {...register('overtimeHolidayMultiplier')} />
-            </FormField>
-          </div>
-        </Card>
-
-        <Card className="p-5">
           <Card.Title>Absence</Card.Title>
           <div className="mt-4 grid grid-cols-1 gap-3">
             <FormField label="Daily rate calculation basis">
@@ -159,9 +138,9 @@ export function PayrollRulesSection({ rules, canEdit, onRefetch }: { rules?: Pay
           </div>
         </Card>
 
-        <Card className="p-5">
+        <Card className="p-5 lg:col-span-2">
           <Card.Title>Payroll Adjustments</Card.Title>
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 grid gap-3 sm:grid-cols-3 sm:gap-6">
             <label className="flex items-center justify-between text-sm">
               Retroactive adjustments allowed
               <Controller control={control} name="adjustmentsRetroactiveAllowed" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} disabled={!canEdit} />} />

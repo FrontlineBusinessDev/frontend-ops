@@ -34,7 +34,7 @@ function SectionBadge({ icon: Icon, label, tone }: { icon: LucideIcon; label: st
   )
 }
 
-interface BreakdownRow {
+export interface BreakdownRow {
   key: string
   type: string
   description: string
@@ -42,24 +42,43 @@ interface BreakdownRow {
   hint?: string
 }
 
-/** Monthly recurring deductions are always actually computed by the payroll engine as an equal semi-monthly (÷2) split — this note documents that split for the employee, without changing the deducted amount itself. */
-function allocationHint(monthlyAmount: number, currentPeriodAmount: number, method: DeductionConfig['allocationMethod']) {
-  const methodLabel = method === 'specific_cutoff' ? '1 of 2 pay periods' : method === 'custom' ? `${formatCurrency(currentPeriodAmount)} this cutoff` : '÷ 2'
+/** How a monthly amount was allocated to this cutoff — mirrors the engine's schedule (pay frequency + Payroll Settings method). */
+function allocationHint(monthlyAmount: number, currentPeriodAmount: number, method: DeductionConfig['allocationMethod'], periodsPerMonth = 2, cutoffIndex = 1, cutoffsCovered?: number[]) {
+  const divisor = Number.isInteger(periodsPerMonth) ? String(periodsPerMonth) : periodsPerMonth.toFixed(2)
+  const methodLabel =
+    periodsPerMonth <= 1
+      ? 'full amount (monthly payroll)'
+      : method === 'specific_cutoff'
+        ? currentPeriodAmount > 0
+          ? `collected in full on cutoff ${cutoffIndex}`
+          : `collected on another cutoff`
+        : cutoffsCovered && cutoffsCovered.length > 1
+          ? `÷ ${divisor}, this run covers cutoffs ${cutoffsCovered[0]}–${cutoffsCovered[cutoffsCovered.length - 1]}`
+        : method === 'custom'
+          ? `${formatCurrency(currentPeriodAmount)} this cutoff (custom split)`
+          : cutoffIndex > periodsPerMonth
+            ? `already collected in full this month (÷ ${divisor})`
+            : `÷ ${divisor} (pay period ${cutoffIndex} of ${divisor})`
   return `Monthly Amount: ${formatCurrency(monthlyAmount)} | Allocation: ${methodLabel}`
 }
 
-function BreakdownCard({
+const OVERTIME_LABELS = new Set(['Overtime Pay', 'Night Differential', 'Rest Day / Holiday Overtime'])
+
+/** Earnings / Deductions panel of a payslip — also reused by the 13th Month Pay computation and payslip. */
+export function BreakdownCard({
   tone,
   icon: Icon,
   title,
   total,
   rows,
+  emptyLabel = 'No items this period.',
 }: {
   tone: 'success' | 'danger'
   icon: LucideIcon
   title: string
   total: number
   rows: BreakdownRow[]
+  emptyLabel?: string
 }) {
   const toneClasses = {
     success: { border: 'border-success/25', badge: 'bg-success/15 text-success', bar: 'bg-success/10 text-success', text: 'text-success' },
@@ -93,7 +112,7 @@ function BreakdownCard({
           {rows.length === 0 ? (
             <tr>
               <td colSpan={3} className="px-4 py-3 text-center text-xs text-muted-foreground">
-                No items this period.
+                {emptyLabel}
               </td>
             </tr>
           ) : (
@@ -146,8 +165,20 @@ export function PayslipCard({
     if (allowanceLabels.has(e.label)) {
       return { key: `${e.label}-${idx}`, type: 'Allowance', description: e.label, amount: e.amount }
     }
+    if (OVERTIME_LABELS.has(e.label)) {
+      return { key: `${e.label}-${idx}`, type: 'Overtime', description: e.label, amount: e.amount }
+    }
+    if (e.label === 'Paid Leave') {
+      return { key: `${e.label}-${idx}`, type: 'Paid Leave', description: 'Approved paid leave', amount: e.amount }
+    }
     return { key: `${e.label}-${idx}`, type: 'Bonus', description: e.label, amount: e.amount }
   })
+
+  // Divisor the monthly amounts were split by this month (older lines only stored the average periods per month).
+  const ppm = line.periodsInMonth ?? line.periodsPerMonth ?? 2
+  const cutoff = line.cutoffIndex ?? 1
+  const ms = line.monthlyStatutory
+  const hint = (monthly: number, current: number, configName: string) => allocationHint(monthly, current, configByName.get(configName)?.allocationMethod, ppm, cutoff, line.cutoffsCovered)
 
   const deductionRows: BreakdownRow[] = [
     ...line.loanDeductions.map((d, idx): BreakdownRow => {
@@ -157,7 +188,7 @@ export function PayslipCard({
         type: 'Loan',
         description: d.label,
         amount: d.amount,
-        hint: loan ? allocationHint(loan.monthlyDeduction, d.amount, 'equal_split') : undefined,
+        hint: loan ? allocationHint(loan.monthlyDeduction, d.amount, 'equal_split', ppm, cutoff, line.cutoffsCovered) : undefined,
       }
     }),
     ...line.otherDeductions.map((d, idx): BreakdownRow => ({ key: `other-${idx}`, type: 'Other Deduction', description: d.label, amount: d.amount })),
@@ -166,23 +197,29 @@ export function PayslipCard({
       type: 'Statutory Contribution',
       description: 'SSS — Employee Share',
       amount: line.sssEmployeeShare,
-      hint: allocationHint(line.sssEmployeeShare * 2, line.sssEmployeeShare, configByName.get('SSS Contribution')?.allocationMethod),
+      hint: hint(ms?.sssEmployee ?? line.sssEmployeeShare * 2, line.sssEmployeeShare, 'SSS Contribution'),
     },
     {
       key: 'philhealth',
       type: 'Statutory Contribution',
       description: 'PhilHealth — Employee Share',
       amount: line.philhealthEmployeeShare,
-      hint: allocationHint(line.philhealthEmployeeShare * 2, line.philhealthEmployeeShare, configByName.get('PhilHealth Contribution')?.allocationMethod),
+      hint: hint(ms?.philhealthEmployee ?? line.philhealthEmployeeShare * 2, line.philhealthEmployeeShare, 'PhilHealth Contribution'),
     },
     {
       key: 'pagibig',
       type: 'Statutory Contribution',
       description: 'Pag-IBIG — Employee Share',
       amount: line.pagibigEmployeeShare,
-      hint: allocationHint(line.pagibigEmployeeShare * 2, line.pagibigEmployeeShare, configByName.get('Pag-IBIG Contribution')?.allocationMethod),
+      hint: hint(ms?.pagibigEmployee ?? line.pagibigEmployeeShare * 2, line.pagibigEmployeeShare, 'Pag-IBIG Contribution'),
     },
-    { key: 'tax', type: 'Withholding Tax', description: 'Monthly Tax', amount: line.withholdingTax },
+    {
+      key: 'tax',
+      type: 'Withholding Tax',
+      description: 'BIR Withholding Tax',
+      amount: line.withholdingTax,
+      hint: ms ? hint(ms.withholdingTax, line.withholdingTax, 'Withholding Tax') : undefined,
+    },
   ]
 
   return (

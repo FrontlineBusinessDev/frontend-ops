@@ -17,7 +17,7 @@ import { payrollRules } from '@/mock-data/seed/payrollRules'
 import { schedules } from '@/mock-data/seed/schedules'
 import { statutoryConfigs } from '@/mock-data/seed/statutoryConfig'
 import { users } from '@/mock-data/seed/users'
-import type { ActivityLogEntry, ApiKey, Employee, PayrollLine, PayrollPeriod, ThirteenthMonthLine, ThirteenthMonthRun, Webhook } from '@/types/domain'
+import type { ActivityLogEntry, ApiKey, Employee, PayrollLine, PayrollPeriod, PayslipEmailRecord, ThirteenthMonthLine, ThirteenthMonthRun, Webhook } from '@/types/domain'
 
 const EMPLOYEE_COUNT_BY_COMPANY: Record<string, number> = {
   co_frontline: 24,
@@ -55,6 +55,16 @@ function reconcileUsersWithEmployees() {
   }
 }
 reconcileUsersWithEmployees()
+
+/** Mock branch managers: the first active manager/supervisor-level employee in each branch (else its first active employee). */
+function assignBranchManagers() {
+  for (const branch of branches) {
+    const staff = employees.filter((e) => e.branchId === branch.id && e.employment.status === 'active')
+    const manager = staff.find((e) => /manager|supervisor|head|lead/i.test(e.employment.position)) ?? staff[0]
+    if (manager) branch.managerEmployeeId = manager.id
+  }
+}
+assignBranchManagers()
 
 /**
  * Payroll group seeds are authored with empty `employeeIds` (see
@@ -105,6 +115,7 @@ export const db = {
   payrollLines: [] as PayrollLine[],
   thirteenthMonthRuns: [] as ThirteenthMonthRun[],
   thirteenthMonthLines: [] as ThirteenthMonthLine[],
+  payslipEmails: [] as PayslipEmailRecord[],
   apiKeys: [] as ApiKey[],
   webhooks: [] as Webhook[],
 }

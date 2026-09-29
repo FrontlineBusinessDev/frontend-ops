@@ -24,6 +24,7 @@ import { useSession } from '@/hooks/useSession'
 import { useTenant } from '@/hooks/useTenant'
 import { findEmployeePayrollGroup } from '@/lib/payroll/groupAssignment'
 import { PAY_RATE_TYPE_LABEL, formatBaseRateShort } from '@/lib/payroll/payRate'
+import { hourlyRateFor } from '@/lib/payroll/rateBasis'
 import { exportEmployeeMasterlistCsv } from '@/lib/services/integrationService'
 import { getDeductionConfigs } from '@/lib/services/payrollSettingsService'
 import { exportOvertimeSummaryCsv } from '@/lib/services/overtimeService'
@@ -58,6 +59,7 @@ function comboboxOptions(employees: Employee[]) {
 }
 
 const FREQUENCY_LABEL: Record<PayrollGroup['frequency'], string> = {
+  daily: 'Daily',
   weekly: 'Weekly',
   biweekly: 'Bi-weekly',
   semi_monthly: 'Semi-monthly',
@@ -579,11 +581,7 @@ export function PayslipReportView() {
   )
 }
 
-function estimateHourlyRate(basicPay: number): number {
-  return basicPay / (22 * 8)
-}
 
-const OT_MULTIPLIER: Record<string, number> = { regular: 1.25, night_diff: 1.1, rest_day_holiday: 1.3 }
 
 export function OvertimeReportView() {
   const { records, isLoading: recordsLoading } = useOvertimeRecords()
@@ -616,7 +614,8 @@ export function OvertimeReportView() {
       if (r.type === 'regular') bucket.regular += r.hours
       else if (r.type === 'night_diff') bucket.nightDiff += r.hours
       else bucket.restDay += r.hours
-      bucket.cost += r.hours * estimateHourlyRate(employee.compensation.basicPay) * (OT_MULTIPLIER[r.type] ?? 1)
+      // Same basis as the payroll engine: hourly rate × the record's own OT rate multiplier.
+      bucket.cost += r.hours * hourlyRateFor(employee) * r.multiplier
       byEmployee.set(employee.id, bucket)
     }
     return [...byEmployee.values()].sort((a, b) => a.employee.personal.lastName.localeCompare(b.employee.personal.lastName))

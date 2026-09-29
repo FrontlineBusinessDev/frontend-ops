@@ -11,8 +11,10 @@ import { PayrollListPage, PayrollPeriodDetailPage } from '@/features/payroll/rou
 import { PayslipDetailPage, PayslipsListPage } from '@/features/payslips/routes'
 import { StatutoryPage } from '@/features/statutory/routes'
 import { LoansDeductionsPage } from '@/features/loans-deductions/routes'
+import { BonusPayslipPage } from '@/features/bonuses/BonusPayslipPage'
 import { BonusesPage } from '@/features/bonuses/routes'
 import { ThirteenthMonthPage } from '@/features/thirteenth-month/routes'
+import { ThirteenthMonthPayslipPage } from '@/features/thirteenth-month/ThirteenthMonthPayslipPage'
 import {
   EssAttendancePage,
   EssHomePage,
@@ -128,10 +130,26 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: 'bonuses/:bonusId/payslips/:employeeId',
+        element: (
+          <RequireCapability capability="bonuses.view">
+            <BonusPayslipPage />
+          </RequireCapability>
+        ),
+      },
+      {
         path: 'thirteenth-month-pay',
         element: (
           <RequireCapability capability="thirteenth_month.view">
             <ThirteenthMonthPage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'thirteenth-month-pay/:runId/payslips/:employeeId',
+        element: (
+          <RequireCapability capability="thirteenth_month.view">
+            <ThirteenthMonthPayslipPage />
           </RequireCapability>
         ),
       },

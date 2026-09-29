@@ -2,19 +2,19 @@ import { Search, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
-import { StatusBadge } from '@/components/ui/Badge'
+import { Badge, StatusBadge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { FilterField, FiltersPopover, SortControl, type SortDirection } from '@/components/ui/FiltersPopover'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { AddBonusDialog } from '@/features/bonuses/components/AddBonusDialog'
+import { AddBonusDialog, BonusFormDialog } from '@/features/bonuses/components/AddBonusDialog'
 import { BonusDetailsDialog } from '@/features/bonuses/components/BonusDetailsDialog'
 import { useBonuses } from '@/features/bonuses/hooks/useBonuses'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
 import { usePermission } from '@/hooks/usePermission'
-import { resolveBonusRecipients } from '@/lib/payroll/bonusMatching'
+import { bonusPayoutMode, resolveBonusRecipients } from '@/lib/payroll/bonusMatching'
 import { formatCurrency } from '@/lib/utils/format'
 import type { BonusIncentive } from '@/types/domain'
 
@@ -47,6 +47,7 @@ export function BonusesPage() {
   const canManage = usePermission('bonuses.manage')
   const departments = useMemo(() => [...new Set(employees.map((e) => e.employment.department))].sort(), [employees])
   const [selectedBonus, setSelectedBonus] = useState<BonusIncentive | null>(null)
+  const [editingBonus, setEditingBonus] = useState<BonusIncentive | null>(null)
 
   const [search, setSearch] = useState('')
   const [type, setType] = useState('all')
@@ -143,14 +144,39 @@ export function BonusesPage() {
                       : 'Unassigned employee'
                     : `${recipients.length} employee${recipients.length === 1 ? '' : 's'}`}
                 </p>
-                <p className="mt-3 text-xs text-muted-foreground">Payroll Period: {bonus.periodLabel}</p>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">Payroll Period: {bonus.periodLabel}</p>
+                  <Badge tone={bonusPayoutMode(bonus) === 'separate_payslip' ? 'brand' : 'neutral'}>
+                    {bonusPayoutMode(bonus) === 'separate_payslip' ? 'Separate Payslip' : 'Regular Payroll'}
+                  </Badge>
+                </div>
               </Card>
             )
           })}
         </div>
       )}
 
-      <BonusDetailsDialog bonus={selectedBonus} employees={employees} canManage={canManage} onClose={() => setSelectedBonus(null)} onChanged={refetch} />
+      <BonusDetailsDialog
+        bonus={selectedBonus}
+        employees={employees}
+        canManage={canManage}
+        onClose={() => setSelectedBonus(null)}
+        onChanged={refetch}
+        onEdit={(bonus) => {
+          setSelectedBonus(null)
+          setEditingBonus(bonus)
+        }}
+      />
+      {editingBonus && (
+        <BonusFormDialog
+          bonus={editingBonus}
+          open
+          onOpenChange={(open) => !open && setEditingBonus(null)}
+          employees={employees}
+          departments={departments}
+          onSaved={refetch}
+        />
+      )}
     </div>
   )
 }

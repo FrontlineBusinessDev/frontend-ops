@@ -1,32 +1,43 @@
 import type { SssBracket, StatutoryConfig } from '@/types/domain'
 import { companies } from '@/mock-data/seed/companies'
 
-const SSS_BRACKETS: SssBracket[] = [
-  { minSalary: 0, maxSalary: 4250, msc: 4000, employeeShare: 180, employerShare: 380 },
-  { minSalary: 4250, maxSalary: 4750, msc: 4500, employeeShare: 202.5, employerShare: 427.5 },
-  { minSalary: 4750, maxSalary: 5250, msc: 5000, employeeShare: 225, employerShare: 475 },
-  { minSalary: 5250, maxSalary: 6250, msc: 5750, employeeShare: 258.75, employerShare: 546.25 },
-  { minSalary: 6250, maxSalary: 7250, msc: 6750, employeeShare: 303.75, employerShare: 641.25 },
-  { minSalary: 7250, maxSalary: 8250, msc: 7750, employeeShare: 348.75, employerShare: 736.25 },
-  { minSalary: 8250, maxSalary: 9250, msc: 8750, employeeShare: 393.75, employerShare: 831.25 },
-  { minSalary: 9250, maxSalary: 10250, msc: 9750, employeeShare: 438.75, employerShare: 926.25 },
-  { minSalary: 10250, maxSalary: 11250, msc: 10750, employeeShare: 483.75, employerShare: 1021.25 },
-  { minSalary: 11250, maxSalary: 12750, msc: 12000, employeeShare: 540, employerShare: 1140 },
-  { minSalary: 12750, maxSalary: 14750, msc: 13750, employeeShare: 618.75, employerShare: 1306.25 },
-  { minSalary: 14750, maxSalary: 16750, msc: 15750, employeeShare: 708.75, employerShare: 1496.25 },
-  { minSalary: 16750, maxSalary: 18750, msc: 17750, employeeShare: 798.75, employerShare: 1686.25 },
-  { minSalary: 18750, maxSalary: 20250, msc: 19750, employeeShare: 888.75, employerShare: 1876.25 },
-  { minSalary: 20250, maxSalary: null, msc: 20000, employeeShare: 900, employerShare: 1900 },
-]
+/**
+ * SSS contribution schedule effective January 2025 (Circular 2024-006): 15% of the Monthly Salary
+ * Credit — 5% employee, 10% employer — on MSCs from ₱5,000 to ₱35,000 in ₱500 steps, plus the
+ * employer-paid Employees' Compensation premium (₱10 below ₱15,000 MSC, ₱30 from ₱15,000).
+ */
+function buildSssBrackets(): SssBracket[] {
+  const brackets: SssBracket[] = []
+  for (let msc = 5000; msc <= 35000; msc += 500) {
+    brackets.push({
+      minSalary: msc === 5000 ? 0 : msc - 250,
+      maxSalary: msc === 35000 ? null : msc + 250,
+      msc,
+      employeeShare: msc * 0.05,
+      employerShare: msc * 0.1,
+      ec: msc < 15000 ? 10 : 30,
+    })
+  }
+  return brackets
+}
+
+const SSS_BRACKETS = buildSssBrackets()
 
 export const statutoryConfigs: StatutoryConfig[] = companies.map((company) => ({
   companyId: company.id,
   sssBrackets: SSS_BRACKETS,
+  // PhilHealth 2024–2025: 5% premium on basic salary, floor ₱10,000 / ceiling ₱100,000, split 50/50.
   philhealthRate: 0.05,
   philhealthEmployeeSharePercent: 0.5,
   philhealthEmployerSharePercent: 0.5,
+  philhealthSalaryFloor: 10_000,
+  philhealthSalaryCeiling: 100_000,
+  // Pag-IBIG (HDMF Circular 460): 2% each on pay up to the ₱10,000 maximum fund salary (₱200 cap); employees earning ₱1,500 or less pay 1%.
+  pagibigRate: 0.02,
+  pagibigMaxFundSalary: 10_000,
   pagibigEmployeeAmount: 200,
   pagibigEmployerAmount: 200,
+  // BIR withholding tax on compensation — TRAIN Law monthly table effective January 2023.
   taxBrackets: [
     { min: 0, max: 20833, rate: 0, baseTax: 0 },
     { min: 20833, max: 33333, rate: 0.15, baseTax: 0 },

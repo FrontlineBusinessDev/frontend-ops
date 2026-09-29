@@ -1,4 +1,5 @@
-import { basicPayFor, monthlyEquivalentFor, type BasicPayResult } from '@/lib/payroll/rateBasis'
+import { LOAN_CONFIG_NAME, allocateMonthly as allocateForDisplay, describeAllocation, periodsPerCycleForFrequency, type PaySchedule } from '@/lib/payroll/payFrequency'
+import { basicPayFor, dailyRateFor, hourlyRateFor, monthlyEquivalentFor, type BasicPayResult } from '@/lib/payroll/rateBasis'
 import { formatCurrency } from '@/lib/utils/format'
 import type {
   AttendanceRecord,
@@ -36,6 +37,8 @@ export interface AllocationDetail {
   allocationMethod: DeductionAllocationMethod
   periodsPerCycle: number
   cutoffIndex: number
+  /** Every cutoff the run covered, when more than one. */
+  cutoffsCovered?: number[]
 }
 
 export interface DeductionItem {
@@ -66,14 +69,6 @@ export interface ComputationBreakdown {
   illustrativeDeductions: DeductionItem[]
   summary: ComputationSummary
 }
-
-/**
- * The real payroll engine (`payrollService.ts#computeLine`) always applies an equal semi-monthly
- * split to statutory contributions, tax, and loans — regardless of the employee's Payroll Group
- * frequency. This constant documents that fact so the breakdown never displays a formula that
- * contradicts the actual computed amount.
- */
-const ENGINE_PERIODS_PER_CYCLE = 2
 
 /** Pay periods a Payroll Group runs per month — display/allocation math only, used for the illustrative "Recurring Company Deductions" preview, never for the authoritative payroll engine. */
 export function periodsPerCycleFor(frequency: PayrollFrequency | undefined, group: PayrollGroup | undefined): number {
@@ -138,41 +133,31 @@ export function allocationFormula(
   return `${formatCurrency(monthly)} monthly ÷ ${periodsPerCycle} pay periods = ${formatCurrency(current)}`
 }
 
-function estimateHourlyRate(employee: Employee): number {
-  return employee.compensation.basicPay / (22 * 8)
-}
-
-const OVERTIME_TYPE_LABEL: Record<OvertimeRecord['type'], string> = {
-  regular: 'Overtime',
+const OVERTIME_TYPE_LABEL_ENGINE: Record<OvertimeRecord['type'], string> = {
+  regular: 'Overtime Pay',
   night_diff: 'Night Differential',
   rest_day_holiday: 'Rest Day / Holiday Overtime',
 }
 
-const LOAN_CONFIG_NAME: Record<LoanRecord['type'], string> = {
-  sss_salary_loan: 'SSS Salary Loan',
-  sss_calamity_loan: 'SSS Salary Loan',
-  pagibig_multipurpose_loan: 'Pag-IBIG Loan',
-  pagibig_calamity_loan: 'Pag-IBIG Loan',
-  pagibig_mp2: 'Pag-IBIG Loan',
-  company_loan: 'Company Loan',
-  other_deduction: 'Late/Undertime Adjustment',
-}
-
-/** Statutory/tax/loan deductions are always actually computed by the engine as an equal ÷2 split — this builds the (real, non-contradictory) allocation context for one of them. */
-function realAllocation(monthlyAmount: number, currentPeriodAmount: number, configuredMethod: DeductionAllocationMethod | undefined): {
-  detail: AllocationDetail
-  formula: string
-} {
-  // The configured method is surfaced for transparency, but the cycle/index always reflect what the engine actually did (equal ÷2) so the displayed math never contradicts the real deducted amount.
+/** Allocation context for a statutory/tax/loan deduction, using the schedule the engine actually applied. */
+function realAllocation(
+  monthlyAmount: number,
+  currentPeriodAmount: number,
+  configuredMethod: DeductionAllocationMethod | undefined,
+  schedule: PaySchedule,
+): { detail: AllocationDetail; formula: string } {
   const detail: AllocationDetail = {
     monthlyAmount,
     currentPeriodAmount,
     allocationMethod: configuredMethod ?? 'equal_split',
-    periodsPerCycle: ENGINE_PERIODS_PER_CYCLE,
-    cutoffIndex: 1,
+    periodsPerCycle: schedule.periodsPerCycle,
+    cutoffIndex: schedule.cutoffIndex,
+    cutoffsCovered: schedule.cutoffsCovered,
   }
-  return { detail, formula: allocationFormula('equal_split', monthlyAmount, currentPeriodAmount, ENGINE_PERIODS_PER_CYCLE, 1) }
+  return { detail, formula: describeAllocation(monthlyAmount, currentPeriodAmount, schedule, configuredMethod) }
 }
+
+const OVERTIME_EARNING_LABELS = new Set(['Overtime Pay', 'Night Differential', 'Rest Day / Holiday Overtime'])
 
 export function buildComputationBreakdown(params: {
   employee: Employee
@@ -195,7 +180,6 @@ export function buildComputationBreakdown(params: {
     employee,
     line,
     period,
-    payrollGroup,
     deductionConfigs,
     loans,
     overtimeRecords,
@@ -208,8 +192,26 @@ export function buildComputationBreakdown(params: {
   const configByName = new Map(deductionConfigs.map((c) => [c.name, c]))
   const bonusByName = new Map(approvedBonuses.map((b) => [b.name, b]))
 
+  // The schedule the engine used for this line (older lines without it were semi-monthly).
+  const schedule: PaySchedule = line.periodsPerMonth
+    ? {
+        frequency: line.payFrequency ?? 'semi_monthly',
+        periodsPerMonth: line.periodsPerMonth,
+        periodsPerCycle: line.periodsInMonth ?? periodsPerCycleForFrequency(line.payFrequency ?? 'semi_monthly', line.periodsPerMonth),
+        cutoffIndex: line.cutoffIndex ?? 1,
+        cutoffsCovered: line.cutoffsCovered,
+      }
+    : { frequency: 'semi_monthly', periodsPerMonth: 2, periodsPerCycle: 2, cutoffIndex: 1 }
+  const ppm = schedule.periodsPerMonth
+  const ppmLabel = Number.isInteger(ppm) ? String(ppm) : ppm.toFixed(2)
+  const hourlyRate = hourlyRateFor(employee)
+  const dailyRate = dailyRateFor(employee)
+
   // ---- Earnings (real — the Basic/Output Pay line is recomputed via the exact same function the engine used, so it can never drift from `line.earnings`) ----
-  const basicPayResult = basicPayFor(employee, period, attendanceRecords, compensationApprovals)
+  const basicPayResult = basicPayFor(employee, period, attendanceRecords, compensationApprovals, ppm)
+  const periodOvertime = overtimeRecords.filter(
+    (r) => r.employeeId === employee.id && r.status === 'approved' && r.date >= period.startDate && r.date <= period.endDate,
+  )
   const earnings: EarningItem[] = line.earnings.map((e) => {
     if (e.label === basicPayResult.label) {
       return { ...e, formula: basicPayResult.formula }
@@ -231,30 +233,27 @@ export function buildComputationBreakdown(params: {
         formula: `Total Basic Salary Earned ${formatCurrency(thirteenthMonthLine.annualBasicEarned)} (${thirteenthMonthLine.monthsCredited}/12 months credited) ÷ 12 = ${formatCurrency(e.amount)} (non-taxable)`,
       }
     }
-    const monthly = employee.compensation.allowances.find((a) => a.label === e.label)?.amount ?? e.amount * 2
-    return { ...e, formula: `${e.label} ${formatCurrency(monthly)} ÷ 2 pay periods = ${formatCurrency(e.amount)}` }
+    if (OVERTIME_EARNING_LABELS.has(e.label)) {
+      const records = periodOvertime.filter((r) => OVERTIME_TYPE_LABEL_ENGINE[r.type] === e.label)
+      const parts = records.map((r) => `${r.hours}h × ${Math.round(r.multiplier * 100)}%`).join(' + ')
+      return { ...e, formula: `Hourly Rate ${formatCurrency(hourlyRate)} × (${parts || '—'}) = ${formatCurrency(e.amount)} (approved, taxable)` }
+    }
+    if (e.label === 'Paid Leave') {
+      return { ...e, formula: `Daily Rate ${formatCurrency(dailyRate)} × ${Math.round(e.amount / dailyRate)} approved paid-leave day(s) = ${formatCurrency(e.amount)}` }
+    }
+    const monthly = employee.compensation.allowances.find((a) => a.label === e.label)?.amount ?? e.amount * ppm
+    return { ...e, formula: `${e.label} ${formatCurrency(monthly)} monthly ÷ ${ppmLabel} pay periods = ${formatCurrency(e.amount)}` }
   })
 
-  // ---- Overtime preview (real approved OT records for this period — illustrative, not yet part of computed Gross Pay) ----
-  const periodOvertime = overtimeRecords.filter(
-    (r) => r.employeeId === employee.id && r.status === 'approved' && r.date >= period.startDate && r.date <= period.endDate,
-  )
-  const hourlyRate = estimateHourlyRate(employee)
-  const overtimePreview: OvertimePreviewItem[] = periodOvertime.map((r) => {
-    const amount = Math.round(r.hours * hourlyRate * r.multiplier * 100) / 100
-    return {
-      label: OVERTIME_TYPE_LABEL[r.type],
-      hours: r.hours,
-      amount,
-      formula: `Hourly Rate ${formatCurrency(hourlyRate)} × ${r.hours}h × ${Math.round(r.multiplier * 100)}% = ${formatCurrency(amount)}`,
-    }
-  })
+  // Overtime is part of Gross Pay (see the earnings above), so there is no separate preview any more.
+  const overtimePreview: OvertimePreviewItem[] = []
 
   // ---- Deductions (real — mirrors line fields exactly; formulas + allocation context added) ----
   const deductions: DeductionItem[] = []
 
-  const sssMonthly = line.sssEmployeeShare * 2
-  const sssAlloc = realAllocation(sssMonthly, line.sssEmployeeShare, configByName.get('SSS Contribution')?.allocationMethod)
+  const ms = line.monthlyStatutory
+  const sssMonthly = ms?.sssEmployee ?? line.sssEmployeeShare * 2
+  const sssAlloc = realAllocation(sssMonthly, line.sssEmployeeShare, configByName.get('SSS Contribution')?.allocationMethod, schedule)
   const monthlyEquivalent = monthlyEquivalentFor(employee)
   const sssBracket = statutoryConfig?.sssBrackets.find(
     (b) => monthlyEquivalent >= b.minSalary && (b.maxSalary === null || monthlyEquivalent < b.maxSalary),
@@ -262,43 +261,46 @@ export function buildComputationBreakdown(params: {
   deductions.push({
     label: 'SSS Contribution',
     currentPeriodAmount: line.sssEmployeeShare,
-    formula: `${sssBracket ? `SSS bracket MSC ${formatCurrency(sssBracket.msc)} → ` : ''}${sssAlloc.formula}`,
+    formula: `${sssBracket ? `MSC ${formatCurrency(sssBracket.msc)} × 5% employee share = ${formatCurrency(sssMonthly)} monthly → ` : ''}${sssAlloc.formula}`,
     allocation: sssAlloc.detail,
   })
 
-  const philhealthMonthly = line.philhealthEmployeeShare * 2
-  const philhealthAlloc = realAllocation(philhealthMonthly, line.philhealthEmployeeShare, configByName.get('PhilHealth Contribution')?.allocationMethod)
+  const philhealthMonthly = ms?.philhealthEmployee ?? line.philhealthEmployeeShare * 2
+  const philhealthAlloc = realAllocation(philhealthMonthly, line.philhealthEmployeeShare, configByName.get('PhilHealth Contribution')?.allocationMethod, schedule)
   const philhealthRatePct = statutoryConfig ? Math.round(statutoryConfig.philhealthRate * 100) : 5
+  const philhealthBase = Math.min(Math.max(monthlyEquivalent, statutoryConfig?.philhealthSalaryFloor ?? 10_000), statutoryConfig?.philhealthSalaryCeiling ?? 100_000)
   deductions.push({
     label: 'PhilHealth Contribution',
     currentPeriodAmount: line.philhealthEmployeeShare,
-    formula: `Monthly-Equivalent Pay ${formatCurrency(monthlyEquivalent)} × ${philhealthRatePct}% premium × 50% employee share = ${formatCurrency(philhealthMonthly)} monthly; ${philhealthAlloc.formula}`,
+    formula: `Basic ${formatCurrency(philhealthBase)}${philhealthBase !== monthlyEquivalent ? ' (floor/ceiling applied)' : ''} × ${philhealthRatePct}% premium × 50% employee share = ${formatCurrency(philhealthMonthly)} monthly; ${philhealthAlloc.formula}`,
     allocation: philhealthAlloc.detail,
   })
 
-  const pagibigMonthly = line.pagibigEmployeeShare * 2
-  const pagibigAlloc = realAllocation(pagibigMonthly, line.pagibigEmployeeShare, configByName.get('Pag-IBIG Contribution')?.allocationMethod)
+  const pagibigMonthly = ms?.pagibigEmployee ?? line.pagibigEmployeeShare * 2
+  const pagibigAlloc = realAllocation(pagibigMonthly, line.pagibigEmployeeShare, configByName.get('Pag-IBIG Contribution')?.allocationMethod, schedule)
   deductions.push({
     label: 'Pag-IBIG Contribution',
     currentPeriodAmount: line.pagibigEmployeeShare,
-    formula: pagibigAlloc.formula,
+    formula: `2% of pay up to the ₱10,000 maximum fund salary = ${formatCurrency(pagibigMonthly)} monthly; ${pagibigAlloc.formula}`,
     allocation: pagibigAlloc.detail,
   })
 
-  const taxMonthly = line.withholdingTax * 2
-  const taxAlloc = realAllocation(taxMonthly, line.withholdingTax, configByName.get('Withholding Tax')?.allocationMethod)
+  const taxMonthly = ms?.withholdingTax ?? line.withholdingTax * 2
+  const taxAlloc = realAllocation(taxMonthly, line.withholdingTax, configByName.get('Withholding Tax')?.allocationMethod, schedule)
+  const regularTax = ms ? Math.round(allocateForDisplay(taxMonthly, schedule, configByName.get('Withholding Tax'))) : line.withholdingTax
+  const extrasTax = Math.max(0, line.withholdingTax - regularTax)
   deductions.push({
     label: 'Withholding Tax',
     currentPeriodAmount: line.withholdingTax,
-    formula: `Estimated from monthly taxable income bracket; ${taxAlloc.formula}`,
+    formula: `TRAIN monthly table on taxable pay (basic − SSS, PhilHealth, Pag-IBIG) = ${formatCurrency(taxMonthly)} monthly; ${describeAllocation(taxMonthly, regularTax, schedule, configByName.get('Withholding Tax')?.allocationMethod)}${extrasTax > 0 ? ` + ${formatCurrency(extrasTax)} on overtime/taxable bonuses at the marginal rate` : ''}`,
     allocation: taxAlloc.detail,
   })
 
   for (const loanDeduction of line.loanDeductions) {
     const loan = loans.find((l) => l.employeeId === employee.id && l.label === loanDeduction.label)
     const config = loan ? configByName.get(LOAN_CONFIG_NAME[loan.type]) : undefined
-    const monthly = loan?.monthlyDeduction ?? loanDeduction.amount * 2
-    const loanAlloc = realAllocation(monthly, loanDeduction.amount, config?.allocationMethod)
+    const monthly = loan?.monthlyDeduction ?? loanDeduction.amount * ppm
+    const loanAlloc = realAllocation(monthly, loanDeduction.amount, config?.allocationMethod, schedule)
     deductions.push({
       label: loanDeduction.label,
       currentPeriodAmount: loanDeduction.amount,
@@ -309,20 +311,19 @@ export function buildComputationBreakdown(params: {
   }
 
   for (const other of line.otherDeductions) {
-    const dailyRate = employee.compensation.basicPay / (11 * 2)
     deductions.push({
       label: other.label,
       currentPeriodAmount: other.amount,
       formula:
         other.label === 'Absences'
-          ? `Daily Rate ${formatCurrency(dailyRate)} × ${line.absentDays} day(s) absent = ${formatCurrency(other.amount)}`
+          ? `Daily Rate ${formatCurrency(dailyRate)} × ${line.absentDays} unpaid absence(s) (approved paid leave excluded) = ${formatCurrency(other.amount)}`
           : `${formatCurrency(other.amount)} this payroll (one-time, not a monthly recurring amount)`,
     })
   }
 
   // ---- Illustrative only: recurring "other" catalog deductions the engine doesn't compute yet ----
-  const periodsPerCycle = periodsPerCycleFor(payrollGroup?.frequency, payrollGroup)
-  const cutoffIndex = cutoffIndexFor(period, periodsPerCycle)
+  const periodsPerCycle = schedule.periodsPerCycle
+  const cutoffIndex = schedule.cutoffIndex
   const ILLUSTRATIVE_MOCK_MONTHLY: Record<string, number> = {
     'Late/Undertime Adjustment': 500.01,
     'Canteen/Meal Plan Deduction': 450,

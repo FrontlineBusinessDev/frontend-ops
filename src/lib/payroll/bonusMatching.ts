@@ -1,5 +1,19 @@
 import { monthlyEquivalentFor } from '@/lib/payroll/rateBasis'
-import type { BonusIncentive, Employee } from '@/types/domain'
+import type { BonusIncentive, BonusPayoutMode, Employee } from '@/types/domain'
+
+export const BONUS_PAYOUT_MODE_LABEL: Record<BonusPayoutMode, string> = {
+  regular_payroll: 'Include in Regular Payroll Run',
+  separate_payslip: 'Generate Separate Payslip',
+}
+
+export function bonusPayoutMode(bonus: BonusIncentive): BonusPayoutMode {
+  return bonus.payoutMode ?? 'regular_payroll'
+}
+
+/** Only bonuses set to "Include in Regular Payroll Run" are added to the standard payroll payslip; separate-payslip bonuses are paid on their own. */
+export function includedInRegularPayroll(bonus: BonusIncentive): boolean {
+  return bonusPayoutMode(bonus) === 'regular_payroll'
+}
 
 /** Whether `bonus`'s target (a specific employee, a department, or the whole company) covers `employee`. */
 export function bonusAppliesToEmployee(bonus: BonusIncentive, employee: Employee): boolean {

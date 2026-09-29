@@ -14,13 +14,20 @@ import { usePayrollGroups } from '@/features/company-settings/hooks/usePayrollGr
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
 import { EmployeeComputationDrawer } from '@/features/payroll/components/EmployeeComputationDrawer'
 import { WorkLogsSummaryCard } from '@/features/payroll/components/WorkLogsSummaryCard'
+import { BulkEmailToolbar, RowCheckbox, SelectAllCheckbox } from '@/features/payslips/components/email/BulkEmailPayslips'
+import { EmailStatusBadge } from '@/features/payslips/components/email/EmailStatusBadge'
+import { PayslipEmailActions } from '@/features/payslips/components/email/PayslipEmailActions'
+import { PayslipCard } from '@/features/payslips/components/PayslipCard'
+import { usePayslipEmails } from '@/features/payslips/hooks/usePayslipEmails'
+import { usePayslipSelection } from '@/features/payslips/hooks/usePayslipSelection'
 import { usePayrollLines, usePayrollPeriods } from '@/features/payroll/hooks/usePayroll'
 import { usePermission } from '@/hooks/usePermission'
 import { useSession } from '@/hooks/useSession'
 import { useTenant } from '@/hooks/useTenant'
-import { bonusAppliesToEmployee } from '@/lib/payroll/bonusMatching'
+import { bonusAppliesToEmployee, includedInRegularPayroll } from '@/lib/payroll/bonusMatching'
 import { findEmployeePayrollGroup } from '@/lib/payroll/groupAssignment'
 import { PAY_RATE_TYPE_LABEL, formatBaseRateShort } from '@/lib/payroll/payRate'
+import { buildPayslipEmail } from '@/lib/payroll/payslipEmail'
 import { basicPayFor } from '@/lib/payroll/rateBasis'
 import { getAttendanceRecords } from '@/lib/services/attendanceService'
 import { getBonuses } from '@/lib/services/bonusService'
@@ -51,7 +58,7 @@ export function PayrollPeriodDetailPage() {
   const { lines, isLoading: isLoadingLines, refetch: refetchLines } = usePayrollLines(id)
   const { employees } = useEmployees()
   const { groups, compensationTypes } = usePayrollGroups()
-  const { branches } = useTenant()
+  const { branches, company } = useTenant()
   const canRun = usePermission('payroll.run')
   const canApprove = usePermission('payroll.approve')
   const canFinalize = usePermission('payroll.finalize')
@@ -90,8 +97,39 @@ export function PayrollPeriodDetailPage() {
   }, [user, periodLabel])
   const employeeById = new Map(employees.map((e) => [e.id, e]))
   const payrollGroup = period?.payrollGroupId ? groups.find((g) => g.id === period.payrollGroupId) : undefined
+  const emails = usePayslipEmails('payroll', id)
+  const selection = usePayslipSelection(lines.map((l) => l.employeeId))
 
   if (!period) return <Skeleton className="h-96" />
+
+  // Payslips are only issued (and so only emailed) once the run is finalized; previews are always available.
+  const canEmail = period.status === 'finalized' && (canRun || canFinalize)
+  const emailDisabledReason = period.status === 'finalized' ? 'You do not have permission to send payslips.' : 'Payslips can be emailed once this payroll run is finalized.'
+  const employeeName = (employeeId: string) => {
+    const e = employeeById.get(employeeId)
+    return e ? `${e.personal.firstName} ${e.personal.lastName}` : 'Unknown'
+  }
+  const emailFor = (employeeId: string) => {
+    const employee = employeeById.get(employeeId)
+    const line = lines.find((l) => l.employeeId === employeeId)
+    return employee && line ? buildPayslipEmail({
+          kind: 'payroll',
+          company,
+          employee,
+          label: period.label,
+          periodStart: period.startDate,
+          periodEnd: period.endDate,
+          payDate: period.payDate,
+          ctaPath: `/ess/payslips/${line.id}`,
+        }) : undefined
+  }
+  const sendEmails = (employeeIds: string[]) =>
+    emails.send(
+      employeeIds.flatMap((employeeId) => {
+        const email = emailFor(employeeId)
+        return email ? [{ employeeId, employeeName: employeeName(employeeId), subject: email.subject }] : []
+      }),
+    )
 
   async function handleRun() {
     if (!id) return
@@ -186,9 +224,27 @@ export function PayrollPeriodDetailPage() {
             </Card>
           </div>
 
+          <BulkEmailToolbar
+            candidates={lines.map((l) => ({
+              employeeId: l.employeeId,
+              employeeName: employeeName(l.employeeId),
+              hasEmail: !!employeeById.get(l.employeeId)?.personal.personalEmail,
+              status: emails.statusFor(l.employeeId),
+            }))}
+            selectedIds={selection.selected}
+            canSend={canEmail}
+            disabledReason={emailDisabledReason}
+            isSending={emails.isSending}
+            onSend={sendEmails}
+            onSent={selection.clear}
+          />
+
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <SelectAllCheckbox state={selection.headerState} onChange={selection.toggleAll} />
+                </TableHead>
                 <TableHead>Employee</TableHead>
                 <TableHead>Position</TableHead>
                 <TableHead>Payroll Group</TableHead>
@@ -200,6 +256,7 @@ export function PayrollPeriodDetailPage() {
                 <TableHead>Deductions</TableHead>
                 <TableHead>Net Pay</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Email Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -209,15 +266,23 @@ export function PayrollPeriodDetailPage() {
                 const employeeGroup = employee ? findEmployeePayrollGroup(groups, employee.id) : undefined
                 const compensationType = compensationTypes.find((c) => c.id === employeeGroup?.compensationTypeId)
                 const branch = branches.find((b) => b.id === employee?.branchId)
-                const basicPayResult = employee ? basicPayFor(employee, period, attendanceRecords, compensationApprovals) : undefined
+                const basicPayResult = employee ? basicPayFor(employee, period, attendanceRecords, compensationApprovals, line.periodsPerMonth ?? 2) : undefined
                 const employeeApprovedBonuses = employee
                   ? bonuses.filter(
-                      (b) => b.status === 'approved' && b.periodLabel.trim().toLowerCase() === period.label.trim().toLowerCase() && bonusAppliesToEmployee(b, employee),
+                      (b) =>
+                        b.status === 'approved' &&
+                        includedInRegularPayroll(b) &&
+                        b.periodLabel.trim().toLowerCase() === period.label.trim().toLowerCase() &&
+                        bonusAppliesToEmployee(b, employee),
                     )
                   : []
                 const employeeThirteenthMonthLine = employee ? thirteenthMonthLines.find((l) => l.employeeId === employee.id) : undefined
+                const email = emailFor(line.employeeId)
                 return (
                   <TableRow key={line.id}>
+                    <TableCell>
+                      <RowCheckbox checked={selection.selected.has(line.employeeId)} onChange={(c) => selection.toggle(line.employeeId, c)} label={employeeName(line.employeeId)} />
+                    </TableCell>
                     <TableCell>
                       <p className="text-sm font-medium">
                         {employee ? `${employee.personal.firstName} ${employee.personal.lastName}` : 'Unknown'}
@@ -238,6 +303,9 @@ export function PayrollPeriodDetailPage() {
                     <TableCell className="font-medium">{formatCurrency(line.netPay)}</TableCell>
                     <TableCell>
                       <StatusBadge status={period.status} />
+                    </TableCell>
+                    <TableCell>
+                      <EmailStatusBadge status={emails.statusFor(line.employeeId)} record={emails.records[line.employeeId]} />
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1.5">
@@ -268,6 +336,28 @@ export function PayrollPeriodDetailPage() {
                           <Button size="sm" variant="secondary" onClick={() => navigate(`/payslips/${line.id}`)}>
                             View Payslip
                           </Button>
+                        )}
+                        {employee && email && (
+                          <PayslipEmailActions
+                            compact
+                            email={email}
+                            status={emails.statusFor(employee.id)}
+                            record={emails.records[employee.id]}
+                            canSend={canEmail}
+                            disabledReason={emailDisabledReason}
+                            onSend={() => sendEmails([employee.id])}
+                            renderPayslip={() => (
+                              <PayslipCard
+                                company={company}
+                                employee={employee}
+                                period={period}
+                                payrollGroup={employeeGroup}
+                                line={line}
+                                deductionConfigs={deductionConfigs}
+                                loans={loans.filter((l) => l.employeeId === employee.id)}
+                              />
+                            )}
+                          />
                         )}
                       </div>
                     </TableCell>

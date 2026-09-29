@@ -16,6 +16,7 @@ import type { CompensationType, Employee, PayrollGroup, Schedule } from '@/types
 import { PayrollGroupAssignDialog } from '@/features/company-settings/components/payroll/PayrollGroupAssignDialog'
 
 const FREQUENCY_LABEL: Record<PayrollGroup['frequency'], string> = {
+  daily: 'Daily',
   weekly: 'Weekly',
   biweekly: 'Bi-weekly',
   semi_monthly: 'Semi-monthly',

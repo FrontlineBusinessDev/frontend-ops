@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/Dialog'
 import { buildComputationBreakdown } from '@/lib/payroll/computationBreakdown'
 import type { AllocationDetail } from '@/lib/payroll/computationBreakdown'
+import { cutoffLabel } from '@/lib/payroll/payFrequency'
 import { PAY_RATE_TYPE_LABEL, formatBaseRate } from '@/lib/payroll/payRate'
 import { HOURLY_WORK_LOG_LABEL, OUTPUT_WORK_LOG_LABEL } from '@/lib/payroll/rateBasis'
 import type { WorkLogsForPeriod } from '@/lib/payroll/rateBasis'
@@ -28,6 +29,7 @@ import type {
 } from '@/types/domain'
 
 const FREQUENCY_LABEL: Record<PayrollGroup['frequency'], string> = {
+  daily: 'Daily',
   weekly: 'Weekly',
   biweekly: 'Bi-weekly',
   semi_monthly: 'Semi-monthly',
@@ -128,7 +130,7 @@ function AllocationBadge({ allocation }: { allocation: AllocationDetail }) {
       <Badge tone="neutral">Monthly: {formatCurrency(allocation.monthlyAmount)}</Badge>
       <Badge tone="brand">{ALLOCATION_METHOD_LABEL[allocation.allocationMethod]}</Badge>
       <span className="text-muted-foreground">
-        cutoff {allocation.cutoffIndex} of {allocation.periodsPerCycle}
+        {cutoffLabel(allocation)}
       </span>
     </div>
   )

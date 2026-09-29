@@ -10,11 +10,21 @@ export async function getBranches(session: SessionUser): Promise<Branch[]> {
 export interface CreateBranchInput {
   name: string
   isHeadOffice: boolean
+  code?: string
+  address?: string
+  city?: string
+  contactNumber?: string
+  email?: string
+  managerEmployeeId?: string
+  openedDate?: string
 }
 
-export async function createBranch(session: SessionUser, input: CreateBranchInput): Promise<Branch> {
-  const branch: Branch = { id: crypto.randomUUID(), companyId: session.companyId, ...input }
+/** Creates a branch and, optionally, bulk-assigns (or transfers) employees to it in the same step. */
+export async function createBranch(session: SessionUser, input: CreateBranchInput & { employeeIds?: string[] }): Promise<Branch> {
+  const { employeeIds = [], ...details } = input
+  const branch: Branch = { id: crypto.randomUUID(), companyId: session.companyId, ...details }
   db.branches.push(branch)
+  await assignEmployeesToBranch(session, employeeIds, branch.id)
   return branch
 }
 
@@ -29,6 +39,11 @@ export async function reassignEmployeeBranch(session: SessionUser, employeeId: s
   const branch = db.branches.find((b) => b.id === branchId && b.companyId === session.companyId)
   if (!employee || !branch) return
 
+  if (employee.branchId === branchId) return
+  // An employee who leaves the branch they manage stops being its manager.
+  const previous = db.branches.find((b) => b.id === employee.branchId && b.companyId === session.companyId)
+  if (previous?.managerEmployeeId === employeeId) previous.managerEmployeeId = undefined
+
   employee.branchId = branchId
   employee.history.push({
     id: crypto.randomUUID(),
@@ -36,6 +51,18 @@ export async function reassignEmployeeBranch(session: SessionUser, employeeId: s
     actor: session.name,
     action: `Reassigned to branch: ${branch.name}`,
   })
+}
+
+/** Bulk assign / transfer employees to a branch; returns how many actually moved. */
+export async function assignEmployeesToBranch(session: SessionUser, employeeIds: string[], branchId: string): Promise<number> {
+  let moved = 0
+  for (const employeeId of employeeIds) {
+    const employee = db.employees.find((e) => e.id === employeeId && e.companyId === session.companyId)
+    if (!employee || employee.branchId === branchId) continue
+    await reassignEmployeeBranch(session, employeeId, branchId)
+    moved += 1
+  }
+  return moved
 }
 
 export interface BranchSummary {

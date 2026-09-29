@@ -63,7 +63,7 @@ export function CreatePeriodDialog({ onCreated }: { onCreated: () => void }) {
         <DialogDescription>Define the period before running payroll calculations.</DialogDescription>
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-5 grid grid-cols-2 gap-4">
-          <FormField label="Payroll Group" hint="Leave as 'All Employees' to run against every active employee, matching current behavior." className="col-span-2">
+          <FormField label="Payroll Group" hint="'All Employees' runs every active employee on their own Payroll Group's frequency — e.g. a Sep 1–30 run covers both semi-monthly cutoffs. Pick a group to run one cutoff at a time (Sep 1–15, Sep 16–30)." className="col-span-2">
             <Controller
               control={control}
               name="payrollGroupId"

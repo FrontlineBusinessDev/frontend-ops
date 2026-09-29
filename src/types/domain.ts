@@ -72,6 +72,15 @@ export interface Branch {
   companyId: string
   name: string
   isHeadOffice: boolean
+  /** Short internal code, e.g. "MKT-HO". */
+  code?: string
+  address?: string
+  city?: string
+  contactNumber?: string
+  email?: string
+  /** Employee who manages this branch. */
+  managerEmployeeId?: string
+  openedDate?: string
 }
 
 export interface SessionUser {
@@ -123,6 +132,9 @@ export interface EmployeeEmployment {
   employmentType: 'regular' | 'probationary' | 'contractual' | 'part_time'
   dateHired: string
   status: EmploymentStatus
+  /** Last day of employment for resigned/separated employees (ISO date). Absent while still employed. */
+  dateSeparated?: string
+  separationReason?: 'resigned' | 'terminated' | 'end_of_contract' | 'retired'
   managerId?: string
   /** Broad payroll-relevant grouping, independent of Position — used to suggest (never restrict) Payroll Group assignment. */
   category: EmployeeCategory
@@ -246,7 +258,7 @@ export interface Schedule {
   assignedEmployeeIds?: string[]
 }
 
-export type PayrollFrequency = 'weekly' | 'biweekly' | 'semi_monthly' | 'monthly' | 'custom'
+export type PayrollFrequency = 'daily' | 'weekly' | 'biweekly' | 'semi_monthly' | 'monthly' | 'custom'
 
 export interface PayrollGroup {
   id: string
@@ -344,6 +356,7 @@ export interface PayrollRules {
   lateDeductionMethod: 'per_minute' | 'fixed'
   latePerMinuteDeduction: number
   overtimePreApprovalRequired: boolean
+  /** @deprecated Not shown or used — OT rates are configured on the Overtime & Holiday Rates tab (payrollRatesStore). */
   overtimeDefaultMultiplier: number
   overtimeRestDayMultiplier: number
   overtimeHolidayMultiplier: number
@@ -447,6 +460,8 @@ export interface SssBracket {
   msc: number
   employeeShare: number
   employerShare: number
+  /** Employees' Compensation (EC) premium, paid by the employer on top of employerShare (₱10 below ₱15,000 MSC, ₱30 at or above). */
+  ec?: number
 }
 
 export interface StatutoryConfig {
@@ -455,9 +470,16 @@ export interface StatutoryConfig {
   philhealthRate: number
   philhealthEmployeeSharePercent: number
   philhealthEmployerSharePercent: number
+  /** Maximum monthly Pag-IBIG share (₱200 = 2% of the ₱10,000 maximum fund salary). */
   pagibigEmployeeAmount: number
   pagibigEmployerAmount: number
   taxBrackets: TaxBracket[]
+  /** PhilHealth premium base is clamped to this range (defaults ₱10,000 – ₱100,000). */
+  philhealthSalaryFloor?: number
+  philhealthSalaryCeiling?: number
+  /** Pag-IBIG contribution rate (default 2%; employees earning ₱1,500 or less pay 1%) applied to pay up to the maximum fund salary (default ₱10,000). */
+  pagibigRate?: number
+  pagibigMaxFundSalary?: number
 }
 
 export interface PayrollEarningLine {
@@ -490,6 +512,26 @@ export interface PayrollLine {
   withholdingTax: number
   totalDeductions: number
   netPay: number
+  /** How this line was scheduled: pay periods per month for the run's frequency, and which cutoff of the month it is. */
+  payFrequency?: PayrollFrequency
+  periodsPerMonth?: number
+  /** How many pay periods this month's contributions/deductions were split across (÷ 1 monthly, 2 semi-monthly, 4 weekly, 22/26 daily, periods-in-month otherwise). */
+  periodsInMonth?: number
+  cutoffIndex?: number
+  /** Every cutoff the run covered — e.g. [1, 2] when a full-month All Employees run pays a semi-monthly employee. */
+  cutoffsCovered?: number[]
+  /** Full monthly statutory amounts before the per-cutoff allocation (employer SSS includes EC). */
+  monthlyStatutory?: {
+    sssEmployee: number
+    sssEmployer: number
+    philhealthEmployee: number
+    philhealthEmployer: number
+    pagibigEmployee: number
+    pagibigEmployer: number
+    withholdingTax: number
+  }
+  /** Overtime / night differential pay, taxed at the marginal rate on top of regular withholding. */
+  overtimePay?: number
 }
 
 export type LoanType =
@@ -566,6 +608,8 @@ export type BonusApprovalStatus = 'draft' | 'pending' | 'approved' | 'rejected'
 export type BonusType = 'fixed_amount' | 'percentage' | 'performance_based' | 'output_based'
 export type BonusTargetType = 'employee' | 'department' | 'company'
 export type BonusFrequency = 'one_time' | 'recurring'
+/** How an approved bonus is paid out: as extra earnings on the regular payroll payslip, or on its own standalone payslip. */
+export type BonusPayoutMode = 'regular_payroll' | 'separate_payslip'
 
 export interface BonusIncentive {
   id: string
@@ -581,6 +625,8 @@ export interface BonusIncentive {
   periodLabel: string
   taxable: boolean
   frequency: BonusFrequency
+  /** Payslip generation preference. Absent on older records, which behave as 'regular_payroll'. */
+  payoutMode?: BonusPayoutMode
   notes?: string
   status: BonusApprovalStatus
   createdAt: string
@@ -590,13 +636,33 @@ export interface BonusIncentive {
 
 export type ThirteenthMonthRunStatus = 'draft' | 'finalized'
 
+/**
+ * Who a 13th Month Pay batch is generated for. 'all' / 'employees' / 'payroll_group' / 'department'
+ * cover active employees only; resigned/separated employees are paid through their own
+ * 'separated' batch (all of them, or the ones listed in `employeeIds`).
+ */
+export type ThirteenthMonthSelectionMode = 'all' | 'employees' | 'payroll_group' | 'department' | 'separated'
+
+export interface ThirteenthMonthSelection {
+  mode: ThirteenthMonthSelectionMode
+  /** 'employees': the chosen active employees. 'separated': the chosen separated employees (empty = all of them). */
+  employeeIds?: string[]
+  payrollGroupId?: string
+  department?: string
+}
+
 export interface ThirteenthMonthRun {
   id: string
   companyId: string
   year: number
   generationDate: string
-  /** Free-text payroll run label this batch pays out on, matched against PayrollPeriod.label the same way BonusIncentive.periodLabel is. */
+  /** Payout label printed on the standalone 13th Month payslips (e.g. "December 2026"). 13th Month Pay is never merged into a regular payroll run. */
   payoutPeriodLabel: string
+  /** Targeting used to build this batch. Older batches without it covered all eligible employees. */
+  selection?: ThirteenthMonthSelection
+  /** Covered window: the calendar year (January 1 – December 31). Separated employees are clamped to their last day per line. */
+  coverageStart?: string
+  coverageEnd?: string
   status: ThirteenthMonthRunStatus
   createdAt: string
   finalizedAt?: string
@@ -607,8 +673,49 @@ export interface ThirteenthMonthLine {
   companyId: string
   runId: string
   employeeId: string
+  /** Net Total Basic Salary Earned in the covered window — gross basic less undertime and unpaid absences. The 13th Month Pay base. */
   annualBasicEarned: number
-  /** Out of 12 — less than 12 when the employee was hired mid-year (statutory proration). */
+  /** Months of the covered window the employee was employed, out of 12 — fractional for partial months (mid-year hires, separations). */
   monthsCredited: number
   thirteenthMonthPay: number
+  /** Employment window actually counted (hire / separation dates clamped to the coverage window). */
+  activeFrom?: string
+  activeTo?: string
+  /** Separated/resigned during (or before the end of) the covered window — pro-rated to active days only. */
+  separated?: boolean
+  /** Basic salary for the active window before deductions. */
+  grossBasicEarned?: number
+  undertimeHours?: number
+  undertimeDeduction?: number
+  /** Absences not covered by an approved paid leave. */
+  unpaidAbsenceDays?: number
+  absenceDeduction?: number
+  /** Portion above the ₱90,000 non-taxable ceiling, and the tax withheld on it. */
+  taxableExcess?: number
+  withholdingTax?: number
+  /** Take-home on the standalone 13th Month payslip. */
+  netPay?: number
+}
+
+/** Which payslip an email carries: a regular payroll run, a 13th Month Pay batch, or a separate bonus payslip. */
+export type PayslipEmailKind = 'payroll' | 'thirteenth_month' | 'bonus'
+
+export type PayslipEmailStatus = 'unsent' | 'sending' | 'sent' | 'failed'
+
+/** Dispatch log for one employee's payslip email — keyed by kind + source (period / run / bonus id) + employee. */
+export interface PayslipEmailRecord {
+  id: string
+  companyId: string
+  kind: PayslipEmailKind
+  /** Payroll period id, 13th Month run id, or bonus id. */
+  sourceId: string
+  employeeId: string
+  recipient?: string
+  subject: string
+  status: PayslipEmailStatus
+  attempts: number
+  lastAttemptAt?: string
+  sentAt?: string
+  sentBy?: string
+  error?: string
 }

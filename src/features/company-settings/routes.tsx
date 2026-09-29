@@ -94,7 +94,7 @@ export function CompanySettingsPage() {
             </TabsContent>
 
             <TabsContent value="ot-holiday-rates">
-              <OvertimeHolidayRatesSection />
+              <OvertimeHolidayRatesSection rules={payrollRules} canEdit={canEditPayroll} onRefetch={refetch} />
             </TabsContent>
 
             <TabsContent value="schedules">

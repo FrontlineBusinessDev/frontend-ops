@@ -5,6 +5,8 @@ export const STANDARD_WORKING_DAYS_PER_YEAR = 261
 export const STANDARD_HOURS_PER_DAY = 8
 /** Matches the engine's existing half-month approximation (`workingDaysInPeriod` in payrollService.ts) — used only when no attendance is recorded for the period, so daily/hourly Basic Pay never collapses to zero purely from a mock-data coverage gap. */
 const FALLBACK_PAID_DAYS_PER_PERIOD = 11
+/** Working days per month used to derive daily/hourly rates from a monthly salary (the engine's existing 11-days-per-half-month convention). */
+export const WORKING_DAYS_PER_MONTH = 22
 
 export interface RateBasis {
   quantity: number
@@ -13,19 +15,20 @@ export interface RateBasis {
   isFallback: boolean
 }
 
-export function computePaidDays(employeeId: string, period: PayrollPeriod, attendanceRecords: AttendanceRecord[]): RateBasis {
+export function computePaidDays(employeeId: string, period: PayrollPeriod, attendanceRecords: AttendanceRecord[], periodsPerMonth = 2): RateBasis {
   const periodRecords = attendanceRecords.filter(
     (r) => r.employeeId === employeeId && r.date >= period.startDate && r.date <= period.endDate,
   )
   if (periodRecords.length === 0) {
-    return { quantity: FALLBACK_PAID_DAYS_PER_PERIOD, unit: 'days', isFallback: true }
+    const fallback = periodsPerMonth === 2 ? FALLBACK_PAID_DAYS_PER_PERIOD : Math.round((WORKING_DAYS_PER_MONTH / periodsPerMonth) * 100) / 100
+    return { quantity: fallback, unit: 'days', isFallback: true }
   }
   const paidDays = periodRecords.filter((r) => r.status !== 'absent').length
   return { quantity: paidDays, unit: 'days', isFallback: false }
 }
 
-export function computePaidHours(employeeId: string, period: PayrollPeriod, attendanceRecords: AttendanceRecord[]): RateBasis {
-  const days = computePaidDays(employeeId, period, attendanceRecords)
+export function computePaidHours(employeeId: string, period: PayrollPeriod, attendanceRecords: AttendanceRecord[], periodsPerMonth = 2): RateBasis {
+  const days = computePaidDays(employeeId, period, attendanceRecords, periodsPerMonth)
   return { quantity: days.quantity * STANDARD_HOURS_PER_DAY, unit: 'hours', isFallback: days.isFallback }
 }
 
@@ -96,7 +99,10 @@ export function basicPayFor(
   period: PayrollPeriod,
   attendanceRecords: AttendanceRecord[],
   compensationApprovals: CompensationApproval[] = [],
+  /** Pay periods per month for this run's frequency (2 = semi-monthly, 1 = monthly, 52/12 = weekly…). */
+  periodsPerMonth = 2,
 ): BasicPayResult {
+  const ppmLabel = Number.isInteger(periodsPerMonth) ? String(periodsPerMonth) : periodsPerMonth.toFixed(2)
   const rate = employee.compensation.basicPay
   const payType = employee.compensation.payType
 
@@ -130,27 +136,34 @@ export function basicPayFor(
   }
 
   switch (payType) {
-    case 'monthly':
+    case 'monthly': {
+      const amount = Math.round((rate / periodsPerMonth) * 100) / 100
       return {
-        amount: rate / 2,
+        amount,
         basis: null,
         label: 'Basic Pay',
-        formula: `Monthly Rate ${formatCurrency(rate)} ÷ 2 pay periods = ${formatCurrency(rate / 2)}`,
+        formula: periodsPerMonth === 1 ? `Monthly Rate ${formatCurrency(rate)} (full month) = ${formatCurrency(amount)}` : `Monthly Rate ${formatCurrency(rate)} ÷ ${ppmLabel} pay periods = ${formatCurrency(amount)}`,
       }
-    case 'semi_monthly':
+    }
+    case 'semi_monthly': {
+      const amount = Math.round(((rate * 2) / periodsPerMonth) * 100) / 100
       return {
-        amount: rate,
+        amount,
         basis: null,
         label: 'Basic Pay',
-        formula: `Semi-Monthly Rate ${formatCurrency(rate)} × 1 payroll period = ${formatCurrency(rate)}`,
+        formula:
+          periodsPerMonth === 2
+            ? `Semi-Monthly Rate ${formatCurrency(rate)} × 1 payroll period = ${formatCurrency(amount)}`
+            : `Semi-Monthly Rate ${formatCurrency(rate)} × 2 ÷ ${ppmLabel} pay periods = ${formatCurrency(amount)}`,
       }
+    }
     case 'daily': {
-      const basis = computePaidDays(employee.id, period, attendanceRecords)
+      const basis = computePaidDays(employee.id, period, attendanceRecords, periodsPerMonth)
       const amount = Math.round(rate * basis.quantity * 100) / 100
       return { amount, basis, label: 'Basic Pay', formula: `Daily Rate ${formatCurrency(rate)} × ${basis.quantity} paid day(s) = ${formatCurrency(amount)}` }
     }
     case 'hourly': {
-      const basis = computePaidHours(employee.id, period, attendanceRecords)
+      const basis = computePaidHours(employee.id, period, attendanceRecords, periodsPerMonth)
       const amount = Math.round(rate * basis.quantity * 100) / 100
       return { amount, basis, label: 'Basic Pay', formula: `Hourly Rate ${formatCurrency(rate)} × ${basis.quantity} paid hour(s) = ${formatCurrency(amount)}` }
     }
@@ -190,4 +203,17 @@ export function monthlyEquivalentFor(employee: Employee): number {
       // No reliable expected-output baseline exists yet — an illustrative placeholder only.
       return rate * 250
   }
+}
+
+/** Daily rate for deductions/premiums: the daily rate itself, or the monthly-equivalent pay ÷ 22 working days. */
+export function dailyRateFor(employee: Employee): number {
+  const rate = employee.compensation.basicPay
+  if (employee.compensation.payType === 'daily') return rate
+  if (employee.compensation.payType === 'hourly') return rate * STANDARD_HOURS_PER_DAY
+  return monthlyEquivalentFor(employee) / WORKING_DAYS_PER_MONTH
+}
+
+/** Hourly rate for overtime, night differential, and undertime: the daily rate ÷ 8 hours. */
+export function hourlyRateFor(employee: Employee): number {
+  return dailyRateFor(employee) / STANDARD_HOURS_PER_DAY
 }

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/Dialog'
 import { formatCurrency, formatDate } from '@/lib/utils/format'
 import type { Employee, OvertimeRecord } from '@/types/domain'
+import { hourlyRateFor } from '@/lib/payroll/rateBasis'
 
 const TYPE_LABEL: Record<OvertimeRecord['type'], string> = {
   regular: 'Regular OT',
@@ -11,9 +12,9 @@ const TYPE_LABEL: Record<OvertimeRecord['type'], string> = {
   night_diff: 'Night Diff',
 }
 
+/** Same hourly rate the payroll engine pays overtime at. */
 function estimatedHourlyRate(employee: Employee | undefined): number {
-  if (!employee) return 0
-  return employee.compensation.basicPay / (22 * 8)
+  return employee ? hourlyRateFor(employee) : 0
 }
 
 export function OvertimeDetailsDialog({

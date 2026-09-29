@@ -16,7 +16,7 @@ import type { CompensationType, PayrollFrequency, PayrollGroup, Schedule } from 
 const schema = z.object({
   name: z.string().min(1, 'Required'),
   description: z.string().optional(),
-  frequency: z.enum(['weekly', 'biweekly', 'semi_monthly', 'monthly', 'custom']),
+  frequency: z.enum(['daily', 'weekly', 'biweekly', 'semi_monthly', 'monthly', 'custom']),
   cutoffSchedule: z.string().min(1, 'Required'),
   payDates: z.string().min(1, 'Required'),
   compensationTypeId: z.string().optional(),
@@ -27,6 +27,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 const FREQUENCY_OPTIONS: { value: PayrollFrequency; label: string }[] = [
+  { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
   { value: 'biweekly', label: 'Bi-weekly' },
   { value: 'semi_monthly', label: 'Semi-monthly' },
@@ -35,6 +36,7 @@ const FREQUENCY_OPTIONS: { value: PayrollFrequency; label: string }[] = [
 ]
 
 const FREQUENCY_DEFAULTS: Record<PayrollFrequency, { cutoffSchedule: string; payDates: string }> = {
+  daily: { cutoffSchedule: 'Each working day', payDates: 'End of each working day' },
   weekly: { cutoffSchedule: 'Monday – Sunday', payDates: 'Following Friday' },
   biweekly: { cutoffSchedule: 'Every 2 weeks, Monday – Sunday', payDates: 'Following Friday' },
   semi_monthly: { cutoffSchedule: 'Period 1: 1st – 15th · Period 2: 16th – End of Month', payDates: '15th & 30th' },

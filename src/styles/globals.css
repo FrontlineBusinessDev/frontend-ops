@@ -383,3 +383,23 @@ body {
 .highlight-target {
   animation: highlight-pulse 2.4s ease-in-out;
 }
+
+/* Payslip email / PDF preview: emails and PDFs are always light, so the preview re-scopes the light
+   theme tokens onto the rendered payslip even when the portal itself is in dark mode. */
+.payslip-paper {
+  --background: #fafaf9;
+  --foreground: #1c1c1a;
+  --card: #ffffff;
+  --card-foreground: #1c1c1a;
+  --muted: #f1f0ee;
+  --muted-foreground: #6f6d68;
+  --border: rgb(0 0 0 / 0.07);
+  --primary: var(--color-brand-600);
+  --primary-foreground: #f7fbf9;
+  --success: #2f8f5b;
+  --warning: #b8791f;
+  --danger: #b83b3b;
+  color-scheme: light;
+  background: #ffffff;
+  color: var(--foreground);
+}

@@ -1,4 +1,4 @@
-import { Check, Lock, Mail } from 'lucide-react'
+import { Check, Layers, Mail, UserPlus, Users } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -8,27 +8,11 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { useSubscriptionUsage } from '@/features/subscription/hooks/useSubscription'
 import { useSession } from '@/hooks/useSession'
 import { usePermission } from '@/hooks/usePermission'
-import { FEATURE_LABELS, PLAN_DETAILS, PLAN_ORDER, formatPlanPrice, type PlanFeature } from '@/lib/plans'
+import { PLAN_DETAILS, PLAN_ORDER, estimateMonthlyBill, formatEmployeeLimit, formatPlanBasePrice } from '@/lib/plans'
 import { upgradePlan } from '@/lib/services/subscriptionService'
 import { useToast } from '@/components/ui/Toast'
-import { formatDate } from '@/lib/utils/format'
+import { formatCurrency, formatDate } from '@/lib/utils/format'
 import type { PlanTier } from '@/types/domain'
-
-const ALL_FEATURES: PlanFeature[] = [
-  'attendance',
-  'leave',
-  'overtime_night_diff',
-  'bonuses_incentives',
-  'thirteenth_month',
-  'loans_deductions',
-  'ess',
-  'multi_branch',
-  'flexible_compensation',
-  'advanced_reports',
-  'api_integrations',
-  'customization',
-  'dedicated_support',
-]
 
 function UsageBar({ label, used, limit }: { label: string; used: number; limit: number | null }) {
   const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0
@@ -77,7 +61,7 @@ function ChangePlanDialog({
           {direction === 'upgrade' ? 'Upgrade' : 'Downgrade'} to {PLAN_DETAILS[targetPlan].label} Plan
         </DialogTitle>
         <DialogDescription>
-          {formatPlanPrice(PLAN_DETAILS[targetPlan].monthlyPricePhp)}. This is a demo {direction} — no payment is collected.
+          {formatPlanBasePrice(PLAN_DETAILS[targetPlan])} · {formatEmployeeLimit(targetPlan)} included. This is a demo {direction} — no payment is collected.
         </DialogDescription>
         <div className="mt-5 flex justify-end gap-2">
           <Button size="sm" onClick={onConfirm}>
@@ -97,6 +81,7 @@ export function SubscriptionPage() {
 
   const currentPlan = PLAN_DETAILS[usage.planTier]
   const currentIndex = PLAN_ORDER.indexOf(usage.planTier)
+  const bill = estimateMonthlyBill(usage.planTier, usage.employeeCount)
 
   return (
     <div className="space-y-6">
@@ -109,7 +94,9 @@ export function SubscriptionPage() {
               Current Plan
             </Badge>
             <p className="font-display text-2xl font-semibold">{currentPlan.label}</p>
-            <p className="text-sm text-muted-foreground">{formatPlanPrice(currentPlan.monthlyPricePhp)}</p>
+            <p className="text-sm text-muted-foreground">
+              {formatPlanBasePrice(currentPlan)} · {formatEmployeeLimit(usage.planTier)}
+            </p>
             <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-muted-foreground">
               <p>
                 Billing interval <span className="font-medium capitalize text-foreground">{usage.billingInterval}</span>
@@ -118,6 +105,22 @@ export function SubscriptionPage() {
                 Next renewal{' '}
                 <span className="font-medium text-foreground">{usage.nextRenewalDate ? formatDate(usage.nextRenewalDate) : '—'}</span>
               </p>
+            </div>
+            <div className="mt-4 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
+              {bill ? (
+                <>
+                  <p className="text-muted-foreground">Estimated monthly bill</p>
+                  <p className="mt-0.5 font-display text-lg font-semibold text-foreground">{formatCurrency(bill.total)}</p>
+                  <p className="text-muted-foreground">
+                    Base {formatCurrency(bill.base)}
+                    {bill.extraEmployees > 0
+                      ? ` + ${bill.extraEmployees} additional employee(s) × ${formatCurrency(currentPlan.additionalEmployeePricePhp ?? 0)} = ${formatCurrency(bill.addOn)}`
+                      : ` · ${usage.employeeCount} of ${currentPlan.employeeLimit} included employees used`}
+                  </p>
+                </>
+              ) : (
+                <p className="text-muted-foreground">Custom pricing — billed per your Enterprise agreement.</p>
+              )}
             </div>
           </div>
           <div className="grid w-full max-w-sm gap-3 sm:w-72">
@@ -132,27 +135,58 @@ export function SubscriptionPage() {
           const details = PLAN_DETAILS[tier]
           const isCurrent = tier === usage.planTier
           return (
-            <Card key={tier} className={isCurrent ? 'border-primary/40 p-6' : 'p-6'}>
+            <Card key={tier} className={isCurrent ? 'flex flex-col border-primary/40 p-6' : 'flex flex-col p-6'}>
               <div className="flex items-center justify-between">
                 <p className="font-display text-lg font-semibold">{details.label}</p>
                 {isCurrent && <Badge tone="success">Current</Badge>}
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">{details.targetAudience}</p>
-              <p className="mt-2 text-sm font-medium">{formatPlanPrice(details.monthlyPricePhp)}</p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Up to {details.employeeLimit ?? 'unlimited'} employees &middot; {details.userLimit ?? 'unlimited'} users
-              </p>
+              <p className="mt-1 min-h-8 text-xs text-muted-foreground">{details.targetAudience}</p>
 
-              <ul className="mt-4 space-y-2 text-sm">
-                {ALL_FEATURES.map((feature) => {
-                  const included = details.features.includes(feature)
-                  return (
-                    <li key={feature} className={`flex items-center gap-2 ${included ? '' : 'text-muted-foreground'}`}>
-                      {included ? <Check className="size-3.5 shrink-0 text-success" /> : <Lock className="size-3.5 shrink-0" />}
-                      {FEATURE_LABELS[feature]}
-                    </li>
-                  )
-                })}
+              <div className="mt-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Base price</p>
+                <p className="font-display text-2xl font-semibold tracking-tight">
+                  {details.monthlyPricePhp !== null ? formatCurrency(details.monthlyPricePhp) : details.startingPricePhp ? `${formatCurrency(details.startingPricePhp)}+` : 'Custom'}
+                  <span className="text-sm font-normal text-muted-foreground">/month</span>
+                </p>
+                {/* Same height on every card so the limits boxes line up. */}
+                <p className="min-h-8 text-xs text-muted-foreground">{details.monthlyPricePhp === null ? 'Depends on complexity — custom pricing' : ' '}</p>
+              </div>
+
+              <div className="mt-4 space-y-1.5 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-xs">
+                <p className="flex items-center gap-2">
+                  <Users className="size-3.5 shrink-0 text-primary" />
+                  <span className="font-medium">{formatEmployeeLimit(tier)}</span>
+                </p>
+                <p className="flex items-center gap-2">
+                  <UserPlus className="size-3.5 shrink-0 text-primary" />
+                  {details.additionalEmployeePricePhp !== null ? (
+                    <span>
+                      <span className="font-medium">{formatCurrency(details.additionalEmployeePricePhp)}</span>
+                      <span className="text-muted-foreground">/month per additional employee</span>
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">Additional employees: custom pricing</span>
+                  )}
+                </p>
+                <p className="flex items-center gap-2 text-muted-foreground">
+                  <Layers className="size-3.5 shrink-0 text-primary" />
+                  {details.userLimit !== null ? `${details.userLimit} admin user seats` : 'Unlimited admin user seats'}
+                </p>
+              </div>
+
+              <ul className="mt-4 flex-1 space-y-2 text-sm">
+                {details.includesTier && (
+                  <li className="flex items-start gap-2 font-medium">
+                    <Check className="mt-0.5 size-3.5 shrink-0 text-success" />
+                    All {PLAN_DETAILS[details.includesTier].label} features
+                  </li>
+                )}
+                {details.highlights.map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <Check className="mt-0.5 size-3.5 shrink-0 text-success" />
+                    {item}
+                  </li>
+                ))}
               </ul>
 
               <div className="mt-5">

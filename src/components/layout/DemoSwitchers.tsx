@@ -4,7 +4,7 @@ import { useSession } from '@/hooks/useSession'
 import { useTenant } from '@/hooks/useTenant'
 import { useActivePlanTier } from '@/hooks/useActivePlanTier'
 import { useDemoPlanStore } from '@/lib/demo/demoPlanStore'
-import { PLAN_DETAILS, PLAN_ORDER } from '@/lib/plans'
+import { PLAN_DETAILS, PLAN_ORDER, formatEmployeeLimit } from '@/lib/plans'
 import { cn } from '@/lib/utils/cn'
 
 export const ROLE_LABELS: Record<string, string> = {
@@ -73,7 +73,7 @@ export function TierSwitcherDropdown({ triggerClassName, side = 'bottom' }: { tr
             >
               <span className="font-medium">{PLAN_DETAILS[tier].label}</span>
               <span className="text-xs text-muted-foreground">
-                {PLAN_DETAILS[tier].targetAudience} · Up to {PLAN_DETAILS[tier].employeeLimit ?? '150+'} employees
+                {PLAN_DETAILS[tier].targetAudience} · {formatEmployeeLimit(tier)}
               </span>
             </DropdownMenu.Item>
           ))}

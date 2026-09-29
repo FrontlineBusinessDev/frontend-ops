@@ -4,9 +4,13 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { FormField } from '@/components/ui/FormField'
 import { Input } from '@/components/ui/Input'
+import { Switch } from '@/components/ui/Switch'
 import { useToast } from '@/components/ui/Toast'
 import type { HolidayRateType, OtRateType } from '@/features/company-settings/payrollRatesStore'
 import { usePayrollRatesStore } from '@/features/company-settings/payrollRatesStore'
+import { useSession } from '@/hooks/useSession'
+import { updatePayrollRules } from '@/lib/services/payrollSettingsService'
+import type { PayrollRules } from '@/types/domain'
 
 /** Local draft copy so edits only take effect once "Save Settings" is clicked — mirrors the pattern
  * used by `PayrollRulesSection`, and keeps the live application-modal dropdowns from flickering
@@ -15,7 +19,9 @@ function toPctDraft(rates: { id: string; multiplier: number }[]): Record<string,
   return Object.fromEntries(rates.map((r) => [r.id, String(Math.round(r.multiplier * 1000) / 10)]))
 }
 
-export function OvertimeHolidayRatesSection() {
+/** All overtime configuration — the OT approval policy, OT / night differential rates, and holiday pay rates. */
+export function OvertimeHolidayRatesSection({ rules, canEdit = true, onRefetch }: { rules?: PayrollRules; canEdit?: boolean; onRefetch?: () => void }) {
+  const { user } = useSession()
   const otRates = usePayrollRatesStore((s) => s.otRates)
   const holidayRates = usePayrollRatesStore((s) => s.holidayRates)
   const { updateOtRate, addCustomOtRate, removeCustomOtRate, updateHolidayRate, resetToDefaults } = usePayrollRatesStore.getState()
@@ -26,6 +32,9 @@ export function OvertimeHolidayRatesSection() {
   const [otLabelDraft, setOtLabelDraft] = useState<Record<string, string>>(() => Object.fromEntries(otRates.map((r) => [r.id, r.label])))
   const [newRateLabel, setNewRateLabel] = useState('')
   const [newRatePct, setNewRatePct] = useState('')
+  // Unsaved toggle; falls back to the saved company rule.
+  const [preApprovalDraft, setPreApprovalRequired] = useState<boolean | undefined>(undefined)
+  const preApprovalRequired = preApprovalDraft ?? rules?.overtimePreApprovalRequired ?? true
 
   function syncDrafts() {
     setOtDraft(toPctDraft(otRates))
@@ -48,7 +57,12 @@ export function OvertimeHolidayRatesSection() {
     notify({ title: 'Rates reset to statutory defaults', tone: 'success' })
   }
 
-  function handleSave() {
+  async function handleSave() {
+    if (canEdit && rules && preApprovalRequired !== rules.overtimePreApprovalRequired) {
+      await updatePayrollRules(user, { overtimePreApprovalRequired: preApprovalRequired })
+      onRefetch?.()
+    }
+    setPreApprovalRequired(undefined)
     for (const rate of otRates) {
       const pct = Number(otDraft[rate.id])
       if (pct > 0) updateOtRate(rate.id, { multiplier: pct / 100, label: otLabelDraft[rate.id]?.trim() || rate.label })
@@ -57,7 +71,7 @@ export function OvertimeHolidayRatesSection() {
       const pct = Number(holidayDraft[rate.id])
       if (pct > 0) updateHolidayRate(rate.id, pct / 100)
     }
-    notify({ title: 'Payroll rate settings saved', description: 'Overtime, Night Differential, and Holiday Pay rates updated.', tone: 'success' })
+    notify({ title: 'Payroll rate settings saved', description: 'Overtime policy, Night Differential, and Holiday Pay rates updated.', tone: 'success' })
   }
 
   return (
@@ -68,6 +82,17 @@ export function OvertimeHolidayRatesSection() {
           Reset to Statutory Defaults
         </Button>
       </div>
+
+      <Card className="p-5">
+        <Card.Title>Overtime Policy</Card.Title>
+        <label className="mt-4 flex items-center justify-between gap-4 text-sm">
+          <span>
+            <span className="font-medium">Pre-approval required</span>
+            <span className="block text-xs text-muted-foreground">Overtime must be filed and approved before it is rendered to be paid in payroll.</span>
+          </span>
+          <Switch checked={preApprovalRequired} onCheckedChange={setPreApprovalRequired} disabled={!canEdit} />
+        </label>
+      </Card>
 
       <Card className="p-5">
         <Card.Title>Overtime (OT) &amp; Night Differential Rates</Card.Title>

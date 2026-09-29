@@ -127,7 +127,8 @@ export function generateEmployeesForCompany(companyId: string, companyBranches: 
         civilStatus: seed % 3 === 0 ? 'married' : 'single',
         address: `${100 + seed} Rizal Street, ${branch.name.replace(/^.*–\s*/, '')}`,
         contactNumber: `09${pad(170000000 + seed, 9)}`,
-        personalEmail: `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+        // A few employees have no email on file, so payslip emailing can show a realistic "Failed" delivery.
+        ...(seed % 12 === 5 ? {} : { personalEmail: `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, '')}@gmail.com` }),
       },
       employment: {
         position,
@@ -135,6 +136,13 @@ export function generateEmployeesForCompany(companyId: string, companyBranches: 
         employmentType,
         dateHired: `${hiredYear}-${hiredMonth}-01`,
         status,
+        // Mock separations: inactive employees resigned partway through 2026 (so they're still owed a
+        // pro-rated 13th Month Pay); archived ones were separated on the date their archive entry records.
+        ...(status === 'inactive'
+          ? { dateSeparated: `2026-${String(3 + (seed % 6)).padStart(2, '0')}-${seed % 2 === 0 ? '15' : '28'}`, separationReason: 'resigned' as const }
+          : status === 'archived'
+            ? { dateSeparated: '2026-01-15', separationReason: 'end_of_contract' as const }
+            : {}),
         category,
       },
       compensation: {

@@ -1,9 +1,9 @@
-import { Calculator } from 'lucide-react'
 import { useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { Card } from '@/components/ui/Card'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/Dialog'
+import { ThirteenthMonthBreakdown } from '@/features/thirteenth-month/components/ThirteenthMonthBreakdown'
+import { THIRTEENTH_MONTH_TAX_EXEMPT_CEILING } from '@/lib/services/thirteenthMonthService'
 import { formatCurrency, formatDate } from '@/lib/utils/format'
 import type { Employee, ThirteenthMonthLine, ThirteenthMonthRun } from '@/types/domain'
 
@@ -20,50 +20,50 @@ export function ComputationDrawer({
 }) {
   const [open, setOpen] = useState(false)
   const isProrated = line.monthsCredited < 12
+  const firstName = employee.personal.firstName
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-3xl">
         <DialogTitle>
           {employee.personal.firstName} {employee.personal.lastName} — 13th Month Pay Computation
         </DialogTitle>
         <DialogDescription>
           Calendar Year {run.year} · Hired {formatDate(employee.employment.dateHired)}
+          {employee.employment.dateSeparated && ` · Separated ${formatDate(employee.employment.dateSeparated)}`}
         </DialogDescription>
 
-        <div className="mt-4 space-y-4">
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Total Basic Salary Earned ({run.year})</p>
-              <p className="font-display text-base font-semibold">{formatCurrency(line.annualBasicEarned)}</p>
+        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
+          <div>
+            <p className="text-xs text-muted-foreground">Active period counted</p>
+            <p className="font-medium">
+              {line.activeFrom && line.activeTo ? `${formatDate(line.activeFrom)} – ${formatDate(line.activeTo)}` : `Jan – Dec ${run.year}`}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Months credited</p>
+            <div className="flex items-center gap-1.5">
+              <p className="font-medium">{line.monthsCredited} / 12</p>
+              {isProrated && <Badge tone="warning">{line.separated ? 'Pro-rated — separated' : 'Pro-rated'}</Badge>}
             </div>
-            <div className="mt-2 flex items-center justify-between border-t border-border pt-2">
-              <p className="text-sm text-muted-foreground">Months Credited</p>
-              <div className="flex items-center gap-1.5">
-                <p className="text-sm font-medium">{line.monthsCredited} / 12</p>
-                {isProrated && <Badge tone="warning">Prorated — mid-year hire</Badge>}
-              </div>
-            </div>
-          </Card>
-
-          <Card className="flex items-center justify-between bg-primary/10 p-4">
-            <div className="flex items-center gap-2">
-              <Calculator className="size-4 text-primary" />
-              <span className="text-sm font-medium text-primary">
-                Total Basic Salary Earned {formatCurrency(line.annualBasicEarned)} ÷ 12 = 13th Month Pay
-              </span>
-            </div>
-            <span className="font-display text-lg font-semibold text-primary">{formatCurrency(line.thirteenthMonthPay)}</span>
-          </Card>
-
-          <p className="text-xs text-muted-foreground">
-            {isProrated
-              ? `${employee.personal.firstName} was hired mid-${run.year}, so only ${line.monthsCredited} month(s) of basic pay count toward this year's 13th Month Pay — consistent with Philippine Labor Code proration rules for employees who did not work the full calendar year.`
-              : `${employee.personal.firstName} worked the full calendar year, so all 12 months of basic pay count toward this year's 13th Month Pay.`}{' '}
-            Non-taxable, per BIR regulations (up to the statutory ₱90,000 combined threshold).
-          </p>
+          </div>
         </div>
+
+        <div className="mt-4">
+          <ThirteenthMonthBreakdown employee={employee} line={line} run={run} />
+        </div>
+
+        <p className="mt-4 text-xs text-muted-foreground">
+          {line.separated
+            ? `${firstName} resigned/separated, so only basic pay for the days actually worked counts — the separation month is pro-rated by calendar days, per Philippine Labor Code rules.`
+            : isProrated
+              ? `${firstName} was employed for part of ${run.year}, so only the months (and partial month) worked count toward this year's 13th Month Pay.`
+              : `${firstName} worked the full calendar year, so all 12 months of basic pay count.`}{' '}
+          Undertime is charged at the hourly rate and unpaid absences (not covered by an approved paid leave) at the daily rate, based on recorded attendance.
+          Non-taxable up to {formatCurrency(THIRTEENTH_MONTH_TAX_EXEMPT_CEILING)}
+          {(line.withholdingTax ?? 0) > 0 && `; ${formatCurrency(line.withholdingTax ?? 0)} withheld on the excess`}.
+        </p>
 
         <div className="mt-5 flex justify-end border-t border-border pt-4">
           <Button variant="secondary" onClick={() => setOpen(false)}>

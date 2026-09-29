@@ -7,6 +7,7 @@ import { formatDate } from '@/lib/utils/format'
 import type { Holiday, PayrollGroup } from '@/types/domain'
 
 const FREQUENCY_LABEL: Record<PayrollGroup['frequency'], string> = {
+  daily: 'Daily',
   weekly: 'Weekly',
   biweekly: 'Bi-weekly',
   semi_monthly: 'Semi-monthly',

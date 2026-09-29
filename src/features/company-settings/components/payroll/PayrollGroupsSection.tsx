@@ -13,6 +13,7 @@ import { PayrollGroupDetailDialog } from '@/features/company-settings/components
 import { PayrollGroupDialog } from '@/features/company-settings/components/payroll/PayrollGroupDialog'
 
 const FREQUENCY_LABEL: Record<PayrollGroup['frequency'], string> = {
+  daily: 'Daily',
   weekly: 'Weekly',
   biweekly: 'Bi-weekly',
   semi_monthly: 'Semi-monthly',
