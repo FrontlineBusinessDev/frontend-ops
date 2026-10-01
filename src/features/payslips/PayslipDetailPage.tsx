@@ -1,6 +1,6 @@
 import { ArrowLeft, Printer } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useEmployee } from '@/features/employees/hooks/useEmployee'
@@ -16,6 +16,8 @@ import type { DeductionConfig, LoanRecord, PayrollGroup, PayrollLine } from '@/t
 
 export function PayslipDetailPage() {
   const { lineId } = useParams<{ lineId: string }>()
+  // Opened from the Payslip Report? Go back to it (filters intact) instead of the payslips list.
+  const from = (useLocation().state as { from?: string; fromLabel?: string } | null) ?? null
   const { user } = useSession()
   const { company } = useTenant()
   const [line, setLine] = useState<PayrollLine | null | undefined>(undefined)
@@ -43,9 +45,9 @@ export function PayslipDetailPage() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between print:hidden">
-        <Link to="/payslips" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <Link to={from?.from ?? '/payslips'} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-3.5" />
-          Back to payslips
+          {from?.from ? `Back to ${from.fromLabel ?? 'previous page'}` : 'Back to payslips'}
         </Link>
         <Button size="sm" variant="secondary" icon={<Printer className="size-4" />} onClick={() => window.print()}>
           Print / Download

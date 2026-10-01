@@ -31,7 +31,7 @@ import {
   EARNINGS_DEDUCTIONS_PALETTE,
   NIVO_THEME,
 } from '@/features/reports/components/nivoTheme'
-import { ChartPane, FilterLabel, ReportFilterBar, ReportViewShell, StatTile, TablePane, ViewModeToggle } from '@/features/reports/components/shared'
+import { ChartPane, FilterLabel, ReportFilterBar, ReportViewShell, StatTile, TablePane, ViewModeToggle, useScopedPayrollLines } from '@/features/reports/components/shared'
 import type { ExcelExport } from '@/features/reports/reportExport'
 import type { ReportViewMode } from '@/features/reports/components/shared'
 import { changePct, payrollMonthKey, summarizeBy, summarizeByPayrollMonth } from '@/features/reports/payrollAggregates'
@@ -733,7 +733,7 @@ export function OvertimeCostAnalysisReport() {
 // ---------- Payroll Analytics ----------
 
 export function PayrollTrendReport() {
-  const { rows, isLoading } = useAllPayrollLines()
+  const { rows, isLoading, scopePicker, scopeMeta } = useScopedPayrollLines()
   const [mode, setMode] = useState<ReportViewMode>('split')
 
   // Month over month (every payroll group's runs combined), so weekly, semi-monthly and monthly runs compare like for like.
@@ -756,7 +756,7 @@ export function PayrollTrendReport() {
     byMonth.length >= 2 ? byMonth[byMonth.length - 1][1].gross - byMonth[byMonth.length - 2][1].gross : 0
 
   return (
-    <ReportViewShell title="Payroll Trend & Variance" description="Gross vs. net pay per payroll month (all payroll groups), with month-over-month variance.">
+    <ReportViewShell filters={scopePicker} meta={[scopeMeta]} title="Payroll Trend & Variance" description="Gross vs. net pay per payroll month (all payroll groups), with month-over-month variance.">
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : byMonth.length === 0 ? (
@@ -831,7 +831,7 @@ export function PayrollTrendReport() {
 type CostDimension = 'department' | 'branch' | 'group'
 
 export function PayrollCostByDimensionReport({ dimension }: { dimension: CostDimension }) {
-  const { rows, isLoading } = useAllPayrollLines()
+  const { rows, isLoading, scopePicker, scopeMeta } = useScopedPayrollLines()
   const { branches } = useTenant()
   const { groups } = usePayrollGroups()
   const [mode, setMode] = useState<ReportViewMode>('split')
@@ -875,7 +875,7 @@ export function PayrollCostByDimensionReport({ dimension }: { dimension: CostDim
   const totalGross = byDimension.reduce((sum, [, t]) => sum + t.gross, 0)
 
   return (
-    <ReportViewShell title={`Payroll Cost by ${label}`} description={`Month-over-month payroll cost trend and comparative metrics, grouped by ${label.toLowerCase()}.`}>
+    <ReportViewShell filters={scopePicker} meta={[scopeMeta]} title={`Payroll Cost by ${label}`} description={`Month-over-month payroll cost trend and comparative metrics, grouped by ${label.toLowerCase()}.`}>
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : byDimension.length === 0 ? (
@@ -975,7 +975,7 @@ export function PayrollCostByDimensionReport({ dimension }: { dimension: CostDim
 }
 
 export function PayrollCostAnalysisReport() {
-  const { rows, isLoading } = useAllPayrollLines()
+  const { rows, isLoading, scopePicker, scopeMeta } = useScopedPayrollLines()
   const [mode, setMode] = useState<ReportViewMode>('split')
 
   const totals = rows.reduce(
@@ -1000,7 +1000,7 @@ export function PayrollCostAnalysisReport() {
   }, [rows])
 
   return (
-    <ReportViewShell title="Payroll Cost Analysis" description="Trend of Gross Pay, Employer Contributions, and Net Pay across every payroll period.">
+    <ReportViewShell filters={scopePicker} meta={[scopeMeta]} title="Payroll Cost Analysis" description="Trend of Gross Pay, Employer Contributions, and Net Pay across every payroll period.">
       {isLoading ? (
         <Skeleton className="h-48" />
       ) : rows.length === 0 ? (
@@ -1061,7 +1061,7 @@ export function PayrollCostAnalysisReport() {
 // ---------- Financial / Management ----------
 
 export function LaborCostAnalysisReport() {
-  const { rows, isLoading } = useAllPayrollLines()
+  const { rows, isLoading, scopePicker, scopeMeta } = useScopedPayrollLines()
   const [mode, setMode] = useState<ReportViewMode>('split')
 
   const byPeriod = useMemo(() => {
@@ -1085,7 +1085,8 @@ export function LaborCostAnalysisReport() {
     <ReportViewShell
       title="Labor Cost Analysis"
       description="Total labor cost per period — gross pay plus employer-side statutory contributions."
-      meta={[{ label: 'Coverage', value: `All payroll periods (${byPeriod.length})` }]}
+      filters={scopePicker}
+      meta={[scopeMeta, { label: 'Payroll Runs', value: String(byPeriod.length) }]}
       onExportExcel={byPeriod.length > 0 ? onExport : undefined}
     >
       {isLoading ? (
@@ -1139,7 +1140,7 @@ export function LaborCostAnalysisReport() {
 }
 
 export function EarningsVsDeductionsReport() {
-  const { rows, isLoading } = useAllPayrollLines()
+  const { rows, isLoading, scopePicker, scopeMeta } = useScopedPayrollLines()
   const [mode, setMode] = useState<ReportViewMode>('split')
 
   const byMonth = useMemo(() => summarizeByPayrollMonth(rows), [rows])
@@ -1149,7 +1150,7 @@ export function EarningsVsDeductionsReport() {
   )
 
   return (
-    <ReportViewShell title="Earnings vs. Deductions Analysis" description="Total earnings against deductions per payroll month, with deductions tracked by type (statutory, tax, loans, other).">
+    <ReportViewShell filters={scopePicker} meta={[scopeMeta]} title="Earnings vs. Deductions Analysis" description="Total earnings against deductions per payroll month, with deductions tracked by type (statutory, tax, loans, other).">
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : byMonth.length === 0 ? (
@@ -1258,7 +1259,7 @@ export function EarningsVsDeductionsReport() {
 }
 
 export function EmployerContributionAnalysisReport() {
-  const { rows, isLoading } = useAllPayrollLines()
+  const { rows, isLoading, scopePicker, scopeMeta } = useScopedPayrollLines()
 
   const byPeriod = useMemo(() => {
     const map = new Map<string, { period: (typeof rows)[number]['period']; sss: number; philhealth: number; pagibig: number }>()
@@ -1273,7 +1274,7 @@ export function EmployerContributionAnalysisReport() {
   }, [rows])
 
   return (
-    <ReportViewShell title="Employer Contribution Analysis" description="Employer-side SSS, PhilHealth, and Pag-IBIG counterpart contributions per period.">
+    <ReportViewShell filters={scopePicker} meta={[scopeMeta]} title="Employer Contribution Analysis" description="Employer-side SSS, PhilHealth, and Pag-IBIG counterpart contributions per period.">
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : byPeriod.length === 0 ? (
@@ -1307,7 +1308,7 @@ export function EmployerContributionAnalysisReport() {
 }
 
 export function PayrollExpenseByAccountReport() {
-  const { rows, isLoading } = useAllPayrollLines()
+  const { rows, isLoading, scopePicker, scopeMeta } = useScopedPayrollLines()
 
   const periods = useMemo(() => {
     const seen = new Map<string, (typeof rows)[number]['period']>()
@@ -1327,7 +1328,7 @@ export function PayrollExpenseByAccountReport() {
   }, [periods, rows])
 
   return (
-    <ReportViewShell title="Payroll Expense by Account & Cost Comparison" description="Salaries & Wages and statutory expense accounts, compared period over period.">
+    <ReportViewShell filters={scopePicker} meta={[scopeMeta]} title="Payroll Expense by Account & Cost Comparison" description="Salaries & Wages and statutory expense accounts, compared period over period.">
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : accountsByPeriod.length === 0 ? (

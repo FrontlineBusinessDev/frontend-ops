@@ -7,7 +7,8 @@ import { Select } from '@/components/ui/Select'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
-import { FilterLabel, ReportFilterBar, ReportViewShell, StatTile } from '@/features/reports/components/shared'
+import { FilterLabel, ReportFilterBar, ReportScopePicker, ReportViewShell, StatTile } from '@/features/reports/components/shared'
+import { defaultScope, inScope, scopeLabel, type ReportScope } from '@/features/reports/payrollAggregates'
 import type { ExcelExport } from '@/features/reports/reportExport'
 import { useAllPayrollLines, useStatutoryContributionData } from '@/features/reports/hooks/useReports'
 import { cn } from '@/lib/utils/cn'
@@ -41,33 +42,44 @@ export function StatutoryContributionReport({ type }: { type: ContributionType }
     return [...seen.values()].sort((a, b) => b.startDate.localeCompare(a.startDate))
   }, [rows])
   const [periodId, setPeriodId] = useState<string | undefined>(undefined)
+  const [scopeState, setScope] = useState<ReportScope | undefined>(undefined)
+  const scope = scopeState ?? defaultScope(periods)
   const activePeriodId = periodId ?? periods[0]?.id
-  const periodRows = rows.filter((r) => r.period.id === activePeriodId)
 
-  const totals = periodRows.reduce(
-    (acc, r) => {
+  // One run, or each employee's shares summed across every run in the chosen month / year / date range.
+  const periodRows = useMemo(() => {
+    const byEmployee = new Map<string, { employee: (typeof rows)[number]['employee']; ee: number; er: number }>()
+    for (const r of rows) {
+      if (scope.basis === 'run' ? r.period.id !== activePeriodId : !inScope(r.period, scope)) continue
       const { ee, er } = shareFor(type, r.line)
-      return { ee: acc.ee + ee, er: acc.er + er }
-    },
-    { ee: 0, er: 0 },
-  )
+      const prev = byEmployee.get(r.employee.id)
+      byEmployee.set(r.employee.id, { employee: r.employee, ee: (prev?.ee ?? 0) + ee, er: (prev?.er ?? 0) + er })
+    }
+    return [...byEmployee.values()]
+  }, [rows, scope, activePeriodId, type])
+
+  const totals = periodRows.reduce((acc, r) => ({ ee: acc.ee + r.ee, er: acc.er + r.er }), { ee: 0, er: 0 })
 
   const activePeriod = periods.find((p) => p.id === activePeriodId)
 
   function onExport(): ExcelExport {
     const header = ['Employee', 'Employee Share', 'Employer Share', 'Total Remittance']
-    const dataRows = periodRows.map((r) => {
-      const { ee, er } = shareFor(type, r.line)
-      return [fullName(r.employee.personal), ee, er, ee + er]
-    })
-    return { filename: `${type}-contribution-${activePeriod?.label ?? 'period'}`, rows: [header, ...dataRows], sumFooter: true }
+    const dataRows = periodRows.map((r) => [fullName(r.employee.personal), r.ee, r.er, r.ee + r.er])
+    const suffix = scope.basis === 'run' ? (activePeriod?.label ?? 'period') : scopeLabel(scope).replace(/\s+/g, '-').toLowerCase()
+    return { filename: `${type}-contribution-${suffix}`, rows: [header, ...dataRows], sumFooter: true }
   }
 
   return (
     <ReportViewShell
       title={meta.title}
       description={meta.description}
-      meta={activePeriod ? [{ label: 'Payroll Period', value: activePeriod.label }, { label: 'Form', value: meta.formLabel }] : []}
+      meta={
+        scope.basis !== 'run'
+          ? [{ label: 'Report Period', value: scopeLabel(scope) }, { label: 'Form', value: meta.formLabel }]
+          : activePeriod
+            ? [{ label: 'Payroll Period', value: activePeriod.label }, { label: 'Form', value: meta.formLabel }]
+            : []
+      }
       onExportExcel={periodRows.length > 0 ? onExport : undefined}
     >
       {isLoading ? (
@@ -76,14 +88,17 @@ export function StatutoryContributionReport({ type }: { type: ContributionType }
         <EmptyState title="No payroll periods yet" />
       ) : (
         <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3 print:hidden">
-            <div className="max-w-xs">
-              <Select value={activePeriodId} onValueChange={setPeriodId} options={periods.map((p) => ({ value: p.id, label: p.label }))} />
-            </div>
-          </div>
+          <ReportFilterBar>
+            <ReportScopePicker scope={scope} onChange={setScope} periods={periods} />
+            {scope.basis === 'run' && (
+              <FilterLabel label="Payroll Run" className="w-72">
+                <Select value={activePeriodId} onValueChange={setPeriodId} options={periods.map((p) => ({ value: p.id, label: p.label }))} />
+              </FilterLabel>
+            )}
+          </ReportFilterBar>
 
           {periodRows.length === 0 ? (
-            <EmptyState title="This period hasn't been run yet" />
+            <EmptyState title={scope.basis === 'run' ? "This period hasn't been run yet" : 'No payroll runs in this report period'} />
           ) : (
             <>
               <div className="grid gap-4 sm:grid-cols-3">
@@ -101,17 +116,14 @@ export function StatutoryContributionReport({ type }: { type: ContributionType }
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {periodRows.map((r) => {
-                    const { ee, er } = shareFor(type, r.line)
-                    return (
-                      <TableRow key={r.employee.id}>
-                        <TableCell className="font-medium">{fullName(r.employee.personal)}</TableCell>
-                        <TableCell>{formatCurrency(ee)}</TableCell>
-                        <TableCell>{formatCurrency(er)}</TableCell>
-                        <TableCell className="font-medium">{formatCurrency(ee + er)}</TableCell>
-                      </TableRow>
-                    )
-                  })}
+                  {periodRows.map((r) => (
+                    <TableRow key={r.employee.id}>
+                      <TableCell className="font-medium">{fullName(r.employee.personal)}</TableCell>
+                      <TableCell>{formatCurrency(r.ee)}</TableCell>
+                      <TableCell>{formatCurrency(r.er)}</TableCell>
+                      <TableCell className="font-medium">{formatCurrency(r.ee + r.er)}</TableCell>
+                    </TableRow>
+                  ))}
                 </TableBody>
               </Table>
             </>

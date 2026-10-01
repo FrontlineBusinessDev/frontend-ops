@@ -34,6 +34,22 @@ export interface CreateEmployeeInput {
   payType: PayRateType
   basicPay: number
   outputUnit?: string | null
+  /** Optional profile details (used by the bulk import). */
+  extras?: CreateEmployeeExtras
+}
+
+export interface CreateEmployeeExtras {
+  birthDate?: string
+  civilStatus?: EmployeePersonal['civilStatus']
+  address?: string
+  contactNumber?: string
+  personalEmail?: string
+  sssNo?: string
+  philhealthNo?: string
+  pagibigNo?: string
+  tinNo?: string
+  bankName?: string
+  accountNumber?: string
 }
 
 export async function createEmployee(session: SessionUser, input: CreateEmployeeInput): Promise<Employee> {
@@ -46,10 +62,11 @@ export async function createEmployee(session: SessionUser, input: CreateEmployee
     personal: {
       firstName: input.firstName,
       lastName: input.lastName,
-      birthDate: '1995-01-01',
-      civilStatus: 'single',
-      address: '',
-      contactNumber: '',
+      birthDate: input.extras?.birthDate ?? '1995-01-01',
+      civilStatus: input.extras?.civilStatus ?? 'single',
+      address: input.extras?.address ?? '',
+      contactNumber: input.extras?.contactNumber ?? '',
+      ...(input.extras?.personalEmail ? { personalEmail: input.extras.personalEmail } : {}),
     },
     employment: {
       position: input.position,
@@ -63,15 +80,23 @@ export async function createEmployee(session: SessionUser, input: CreateEmployee
     benefits: {
       leaveCreditsByType: { 'Vacation Leave': 15, 'Sick Leave': 10, 'Emergency Leave': 5, 'Maternity/Paternity Leave': 7 },
     },
-    government: {},
-    bank: {},
+    government: {
+      ...(input.extras?.sssNo ? { sssNo: input.extras.sssNo } : {}),
+      ...(input.extras?.philhealthNo ? { philhealthNo: input.extras.philhealthNo } : {}),
+      ...(input.extras?.pagibigNo ? { pagibigNo: input.extras.pagibigNo } : {}),
+      ...(input.extras?.tinNo ? { tinNo: input.extras.tinNo } : {}),
+    },
+    bank: {
+      ...(input.extras?.bankName ? { bankName: input.extras.bankName } : {}),
+      ...(input.extras?.accountNumber ? { accountNumber: input.extras.accountNumber } : {}),
+    },
     documents: [],
     history: [
       {
         id: crypto.randomUUID(),
         timestamp: new Date().toISOString(),
         actor: session.name,
-        action: 'Employee record created',
+        action: input.extras ? 'Employee record created (imported)' : 'Employee record created',
       },
     ],
     compensationHistory: [
@@ -88,6 +113,12 @@ export async function createEmployee(session: SessionUser, input: CreateEmployee
 
   db.employees.push(employee)
   return employee
+}
+
+/** Creates every row in order and returns how many were added. Rows are validated beforehand by the import dialog. */
+export async function importEmployees(session: SessionUser, rows: CreateEmployeeInput[]): Promise<number> {
+  for (const row of rows) await createEmployee(session, row)
+  return rows.length
 }
 
 export interface SelfServiceProfileUpdate {

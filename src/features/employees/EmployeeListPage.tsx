@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { AddEmployeeDialog } from '@/features/employees/components/AddEmployeeDialog'
+import { ImportEmployeesDialog } from '@/features/employees/components/ImportEmployeesDialog'
 import { EmployeeTable } from '@/features/employees/components/EmployeeTable'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
 import { useTenant } from '@/hooks/useTenant'
@@ -97,7 +98,12 @@ export function EmployeeListPage() {
       <PageHeader
         title="Employees"
         description="View, add, and manage everyone on the company roster."
-        actions={<AddEmployeeDialog onCreated={refetch} />}
+        actions={
+          <div className="flex items-center gap-2">
+            <ImportEmployeesDialog onImported={refetch} />
+            <AddEmployeeDialog onCreated={refetch} />
+          </div>
+        }
       />
 
       <div className="flex flex-wrap items-center gap-3">

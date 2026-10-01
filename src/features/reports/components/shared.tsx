@@ -1,14 +1,15 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Banknote, BarChart3, Building2, CalendarClock, Check, ChevronDown, Download, FileText, HandCoins, HeartPulse, Home, Landmark, Printer, Receipt, Repeat, Rows3, ShieldCheck, SquareStack, UserCheck, UserX, Users, Wallet, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { REPORT_BASIS_LABEL, monthLabel, payrollMonthKey, type ReportBasis, type ReportScope } from '@/features/reports/payrollAggregates'
+import { useAllPayrollLines } from '@/features/reports/hooks/useReports'
+import { REPORT_BASIS_LABEL, defaultScope, inScope, monthLabel, payrollMonthKey, scopeLabel, type ReportBasis, type ReportScope } from '@/features/reports/payrollAggregates'
 import type { PayrollPeriod } from '@/types/domain'
 import {
   downloadReportWorkbook,
@@ -83,6 +84,7 @@ export function ReportViewShell({
   meta = [],
   orientation: defaultOrientation = 'portrait',
   onExportExcel,
+  filters,
   children,
 }: {
   title: string
@@ -92,6 +94,8 @@ export function ReportViewShell({
   /** Default PDF orientation — wide tables start in landscape; the user can switch in the PDF menu. */
   orientation?: PageOrientation
   onExportExcel?: () => ExcelExport | Promise<ExcelExport>
+  /** Filter controls shown above the report body (screen only). */
+  filters?: ReactNode
   children: React.ReactNode
 }) {
   const { user } = useSession()
@@ -168,6 +172,7 @@ export function ReportViewShell({
         generatedAt={generatedAt}
         generatedBy={user.name}
       />
+      {filters && <div className="mb-4 print:hidden">{filters}</div>}
       {children}
     </Card>
   )
@@ -341,6 +346,22 @@ export function ReportScopePicker({ scope, onChange, periods }: { scope: ReportS
       )}
     </>
   )
+}
+
+/** All payroll lines narrowed to the chosen Report Period, plus the picker and header meta to show it. */
+export function useScopedPayrollLines() {
+  const { rows: allRows, isLoading } = useAllPayrollLines()
+  const [state, setState] = useState<ReportScope | undefined>(undefined)
+  const periods = useMemo(() => allRows.map((r) => r.period), [allRows])
+  const scope = state ?? defaultScope(periods)
+  const rows = useMemo(() => allRows.filter((r) => inScope(r.period, scope)), [allRows, scope])
+  const scopePicker = (
+    <ReportFilterBar>
+      <ReportScopePicker scope={scope} onChange={setState} periods={periods} />
+    </ReportFilterBar>
+  )
+  const scopeMeta: ReportMetaItem = { label: 'Report Period', value: scopeLabel(scope) }
+  return { rows, isLoading, scope, setScope: setState, scopePicker, scopeMeta }
 }
 
 export type ReportViewMode = 'graph' | 'table' | 'split'

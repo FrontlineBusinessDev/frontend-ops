@@ -29,6 +29,7 @@ import {
   PayrollSummaryPerEmployeeReport,
   PayrollSummaryReport,
   PayslipReportView,
+  BenefitsReportView,
 } from '@/features/reports/components/BasicReports'
 import { CustomReportBuilder } from '@/features/reports/components/CustomReportBuilder'
 import { ReportCategorySection, type ReportCategory } from '@/features/reports/components/shared'
@@ -52,6 +53,7 @@ const BASIC_CATEGORIES: ReportCategory[] = [
       { id: 'payslip-report', label: 'Payslip Report', description: 'Batch view of generated payslips.' },
       { id: 'overtime-report', label: 'Overtime Report', description: 'OT and Night Differential hours & costs.' },
       { id: 'loans-deductions-report', label: 'Loans & Deductions Report', description: 'Active company loans and recurring deduction tracking.' },
+      { id: 'benefits-report', label: 'Benefits Report', description: 'HMO, allowances, insurance and other benefits, with amounts paid through payroll.' },
     ],
   },
   {
@@ -133,6 +135,8 @@ function renderBasicReport(id: string) {
       return <OvertimeReportView />
     case 'loans-deductions-report':
       return <LoansDeductionsReportView />
+    case 'benefits-report':
+      return <BenefitsReportView />
     case 'debit-credit':
       return <DebitCreditReport />
     case 'bir-2316':

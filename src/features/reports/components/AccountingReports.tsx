@@ -3,7 +3,8 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
-import { ReportViewShell } from '@/features/reports/components/shared'
+import { FilterLabel, ReportFilterBar, ReportScopePicker, ReportViewShell } from '@/features/reports/components/shared'
+import { defaultScope, inScope, scopeLabel, type ReportScope } from '@/features/reports/payrollAggregates'
 import type { ExcelExport } from '@/features/reports/reportExport'
 import { useAllPayrollLines } from '@/features/reports/hooks/useReports'
 import { formatCurrency } from '@/lib/utils/format'
@@ -22,8 +23,12 @@ export function DebitCreditReport() {
     return [...seen.values()].sort((a, b) => b.startDate.localeCompare(a.startDate))
   }, [rows])
   const [periodId, setPeriodId] = useState<string | undefined>(undefined)
+  const [scopeState, setScope] = useState<ReportScope | undefined>(undefined)
+  const scope = scopeState ?? defaultScope(periods)
   const activePeriodId = periodId ?? periods[0]?.id
-  const periodLines = rows.filter((r) => r.period.id === activePeriodId).map((r) => r.line)
+  // One run, or every run in the chosen month / year / date range journalised together.
+  const scopedRows = rows.filter((r) => (scope.basis === 'run' ? r.period.id === activePeriodId : inScope(r.period, scope)))
+  const periodLines = scopedRows.map((r) => r.line)
 
   const accounts: AccountRow[] = useMemo(() => {
     const totals = periodLines.reduce(
@@ -88,7 +93,7 @@ export function DebitCreditReport() {
     const header = ['Account Title', 'Debit (PHP)', 'Credit (PHP)']
     const dataRows = accounts.map((a) => [a.account, a.debit || '', a.credit || ''])
     return {
-      filename: `payroll-debit-credit-${activePeriod?.label ?? 'period'}`,
+      filename: scope.basis === 'run' ? `payroll-debit-credit-${activePeriod?.label ?? 'period'}` : `payroll-debit-credit-${scopeLabel(scope).replace(/\s+/g, '-').toLowerCase()}`,
       rows: [header, ...dataRows],
       footer: ['Total', grandTotal.debit, grandTotal.credit],
     }
@@ -98,7 +103,13 @@ export function DebitCreditReport() {
     <ReportViewShell
       title="Payroll Summary — Debit & Credit"
       description="Accounting-oriented summary of payroll transactions, formatted as formal Debit/Credit journal accounts."
-      meta={activePeriod ? [{ label: 'Payroll Period', value: activePeriod.label }] : []}
+      meta={
+        scope.basis !== 'run'
+          ? [{ label: 'Report Period', value: scopeLabel(scope) }, { label: 'Payroll Runs Included', value: String(new Set(scopedRows.map((r) => r.period.id)).size) }]
+          : activePeriod
+            ? [{ label: 'Payroll Period', value: activePeriod.label }]
+            : []
+      }
       onExportExcel={periodLines.length > 0 ? onExport : undefined}
     >
       {isLoading ? (
@@ -107,12 +118,17 @@ export function DebitCreditReport() {
         <EmptyState title="No payroll periods yet" description="Run a payroll period first to generate this journal entry." />
       ) : (
         <div className="space-y-4">
-          <div className="max-w-xs print:hidden">
-            <Select value={activePeriodId} onValueChange={setPeriodId} options={periods.map((p) => ({ value: p.id, label: p.label }))} />
-          </div>
+          <ReportFilterBar>
+            <ReportScopePicker scope={scope} onChange={setScope} periods={periods} />
+            {scope.basis === 'run' && (
+              <FilterLabel label="Payroll Run" className="w-72">
+                <Select value={activePeriodId} onValueChange={setPeriodId} options={periods.map((p) => ({ value: p.id, label: p.label }))} />
+              </FilterLabel>
+            )}
+          </ReportFilterBar>
 
           {periodLines.length === 0 ? (
-            <EmptyState title="This period hasn't been run yet" />
+            <EmptyState title={scope.basis === 'run' ? "This period hasn't been run yet" : 'No payroll runs in this report period'} />
           ) : (
             <Table>
               <TableHeader>

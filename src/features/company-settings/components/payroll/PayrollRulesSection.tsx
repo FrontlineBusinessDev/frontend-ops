@@ -144,16 +144,16 @@ export function PayrollRulesSection({ rules, canEdit, onRefetch }: { rules?: Pay
 
         <Card className="p-5 lg:col-span-2">
           <Card.Title>Payroll Adjustments</Card.Title>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3 sm:gap-6">
-            <label className="flex items-center justify-between text-sm">
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <label className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm">
               Retroactive adjustments allowed
               <Controller control={control} name="adjustmentsRetroactiveAllowed" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} disabled={!canEdit} />} />
             </label>
-            <label className="flex items-center justify-between text-sm">
+            <label className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm">
               Manual adjustments allowed
               <Controller control={control} name="adjustmentsManualAllowed" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} disabled={!canEdit} />} />
             </label>
-            <label className="flex items-center justify-between text-sm">
+            <label className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm">
               Adjustment approval required
               <Controller control={control} name="adjustmentsApprovalRequired" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} disabled={!canEdit} />} />
             </label>

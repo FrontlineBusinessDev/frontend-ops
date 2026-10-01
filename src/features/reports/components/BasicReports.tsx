@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { StatusBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { EmployeeCombobox } from '@/components/ui/EmployeeCombobox'
@@ -12,8 +12,10 @@ import { usePayrollGroups } from '@/features/company-settings/hooks/usePayrollGr
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
 import { useOvertimeRecords } from '@/features/overtime/hooks/useOvertime'
 import { useLoans } from '@/features/loans-deductions/hooks/useLoans'
-import { FilterLabel, ReportFilterBar, ReportScopePicker, ReportViewShell, StatTile } from '@/features/reports/components/shared'
-import { defaultScope, inScope, monthLabel, payrollMonthKey, scopeLabel, summarizeBy, type ReportScope } from '@/features/reports/payrollAggregates'
+import { FilterLabel, ReportFilterBar, ReportScopePicker, ReportViewShell, StatTile, useScopedPayrollLines } from '@/features/reports/components/shared'
+import { useEmployeeBenefits } from '@/features/loans-deductions/hooks/useBenefitsDeductions'
+import { BENEFIT_CATEGORY_META } from '@/features/loans-deductions/loanUtils'
+import { deductionBreakdown, defaultScope, inScope, monthLabel, payrollMonthKey, scopeLabel, summarizeBy, type ReportScope } from '@/features/reports/payrollAggregates'
 import { parseCsv, type ExcelExport, type ReportMetaItem } from '@/features/reports/reportExport'
 import {
   useAllPayrollLines,
@@ -30,7 +32,7 @@ import { exportEmployeeMasterlistCsv } from '@/lib/services/integrationService'
 import { getDeductionConfigs } from '@/lib/services/payrollSettingsService'
 import { exportOvertimeSummaryCsv } from '@/lib/services/overtimeService'
 import { formatCurrency, formatDate } from '@/lib/utils/format'
-import type { DeductionConfig, Employee, PayrollGroup } from '@/types/domain'
+import type { BenefitCategory, DeductionConfig, Employee, PayrollGroup } from '@/types/domain'
 
 function fullName(personal: { firstName: string; lastName: string }) {
   return `${personal.firstName} ${personal.lastName}`
@@ -627,15 +629,44 @@ export function PayrollSummaryPerEmployeeReport() {
 }
 
 export function PayslipReportView() {
-  const { periods, isLoading } = usePayrollPeriodOptions()
   const { employees, isLoading: employeesLoading } = useEmployees()
-  const { rows, isLoading: rowsLoading } = useAllPayrollLines()
+  const { rows: allRows, isLoading: rowsLoading } = useAllPayrollLines()
   const { branches } = useTenant()
-  const finalized = periods.filter((p) => p.status === 'finalized')
 
-  const [employeeId, setEmployeeId] = useState<string | undefined>(undefined)
-  const [department, setDepartment] = useState('all')
-  const [branchId, setBranchId] = useState('all')
+  // Filters live in the URL so opening a payslip and coming back lands on the same filtered report.
+  const location = useLocation()
+  const [params, setParams] = useSearchParams()
+  const setParam = (updates: Record<string, string | undefined>) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        for (const [key, value] of Object.entries(updates)) {
+          if (value === undefined || value === '') next.delete(key)
+          else next.set(key, value)
+        }
+        return next
+      },
+      { replace: true },
+    )
+  const employeeId = params.get('employee') ?? undefined
+  const department = params.get('department') ?? 'all'
+  const branchId = params.get('branch') ?? 'all'
+  const setEmployeeId = (value: string | undefined) => setParam({ employee: value })
+  const setDepartment = (value: string) => setParam({ department: value === 'all' ? undefined : value })
+  const setBranchId = (value: string) => setParam({ branch: value === 'all' ? undefined : value })
+
+  // Payslips exist once a run is finalized.
+  const finalizedRows = useMemo(() => allRows.filter((r) => r.period.status === 'finalized'), [allRows])
+  const defaults = defaultScope(finalizedRows.map((r) => r.period))
+  const scope: ReportScope = {
+    basis: (params.get('basis') as ReportScope['basis'] | null) ?? 'run',
+    month: params.get('month') ?? defaults.month,
+    year: params.get('year') ?? defaults.year,
+    from: params.get('from') ?? defaults.from,
+    to: params.get('to') ?? defaults.to,
+  }
+  const setScope = (next: ReportScope) =>
+    setParam({ basis: next.basis === 'run' ? undefined : next.basis, month: next.basis === 'month' ? next.month : undefined, year: next.basis === 'year' ? next.year : undefined, from: next.basis === 'range' ? next.from : undefined, to: next.basis === 'range' ? next.to : undefined })
 
   const departmentOptions = useMemo(() => {
     const unique = Array.from(new Set(employees.map((e) => e.employment.department))).sort()
@@ -646,32 +677,85 @@ export function PayslipReportView() {
     [branches],
   )
 
-  const matchingRowsByPeriod = useMemo(() => {
-    const map = new Map<string, (typeof rows)[number]>()
-    for (const r of rows) {
-      if (employeeId && r.employee.id !== employeeId) continue
-      if (department !== 'all' && r.employee.employment.department !== department) continue
-      if (branchId !== 'all' && r.employee.branchId !== branchId) continue
-      map.set(r.period.id, r)
-    }
-    return map
-  }, [rows, employeeId, department, branchId])
+  const payslips = useMemo(
+    () =>
+      finalizedRows
+        .filter(
+          (r) =>
+            inScope(r.period, scope) &&
+            (!employeeId || r.employee.id === employeeId) &&
+            (department === 'all' || r.employee.employment.department === department) &&
+            (branchId === 'all' || r.employee.branchId === branchId),
+        )
+        .map((r) => {
+          const d = deductionBreakdown(r.line)
+          return {
+            ...r,
+            statutory: d.statutory,
+            tax: d.tax,
+            otherDeductions: d.loans + d.other,
+            benefits: (r.line.benefitsProvided ?? []).reduce((sum, b) => sum + b.amount, 0),
+          }
+        })
+        .sort((a, b) => b.period.startDate.localeCompare(a.period.startDate) || fullName(a.employee.personal).localeCompare(fullName(b.employee.personal))),
+    [finalizedRows, scope, employeeId, department, branchId],
+  )
+
+  const totals = payslips.reduce(
+    (acc, p) => ({
+      gross: acc.gross + p.line.grossPay,
+      net: acc.net + p.line.netPay,
+      statutory: acc.statutory + p.statutory,
+      tax: acc.tax + p.tax,
+      other: acc.other + p.otherDeductions,
+      benefits: acc.benefits + p.benefits,
+    }),
+    { gross: 0, net: 0, statutory: 0, tax: 0, other: 0, benefits: 0 },
+  )
+  const selectedEmployee = employees.find((e) => e.id === employeeId)
 
   const hasActiveFilters = !!employeeId || department !== 'all' || branchId !== 'all'
-  const filteredPeriods = hasActiveFilters ? finalized.filter((p) => matchingRowsByPeriod.has(p.id)) : finalized
-
   function clearFilters() {
     setEmployeeId(undefined)
     setDepartment('all')
     setBranchId('all')
   }
 
+  function onExport(): ExcelExport {
+    const header = ['Employee #', 'Employee', 'Department', 'Payroll Period', 'Pay Date', 'Gross Pay', 'Statutory Contributions', 'Withholding Tax', 'Loans & Other Deductions', 'Net Pay', 'Benefits Provided']
+    const dataRows = payslips.map((p) => [
+      p.employee.employeeNumber,
+      fullName(p.employee.personal),
+      p.employee.employment.department,
+      p.period.label,
+      p.period.payDate,
+      p.line.grossPay,
+      p.statutory,
+      p.tax,
+      p.otherDeductions,
+      p.line.netPay,
+      p.benefits,
+    ])
+    return { filename: `payslip-report-${selectedEmployee?.employeeNumber ?? scopeLabel(scope).replace(/\s+/g, '-').toLowerCase()}`, rows: [header, ...dataRows], sumFooter: true }
+  }
+
   return (
-    <ReportViewShell title="Payslip Report" description="Every finalized period's payslips — open a period to view or print each employee's payslip.">
-      {isLoading || employeesLoading || rowsLoading ? (
+    <ReportViewShell
+      title="Payslip Report"
+      description="Every finalized payslip with its pay breakdown — for all payroll runs, or a month, a year or a date range. Select an employee for an overview of their totals."
+      orientation="landscape"
+      meta={[
+        { label: 'Report Period', value: scopeLabel(scope) },
+        ...(selectedEmployee ? [{ label: 'Employee', value: `${fullName(selectedEmployee.personal)} (${selectedEmployee.employeeNumber})` }] : []),
+        ...(department !== 'all' ? [{ label: 'Department', value: department }] : []),
+        ...(branchId !== 'all' ? [{ label: 'Branch', value: branches.find((b) => b.id === branchId)?.name ?? branchId }] : []),
+      ]}
+      onExportExcel={payslips.length > 0 ? onExport : undefined}
+    >
+      {employeesLoading || rowsLoading ? (
         <Skeleton className="h-64" />
-      ) : finalized.length === 0 ? (
-        <EmptyState title="No finalized periods yet" description="Payslips become available once a payroll period is finalized." />
+      ) : finalizedRows.length === 0 ? (
+        <EmptyState title="No finalized payslips yet" description="Payslips become available once a payroll run is finalized." />
       ) : (
         <div className="space-y-4">
           <ReportFilterBar onClear={hasActiveFilters ? clearFilters : undefined}>
@@ -684,40 +768,74 @@ export function PayslipReportView() {
             <FilterLabel label="Branch" className="w-44">
               <Select value={branchId} onValueChange={setBranchId} options={branchOptions} />
             </FilterLabel>
+            <ReportScopePicker scope={scope} onChange={setScope} periods={finalizedRows.map((r) => r.period)} />
           </ReportFilterBar>
 
-          {filteredPeriods.length === 0 ? (
-            <EmptyState title="No matching employee records found" description="Try adjusting or clearing the filters above." />
+          {selectedEmployee && (
+            <div>
+              <p className="mb-2 text-sm font-semibold">
+                {fullName(selectedEmployee.personal)} · overview <span className="font-normal text-muted-foreground">({scopeLabel(scope)}, {payslips.length} payslip{payslips.length === 1 ? '' : 's'})</span>
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <StatTile label="Total Gross Pay" value={formatCurrency(totals.gross)} />
+                <StatTile label="Total Net Pay" value={formatCurrency(totals.net)} />
+                <StatTile label="Statutory Contributions" value={formatCurrency(totals.statutory)} />
+                <StatTile label="Withholding Tax" value={formatCurrency(totals.tax)} />
+                <StatTile label="Loans & Other Deductions" value={formatCurrency(totals.other)} />
+                <StatTile label="Benefits Provided" value={formatCurrency(totals.benefits)} />
+              </div>
+            </div>
+          )}
+
+          {payslips.length === 0 ? (
+            <EmptyState title="No payslips found" description="Try another report period or clear the filters above." />
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Period</TableHead>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Payroll Period</TableHead>
                   <TableHead>Pay Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">Gross Pay</TableHead>
+                  <TableHead className="text-right">Statutory</TableHead>
+                  <TableHead className="text-right">Tax</TableHead>
+                  <TableHead className="text-right">Loans & Other</TableHead>
+                  <TableHead className="text-right">Net Pay</TableHead>
+                  <TableHead className="text-right print:hidden">Payslip</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPeriods.map((p) => {
-                  const matchingLine = employeeId ? matchingRowsByPeriod.get(p.id) : undefined
-                  return (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.label}</TableCell>
-                      <TableCell>{formatDate(p.payDate)}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={p.status} />
-                      </TableCell>
-                      <TableCell className="text-right print:hidden">
-                        <Button size="sm" variant="secondary" asChild>
-                          <Link to={matchingLine ? `/payslips/${matchingLine.line.id}` : '/payslips'}>
-                            {matchingLine ? 'View Payslip' : 'View Payslips'}
-                          </Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
+                {payslips.map((p) => (
+                  <TableRow key={p.line.id}>
+                    <TableCell className="font-medium">
+                      {fullName(p.employee.personal)}
+                      <span className="block text-xs font-normal text-muted-foreground">{p.employee.employeeNumber}</span>
+                    </TableCell>
+                    <TableCell>{p.period.label}</TableCell>
+                    <TableCell>{formatDate(p.period.payDate)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCurrency(p.line.grossPay)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCurrency(p.statutory)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCurrency(p.tax)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCurrency(p.otherDeductions)}</TableCell>
+                    <TableCell className="text-right font-medium tabular-nums">{formatCurrency(p.line.netPay)}</TableCell>
+                    <TableCell className="text-right print:hidden">
+                      <Button size="sm" variant="secondary" asChild>
+                        <Link to={`/payslips/${p.line.id}`} state={{ from: `${location.pathname}${location.search}`, fromLabel: 'Payslip Report' }}>
+                          View
+                        </Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="bg-muted/50 font-semibold">
+                  <TableCell colSpan={3}>Total ({payslips.length} payslips)</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatCurrency(totals.gross)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatCurrency(totals.statutory)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatCurrency(totals.tax)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatCurrency(totals.other)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatCurrency(totals.net)}</TableCell>
+                  <TableCell className="print:hidden" />
+                </TableRow>
               </TableBody>
             </Table>
           )}
@@ -726,8 +844,6 @@ export function PayslipReportView() {
     </ReportViewShell>
   )
 }
-
-
 
 export function OvertimeReportView() {
   const { records, isLoading: recordsLoading } = useOvertimeRecords()
@@ -844,6 +960,253 @@ export function OvertimeReportView() {
                 ))}
               </TableBody>
             </Table>
+          )}
+        </div>
+      )}
+    </ReportViewShell>
+  )
+}
+
+export function BenefitsReportView() {
+  const { benefits, isLoading: benefitsLoading } = useEmployeeBenefits()
+  const { employees, isLoading: employeesLoading } = useEmployees()
+  const { rows: payrollRows, isLoading: payrollLoading, scope, setScope, scopeMeta } = useScopedPayrollLines()
+  const { branches } = useTenant()
+
+  const [category, setCategory] = useState('all')
+  const [status, setStatus] = useState('all')
+  const [department, setDepartment] = useState('all')
+  const [branchId, setBranchId] = useState('all')
+  const [employeeIds, setEmployeeIds] = useState<string[]>([])
+
+  const employeeById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees])
+  const departmentOptions = useMemo(() => {
+    const unique = Array.from(new Set(employees.map((e) => e.employment.department))).sort()
+    return [{ value: 'all', label: 'All Departments' }, ...unique.map((d) => ({ value: d, label: d }))]
+  }, [employees])
+  const branchOptions = useMemo(() => [{ value: 'all', label: 'All Branches' }, ...branches.map((b) => ({ value: b.id, label: b.name }))], [branches])
+  const categoryOptions = [
+    { value: 'all', label: 'All Categories' },
+    ...(Object.keys(BENEFIT_CATEGORY_META) as BenefitCategory[]).map((value) => ({ value, label: BENEFIT_CATEGORY_META[value].title })),
+  ]
+  const statusOptions = [
+    { value: 'all', label: 'All Statuses' },
+    { value: 'active', label: 'Active' },
+    { value: 'paused', label: 'Paused' },
+    { value: 'cancelled', label: 'Cancelled' },
+  ]
+
+  // What payroll actually gave/took for each benefit in the report period (finalized runs only).
+  const paidByBenefit = useMemo(() => {
+    const map = new Map<string, { companyPaid: number; employeeShare: number }>()
+    for (const { period, line, employee } of payrollRows) {
+      if (period.status !== 'finalized') continue
+      for (const b of benefits) {
+        if (b.employeeId !== employee.id) continue
+        const entry = map.get(b.id) ?? { companyPaid: 0, employeeShare: 0 }
+        if (b.category === 'allowance') entry.companyPaid += line.earnings.filter((e) => e.label === b.name).reduce((s, e) => s + e.amount, 0)
+        else entry.companyPaid += (line.benefitsProvided ?? []).filter((p) => p.label === b.name).reduce((s, p) => s + p.amount, 0)
+        entry.employeeShare += line.otherDeductions.filter((d) => d.label === `${b.name} – Employee Share`).reduce((s, d) => s + d.amount, 0)
+        map.set(b.id, entry)
+      }
+    }
+    return map
+  }, [payrollRows, benefits])
+
+  const rows = useMemo(
+    () =>
+      benefits
+        .map((b) => ({ benefit: b, employee: employeeById.get(b.employeeId), paid: paidByBenefit.get(b.id) ?? { companyPaid: 0, employeeShare: 0 } }))
+        .filter(
+          (r): r is typeof r & { employee: Employee } =>
+            !!r.employee &&
+            (category === 'all' || r.benefit.category === category) &&
+            (status === 'all' || r.benefit.status === status) &&
+            (department === 'all' || r.employee.employment.department === department) &&
+            (branchId === 'all' || r.employee.branchId === branchId) &&
+            (employeeIds.length === 0 || employeeIds.includes(r.employee.id)),
+        )
+        .sort((a, b) => fullName(a.employee.personal).localeCompare(fullName(b.employee.personal)) || a.benefit.name.localeCompare(b.benefit.name)),
+    [benefits, employeeById, paidByBenefit, category, status, department, branchId, employeeIds],
+  )
+
+  const active = rows.filter((r) => r.benefit.status === 'active')
+  const totals = {
+    enrolled: new Set(active.map((r) => r.employee.id)).size,
+    monthlyCost: active.reduce((s, r) => s + r.benefit.monthlyValue, 0),
+    monthlyShare: active.reduce((s, r) => s + r.benefit.employeeShare, 0),
+    companyPaid: rows.reduce((s, r) => s + r.paid.companyPaid, 0),
+    employeeShare: rows.reduce((s, r) => s + r.paid.employeeShare, 0),
+  }
+  const byCategory = (Object.keys(BENEFIT_CATEGORY_META) as BenefitCategory[])
+    .map((key) => {
+      const items = rows.filter((r) => r.benefit.category === key)
+      const live = items.filter((r) => r.benefit.status === 'active')
+      return {
+        key,
+        employees: new Set(live.map((r) => r.employee.id)).size,
+        records: live.length,
+        monthlyCost: live.reduce((s, r) => s + r.benefit.monthlyValue, 0),
+        companyPaid: items.reduce((s, r) => s + r.paid.companyPaid, 0),
+        employeeShare: items.reduce((s, r) => s + r.paid.employeeShare, 0),
+      }
+    })
+    .filter((c) => c.records > 0 || c.companyPaid > 0)
+
+  const hasActiveFilters = category !== 'all' || status !== 'all' || department !== 'all' || branchId !== 'all' || employeeIds.length > 0
+  function clearFilters() {
+    setCategory('all')
+    setStatus('all')
+    setDepartment('all')
+    setBranchId('all')
+    setEmployeeIds([])
+  }
+
+  function onExport(): ExcelExport {
+    const header = ['Employee #', 'Employee', 'Department', 'Category', 'Benefit', 'Provider', 'Coverage', 'Monthly Value', 'Employee Share / Month', 'Start Date', 'End Date', 'Status', 'Company-paid in Period', 'Employee Share Deducted in Period']
+    const dataRows = rows.map((r) => [
+      r.employee.employeeNumber,
+      fullName(r.employee.personal),
+      r.employee.employment.department,
+      BENEFIT_CATEGORY_META[r.benefit.category].title,
+      r.benefit.name,
+      r.benefit.provider ?? '',
+      r.benefit.coverage ?? '',
+      r.benefit.monthlyValue,
+      r.benefit.employeeShare,
+      r.benefit.startDate,
+      r.benefit.endDate ?? '',
+      r.benefit.status,
+      r.paid.companyPaid,
+      r.paid.employeeShare,
+    ])
+    return { filename: 'benefits-report', rows: [header, ...dataRows], sumFooter: true, columnTypes: {} }
+  }
+
+  return (
+    <ReportViewShell
+      title="Benefits Report"
+      description="Every employee benefit — HMO, allowances, insurance and other perks — with what the company and employees actually paid through payroll in the report period."
+      orientation="landscape"
+      meta={[
+        scopeMeta,
+        ...(category !== 'all' ? [{ label: 'Category', value: BENEFIT_CATEGORY_META[category as BenefitCategory].title }] : []),
+        ...(department !== 'all' ? [{ label: 'Department', value: department }] : []),
+        ...(branchId !== 'all' ? [{ label: 'Branch', value: branches.find((b) => b.id === branchId)?.name ?? branchId }] : []),
+        ...(employeeIds.length > 0 ? [{ label: 'Employees', value: `${employeeIds.length} selected` }] : []),
+      ]}
+      onExportExcel={rows.length > 0 ? onExport : undefined}
+    >
+      {benefitsLoading || employeesLoading || payrollLoading ? (
+        <Skeleton className="h-64" />
+      ) : benefits.length === 0 ? (
+        <EmptyState title="No benefits recorded yet" description="Add benefits under Benefits, Loans & Deductions to report on them here." />
+      ) : (
+        <div className="space-y-4">
+          <ReportFilterBar onClear={hasActiveFilters ? clearFilters : undefined}>
+            <FilterLabel label="Employee" className="w-64">
+              <EmployeeCombobox multiple employees={comboboxOptions(employees)} value={employeeIds} onChange={setEmployeeIds} />
+            </FilterLabel>
+            <FilterLabel label="Category" className="w-44">
+              <Select value={category} onValueChange={setCategory} options={categoryOptions} />
+            </FilterLabel>
+            <FilterLabel label="Status" className="w-40">
+              <Select value={status} onValueChange={setStatus} options={statusOptions} />
+            </FilterLabel>
+            <FilterLabel label="Department" className="w-44">
+              <Select value={department} onValueChange={setDepartment} options={departmentOptions} />
+            </FilterLabel>
+            <FilterLabel label="Branch" className="w-44">
+              <Select value={branchId} onValueChange={setBranchId} options={branchOptions} />
+            </FilterLabel>
+            <ReportScopePicker scope={scope} onChange={setScope} periods={payrollRows.map((r) => r.period)} />
+          </ReportFilterBar>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatTile label="Employees Covered" value={String(totals.enrolled)} />
+            <StatTile label="Company Cost / Month" value={formatCurrency(totals.monthlyCost)} />
+            <StatTile label={`Company-paid (${scopeLabel(scope)})`} value={formatCurrency(totals.companyPaid)} />
+            <StatTile label={`Employee Share Deducted (${scopeLabel(scope)})`} value={formatCurrency(totals.employeeShare)} />
+          </div>
+
+          {rows.length === 0 ? (
+            <EmptyState title="No matching benefits found" description="Try adjusting or clearing the filters above." />
+          ) : (
+            <>
+              {byCategory.length > 0 && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="text-right">Employees</TableHead>
+                      <TableHead className="text-right">Active Records</TableHead>
+                      <TableHead className="text-right">Cost / Month</TableHead>
+                      <TableHead className="text-right">Company-paid in Period</TableHead>
+                      <TableHead className="text-right">Employee Share in Period</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {byCategory.map((c) => (
+                      <TableRow key={c.key}>
+                        <TableCell className="font-medium">{BENEFIT_CATEGORY_META[c.key].title}</TableCell>
+                        <TableCell className="text-right tabular-nums">{c.employees}</TableCell>
+                        <TableCell className="text-right tabular-nums">{c.records}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatCurrency(c.monthlyCost)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatCurrency(c.companyPaid)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatCurrency(c.employeeShare)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Benefit</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead className="text-right">Monthly Value</TableHead>
+                    <TableHead className="text-right">Employee Share / Mo</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Company-paid in Period</TableHead>
+                    <TableHead className="text-right">Employee Share in Period</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((r) => (
+                    <TableRow key={r.benefit.id}>
+                      <TableCell className="font-medium">
+                        {fullName(r.employee.personal)}
+                        <span className="block text-xs font-normal text-muted-foreground">{r.employee.employment.department}</span>
+                      </TableCell>
+                      <TableCell>
+                        {r.benefit.name}
+                        {(r.benefit.provider || r.benefit.coverage) && (
+                          <span className="block text-xs text-muted-foreground">{[r.benefit.provider, r.benefit.coverage].filter(Boolean).join(' · ')}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>{BENEFIT_CATEGORY_META[r.benefit.category].title}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCurrency(r.benefit.monthlyValue)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.benefit.employeeShare > 0 ? formatCurrency(r.benefit.employeeShare) : '—'}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={r.benefit.status} />
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCurrency(r.paid.companyPaid)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.paid.employeeShare > 0 ? formatCurrency(r.paid.employeeShare) : '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="bg-muted/50 font-semibold">
+                    <TableCell colSpan={3}>Total ({rows.length} records)</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCurrency(rows.reduce((s, r) => s + r.benefit.monthlyValue, 0))}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCurrency(rows.reduce((s, r) => s + r.benefit.employeeShare, 0))}</TableCell>
+                    <TableCell />
+                    <TableCell className="text-right tabular-nums">{formatCurrency(totals.companyPaid)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCurrency(totals.employeeShare)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </>
           )}
         </div>
       )}
