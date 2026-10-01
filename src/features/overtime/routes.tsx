@@ -1,4 +1,5 @@
-import { Download, Search } from 'lucide-react'
+import { Banknote, Download, Hourglass, MoonStar, Search, Timer } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Avatar } from '@/components/ui/Avatar'
@@ -66,9 +67,10 @@ function daysAgo(n: number): Date {
   return d
 }
 
-function MetricCard({ label, value, hint }: { label: string; value: string; hint: string }) {
+function MetricCard({ label, value, hint, icon }: { label: string; value: string; hint: string; icon: LucideIcon }) {
   return (
-    <Card className="p-5">
+    // Same corner placement as the dashboard KPI cards (MetricCard).
+    <Card watermark={icon} watermarkClassName="-right-3 -top-3 size-20" className="overflow-hidden p-5">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-2 font-display text-2xl font-semibold tracking-tight">{value}</p>
       <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
@@ -187,11 +189,13 @@ export function OvertimePage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard
             label="Pending Approvals"
+            icon={Hourglass}
             value={`${summary.pendingCount} Requests`}
             hint={`${summary.pendingOvertimeCount} Overtime | ${summary.pendingNightDiffCount} Night Diff`}
           />
           <MetricCard
             label="Total OT Hours (Current Period)"
+            icon={Timer}
             value={`${summary.totalOvertimeHours} hrs`}
             hint={
               summary.overtimeHoursChangePct === null
@@ -201,11 +205,13 @@ export function OvertimePage() {
           />
           <MetricCard
             label="Night Diff Hours"
+            icon={MoonStar}
             value={`${summary.nightDiffHours} hrs`}
             hint={`${summary.activeNightShiftWorkers} active night shift workers`}
           />
           <MetricCard
             label="Estimated OT Cost"
+            icon={Banknote}
             value={formatCurrency(summary.estimatedCost)}
             hint="Ready for payroll integration"
           />

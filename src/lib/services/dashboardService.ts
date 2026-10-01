@@ -60,13 +60,18 @@ export interface AdminDashboardOverview {
     leavePending: number
     overtimeToday: number
     overtimeEmployees: number
+    /** Approved overtime hours logged today. */
+    overtimeHours: number
     payrollStatusLabel: string
     payrollCutoffLabel: string
+    /** The pay period currently in the payroll cycle, e.g. "Sep 16 – 30, 2026". */
+    payrollPeriodLabel: string
+    nextCutoffLabel: string
   }
   payrollChart: { month: string; grossPay: number; netPay: number }[]
-  payrollCalendar: { id: string; dateLabel: string; title: string; description: string }[]
-  recentEmployees: { id: string; name: string; department: string; status: 'active' | 'on_leave' | 'inactive' }[]
-  announcements: { id: string; title: string; dateLabel: string }[]
+  payrollCalendar: { id: string; dateLabel: string; fullDate: string; title: string; description: string; state: 'done' | 'current' | 'upcoming' }[]
+  recentEmployees: { id: string; name: string; department: string; position: string; hiredLabel: string; status: 'active' | 'on_leave' | 'inactive' }[]
+  announcements: { id: string; title: string; summary: string; category: 'Reminder' | 'Notice' | 'Policy' | 'Event'; dateLabel: string }[]
 }
 
 export interface PendingRequestsSummary {
@@ -95,13 +100,72 @@ export async function getPendingRequestsSummary(session: SessionUser): Promise<P
   }
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date)
+  d.setDate(d.getDate() + days)
+  return d
+}
+
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+const fmtShort = (d: Date) => `${MONTHS[d.getMonth()].toUpperCase()} ${d.getDate()}`
+const fmtLong = (d: Date) => d.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })
+
+/** Semi-monthly cut-offs (15th and month-end) around `today`, each with its processing (+3 days) and release (+5 days) dates. */
+function payrollCycles(today: Date) {
+  const cycles: { periodStart: Date; cutoff: Date; processing: Date; release: Date }[] = []
+  for (let m = -1; m <= 1; m++) {
+    const year = today.getFullYear()
+    const month = today.getMonth() + m
+    const mid = new Date(year, month, 15)
+    const end = new Date(year, month + 1, 0)
+    cycles.push({ periodStart: new Date(year, month, 1), cutoff: mid, processing: addDays(mid, 3), release: addDays(mid, 5) })
+    cycles.push({ periodStart: new Date(year, month, 16), cutoff: end, processing: addDays(end, 3), release: addDays(end, 5) })
+  }
+  return cycles
+}
+
 /**
  * Company Admin's home dashboard. Numbers are illustrative mock data (not
  * derived from the live employee roster) so the widget set — payroll trend,
  * upcoming payroll calendar, recent hires, announcements — renders fully
  * out of the box regardless of how much seed data a demo company has.
+ * Dates are relative to today so the payroll calendar is always "upcoming".
  */
 export async function getAdminDashboardOverview(session: SessionUser): Promise<AdminDashboardOverview> {
+  const today = startOfDay(new Date())
+
+  // The cycle in progress: the first one whose release date hasn't passed yet.
+  const cycles = payrollCycles(today)
+  const current = cycles.find((c) => c.release >= today) ?? cycles[cycles.length - 1]
+  const next = cycles[cycles.indexOf(current) + 1] ?? current
+  const stateOf = (d: Date): 'done' | 'current' | 'upcoming' => (d < today ? 'done' : d.getTime() === today.getTime() ? 'current' : 'upcoming')
+  const status =
+    today < current.cutoff
+      ? 'Open for Cut-off'
+      : today < current.processing
+        ? 'Ready for Processing'
+        : today < current.release
+          ? 'Processing'
+          : 'Releasing Today'
+  const periodLabel = `${MONTHS[current.periodStart.getMonth()]} ${current.periodStart.getDate()} – ${current.cutoff.getDate()}, ${current.cutoff.getFullYear()}`
+
+  // Last six completed months for the payroll trend (e.g. Apr–Sep when viewed in October).
+  const PAYROLL_TREND = [
+    { grossPay: 4850000, netPay: 4120000 },
+    { grossPay: 4920000, netPay: 4180000 },
+    { grossPay: 5100000, netPay: 4340000 },
+    { grossPay: 5260000, netPay: 4460000 },
+    { grossPay: 5480000, netPay: 4650000 },
+    { grossPay: 5720000, netPay: 4860000 },
+  ]
+  const payrollChart = PAYROLL_TREND.map((values, i) => ({ month: MONTHS[(today.getMonth() - 6 + i + 12) % 12], ...values }))
+  const daysAgo = (n: number) => fmtLong(addDays(today, -n))
+
   return {
     greetingName: session.name.split(' ')[0],
     metrics: {
@@ -113,50 +177,85 @@ export async function getAdminDashboardOverview(session: SessionUser): Promise<A
       onLeaveToday: 8,
       leaveApproved: 6,
       leavePending: 2,
-      overtimeToday: 14,
+      overtimeToday: 11,
       overtimeEmployees: 11,
-      payrollStatusLabel: 'Ready for Processing',
-      payrollCutoffLabel: 'Cut-off: Sep 15, 2026',
+      overtimeHours: 26.5,
+      payrollStatusLabel: status,
+      payrollCutoffLabel: `Cut-off: ${fmtLong(current.cutoff)}`,
+      payrollPeriodLabel: periodLabel,
+      nextCutoffLabel: fmtLong(today <= current.cutoff ? current.cutoff : next.cutoff),
     },
-    payrollChart: [
-      { month: 'Apr', grossPay: 4850000, netPay: 4120000 },
-      { month: 'May', grossPay: 4920000, netPay: 4180000 },
-      { month: 'Jun', grossPay: 5100000, netPay: 4340000 },
-      { month: 'Jul', grossPay: 5260000, netPay: 4460000 },
-      { month: 'Aug', grossPay: 5480000, netPay: 4650000 },
-      { month: 'Sep', grossPay: 5720000, netPay: 4860000 },
-    ],
+    payrollChart,
     payrollCalendar: [
       {
         id: 'cutoff',
-        dateLabel: 'SEP 15',
+        dateLabel: fmtShort(current.cutoff),
+        fullDate: fmtLong(current.cutoff),
         title: 'Cut-off Date',
-        description: 'Time and attendance, leaves, OT, and loans finalization.',
+        description: `Time and attendance, leaves, OT, and loans finalization for ${periodLabel}.`,
+        state: stateOf(current.cutoff),
       },
       {
         id: 'processing',
-        dateLabel: 'SEP 18',
+        dateLabel: fmtShort(current.processing),
+        fullDate: fmtLong(current.processing),
         title: 'Payroll Processing',
-        description: 'Generate and review payroll.',
+        description: 'Generate, review, and approve the payroll run.',
+        state: stateOf(current.processing),
       },
       {
         id: 'release',
-        dateLabel: 'SEP 20',
+        dateLabel: fmtShort(current.release),
+        fullDate: fmtLong(current.release),
         title: 'Payroll Release',
-        description: 'Salaries credited to accounts.',
+        description: 'Salaries credited to employee bank accounts; payslips emailed.',
+        state: stateOf(current.release),
+      },
+      {
+        id: 'next-cutoff',
+        dateLabel: fmtShort(next.cutoff),
+        fullDate: fmtLong(next.cutoff),
+        title: 'Next Cut-off',
+        description: 'Following pay period closes.',
+        state: stateOf(next.cutoff),
       },
     ],
     recentEmployees: [
-      { id: 'e1', name: 'Maria Santos', department: 'Human Resources', status: 'active' },
-      { id: 'e2', name: 'Juan Dela Cruz', department: 'Sales', status: 'active' },
-      { id: 'e3', name: 'Ana Reyes', department: 'Finance', status: 'on_leave' },
-      { id: 'e4', name: 'Carlos Mendoza', department: 'Warehouse', status: 'active' },
-      { id: 'e5', name: 'Lea Garcia', department: 'Customer Support', status: 'active' },
+      { id: 'e1', name: 'Maria Santos', department: 'Human Resources', position: 'HR Associate', hiredLabel: daysAgo(3), status: 'active' },
+      { id: 'e2', name: 'Juan Dela Cruz', department: 'Sales', position: 'Account Executive', hiredLabel: daysAgo(8), status: 'active' },
+      { id: 'e3', name: 'Ana Reyes', department: 'Finance', position: 'Payroll Analyst', hiredLabel: daysAgo(12), status: 'on_leave' },
+      { id: 'e4', name: 'Carlos Mendoza', department: 'Warehouse', position: 'Inventory Clerk', hiredLabel: daysAgo(17), status: 'active' },
+      { id: 'e5', name: 'Lea Garcia', department: 'Customer Support', position: 'Support Specialist', hiredLabel: daysAgo(23), status: 'active' },
     ],
     announcements: [
-      { id: 'ann1', title: 'Payroll Cut-off Reminder', dateLabel: 'Sep 10, 2026' },
-      { id: 'ann2', title: 'PhilHealth Contribution Update', dateLabel: 'Sep 5, 2026' },
-      { id: 'ann3', title: 'BIR Form 2316 Reminder', dateLabel: 'Aug 28, 2026' },
+      {
+        id: 'ann1',
+        title: 'Payroll Cut-off Reminder',
+        summary: `Submit attendance adjustments, overtime, and leave requests before the ${fmtLong(today <= current.cutoff ? current.cutoff : next.cutoff)} cut-off.`,
+        category: 'Reminder',
+        dateLabel: daysAgo(1),
+      },
+      {
+        id: 'ann2',
+        title: 'PhilHealth Contribution Update',
+        summary: 'Premium rate remains at 5% (shared 50/50) with the ₱10,000 floor and ₱100,000 ceiling for 2026.',
+        category: 'Policy',
+        dateLabel: daysAgo(6),
+      },
+      {
+        id: 'ann3',
+        title: 'Company Town Hall',
+        summary: 'Quarterly town hall at the Makati head office, 3:00 PM — branches can join via video call.',
+        category: 'Event',
+        dateLabel: daysAgo(9),
+      },
+      {
+        id: 'ann4',
+        title: 'BIR Form 2316 Reminder',
+        summary: 'Employees with changes in civil status or dependents should update HR before year-end.',
+        category: 'Notice',
+        dateLabel: daysAgo(14),
+      },
     ],
   }
 }

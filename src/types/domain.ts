@@ -419,6 +419,8 @@ export interface LeaveType {
   tierCredits?: LeaveTypeTierCredits
 }
 
+export type LeaveDayPortion = 'full' | 'half_am' | 'half_pm'
+
 export interface LeaveRequest {
   id: string
   companyId: string
@@ -426,6 +428,8 @@ export interface LeaveRequest {
   leaveTypeId: string
   dateFrom: string
   dateTo: string
+  /** Full day (default) or a half-day leave — morning (AM) or afternoon (PM). */
+  dayPortion?: LeaveDayPortion
   reason?: string
   status: ApprovalStatus
   requestedAt: string

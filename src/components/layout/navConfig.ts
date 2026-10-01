@@ -38,6 +38,8 @@ export interface NavItem {
    * an `/ess` "My Dashboard") whose path is itself a prefix of sibling nav items' paths, so it
    * doesn't stay lit up while viewing one of those other pages. */
   exactMatch?: boolean
+  /** Cards on this page (and its sub-pages) skip the soft theme's corner watermark icon. */
+  plainCards?: boolean
 }
 
 export interface NavGroup {
@@ -69,35 +71,36 @@ export const ADMIN_NAV: NavGroup[] = [
   {
     label: 'Payroll',
     items: [
-      { label: 'Payroll Runs', path: '/payroll', icon: Wallet, capability: 'payroll.view' },
-      { label: 'Bonuses & Incentives', path: '/bonuses', icon: Gift, capability: 'bonuses.view', feature: 'bonuses_incentives' },
+      { label: 'Payroll Runs', path: '/payroll', icon: Wallet, plainCards: true, capability: 'payroll.view' },
+      { label: 'Bonuses & Incentives', path: '/bonuses', icon: Gift, plainCards: true, capability: 'bonuses.view', feature: 'bonuses_incentives' },
       {
         label: '13th Month Pay',
         path: '/thirteenth-month-pay',
         icon: PartyPopper,
+        plainCards: true,
         capability: 'thirteenth_month.view',
         feature: 'thirteenth_month',
       },
-      { label: 'Statutory Contributions', path: '/statutory', icon: Landmark, capability: 'statutory.view' },
+      { label: 'Statutory Contributions', path: '/statutory', icon: Landmark, plainCards: true, capability: 'statutory.view' },
       { label: 'Payslips', path: '/payslips', icon: ReceiptText, capability: 'payslips.view' },
     ],
   },
   {
     label: 'Analytics and Reports',
     items: [
-      { label: 'Reports', path: '/reports', icon: LineChart, capability: 'reports.view' },
+      { label: 'Reports', path: '/reports', icon: LineChart, plainCards: true, capability: 'reports.view' },
       { label: 'Insights & Decision Making Support', path: '/insights', icon: Sparkles, capability: 'insights.view' },
     ],
   },
   {
     label: 'Settings',
     items: [
-      { label: 'Company & Payroll Settings', path: '/company-settings', icon: Settings, capability: 'settings.company.edit' },
+      { label: 'Company & Payroll Settings', path: '/company-settings', icon: Settings, plainCards: true, capability: 'settings.company.edit' },
       // Not plan-gated: Branches stays unlocked on every tier while the Company Admin portal is used for demos/testing.
-      { label: 'Branches', path: '/branches', icon: Building2, capability: 'branches.manage' },
-      { label: 'Users & Access', path: '/user-access', icon: ShieldCheck, capability: 'users.manage' },
-      { label: 'Onboarding', path: '/onboarding', icon: CalendarClock, capability: 'onboarding.manage' },
-      { label: 'Subscription & Plan', path: '/subscription', icon: Gauge, capability: 'subscription.manage' },
+      { label: 'Branches', path: '/branches', icon: Building2, plainCards: true, capability: 'branches.manage' },
+      { label: 'Users & Access', path: '/user-access', icon: ShieldCheck, plainCards: true, capability: 'users.manage' },
+      { label: 'Onboarding', path: '/onboarding', icon: CalendarClock, plainCards: true, capability: 'onboarding.manage' },
+      { label: 'Subscription & Plan', path: '/subscription', icon: Gauge, plainCards: true, capability: 'subscription.manage' },
       { label: 'Integrations & API', path: '/integrations', icon: Plug, capability: 'integrations.manage' },
     ],
   },

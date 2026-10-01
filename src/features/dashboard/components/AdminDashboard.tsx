@@ -1,5 +1,6 @@
 import {
   CalendarClock,
+  CheckCircle2,
   CalendarDays,
   CalendarPlus,
   Clock3,
@@ -21,8 +22,9 @@ import { Card } from '@/components/ui/Card'
 import { MetricCard } from '@/components/ui/MetricCard'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
-import { useAdminDashboardOverview } from '@/features/dashboard/hooks/useDashboardData'
+import { useAdminDashboardOverview, usePendingRequestsSummary } from '@/features/dashboard/hooks/useDashboardData'
 import { PendingRequestsCard } from '@/features/dashboard/components/PendingRequestsCard'
+import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format'
 
 function timeOfDayGreeting() {
@@ -43,9 +45,16 @@ const QUICK_ACTIONS = [
   { label: 'Process Payroll', icon: Wallet, to: '/payroll' },
   { label: 'Record Attendance', icon: Clock3, to: '/attendance' },
   { label: 'File Leave', icon: CalendarPlus, to: '/leave' },
-  { label: 'Add Overtime', icon: Clock3, to: '/attendance' },
+  { label: 'Add Overtime', icon: Clock3, to: '/overtime' },
   { label: 'Generate Report', icon: FileBarChart2, to: '/reports' },
 ]
+
+const ANNOUNCEMENT_TONE = { Reminder: 'warning', Notice: 'neutral', Policy: 'brand', Event: 'success' } as const
+
+/** "₱4.86M" */
+function compactPeso(value: number) {
+  return `₱${(value / 1_000_000).toFixed(2)}M`
+}
 
 function ViewAllLink({ to }: { to: string }) {
   return (
@@ -57,10 +66,11 @@ function ViewAllLink({ to }: { to: string }) {
 
 export function AdminDashboard() {
   const { overview, isLoading } = useAdminDashboardOverview()
+  const { summary: pending } = usePendingRequestsSummary()
 
   if (isLoading || !overview) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="dashboard-elevated grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {Array.from({ length: 5 }).map((_, i) => (
           <Skeleton key={i} className="h-36" />
         ))}
@@ -70,15 +80,34 @@ export function AdminDashboard() {
 
   const { metrics, payrollChart, payrollCalendar, recentEmployees, announcements } = overview
   const today = new Date()
+  const pendingTotal = pending
+    ? pending.leavePending + pending.overtimePending + pending.nightDiffPending + pending.attendanceAdjustmentsPending + pending.compensationApprovalsPending
+    : null
+  const latest = payrollChart[payrollChart.length - 1]
+  const previous = payrollChart[payrollChart.length - 2]
+  const deductionRate = latest ? Math.round(((latest.grossPay - latest.netPay) / latest.grossPay) * 1000) / 10 : 0
+  const grossChange = latest && previous ? Math.round(((latest.grossPay - previous.grossPay) / previous.grossPay) * 1000) / 10 : 0
+  const sixMonthNet = payrollChart.reduce((sum, m) => sum + m.netPay, 0)
 
   return (
-    <div className="space-y-6">
+    <div className="dashboard-elevated space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight">
             {timeOfDayGreeting()}, {overview.greetingName}!
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">Here&apos;s what&apos;s happening with your payroll today.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Payroll for <span className="font-medium text-foreground">{metrics.payrollPeriodLabel}</span> is{' '}
+            <span className="font-medium text-foreground">{metrics.payrollStatusLabel.toLowerCase()}</span> · {metrics.presentToday} present and{' '}
+            {metrics.onLeaveToday} on leave today
+            {pendingTotal !== null && (
+              <>
+                {' '}
+                · <span className="font-medium text-foreground">{pendingTotal}</span> request{pendingTotal === 1 ? '' : 's'} awaiting review
+              </>
+            )}
+            .
+          </p>
         </div>
         <p className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground">
           {today.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })} |{' '}
@@ -113,8 +142,8 @@ export function AdminDashboard() {
         />
         <MetricCard
           label="With Overtime Today"
-          value={String(metrics.overtimeToday)}
-          hint={`${metrics.overtimeEmployees} employees`}
+          value={`${metrics.overtimeHours} hrs`}
+          hint={`${metrics.overtimeEmployees} employees with approved OT`}
           icon={Clock3}
           tone="accent"
           footer={{ label: 'View Overtime', to: '/overtime' }}
@@ -122,7 +151,7 @@ export function AdminDashboard() {
         <MetricCard
           label="Payroll Status"
           value={metrics.payrollStatusLabel}
-          hint={metrics.payrollCutoffLabel}
+          hint={`Next cut-off: ${metrics.nextCutoffLabel}`}
           icon={Wallet}
           tone="primary"
           footer={{ label: 'View Payroll', to: '/payroll' }}
@@ -140,6 +169,20 @@ export function AdminDashboard() {
             </div>
             <ViewAllLink to="/payroll" />
           </Card.Header>
+          <div className="relative grid grid-cols-2 gap-3 px-5 pt-1 sm:grid-cols-4">
+            {[
+              { label: `${latest?.month} Gross Pay`, value: formatCurrency(latest?.grossPay ?? 0), sub: `${grossChange >= 0 ? '+' : ''}${grossChange}% vs ${previous?.month}` },
+              { label: `${latest?.month} Net Pay`, value: formatCurrency(latest?.netPay ?? 0), sub: 'Credited to employees' },
+              { label: 'Deductions', value: formatCurrency((latest?.grossPay ?? 0) - (latest?.netPay ?? 0)), sub: `${deductionRate}% of gross (statutory, tax, loans)` },
+              { label: '6-Month Net Payout', value: compactPeso(sixMonthNet), sub: `${payrollChart[0]?.month} – ${latest?.month}` },
+            ].map((stat) => (
+              <div key={stat.label} className="rounded-xl bg-card/70 px-3 py-2">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{stat.label}</p>
+                <p className="font-display text-base font-semibold tabular-nums">{stat.value}</p>
+                <p className="text-[11px] text-muted-foreground">{stat.sub}</p>
+              </div>
+            ))}
+          </div>
           <Card.Body className="relative h-64 pt-2">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={payrollChart} margin={{ left: 4, right: 8, top: 8 }} barGap={4}>
@@ -150,8 +193,8 @@ export function AdminDashboard() {
                   axisLine={false}
                   fontSize={11}
                   stroke="var(--color-muted-foreground)"
-                  tickFormatter={(v: number) => `₱${(v / 1_000_000).toFixed(0)}M`}
-                  width={40}
+                  tickFormatter={(v: number) => `₱${(v / 1_000_000).toFixed(1)}M`}
+                  width={48}
                 />
                 <Tooltip
                   formatter={(value) => formatCurrency(Number(value))}
@@ -177,11 +220,20 @@ export function AdminDashboard() {
           <Card.Body className="relative pt-2">
             <ol className="relative space-y-5 border-l border-border pl-5">
               {payrollCalendar.map((event) => (
-                <li key={event.id} className="relative">
-                  <span className="absolute -left-[27px] top-0.5 flex size-4 items-center justify-center rounded-full bg-primary" />
-                  <Badge tone="brand" className="mb-1">
-                    {event.dateLabel}
-                  </Badge>
+                <li key={event.id} className={cn('relative', event.state === 'done' && 'opacity-70')}>
+                  <span
+                    className={cn(
+                      'absolute -left-[27px] top-0.5 flex size-4 items-center justify-center rounded-full',
+                      event.state === 'done' ? 'bg-success text-white' : event.state === 'current' ? 'bg-primary ring-4 ring-primary/25' : 'border-2 border-primary bg-card',
+                    )}
+                  >
+                    {event.state === 'done' && <CheckCircle2 className="size-3" />}
+                  </span>
+                  <div className="mb-1 flex flex-wrap items-center gap-1.5">
+                    <Badge tone={event.state === 'done' ? 'success' : 'brand'}>{event.dateLabel}</Badge>
+                    {event.state === 'done' && <span className="text-[11px] font-medium text-success">Done</span>}
+                    {event.state === 'current' && <span className="text-[11px] font-medium text-primary">Today</span>}
+                  </div>
                   <p className="text-sm font-medium">{event.title}</p>
                   <p className="text-xs text-muted-foreground">{event.description}</p>
                 </li>
@@ -227,7 +279,12 @@ export function AdminDashboard() {
                     <TableCell>
                       <div className="flex items-center gap-2.5">
                         <Avatar name={employee.name} size="sm" />
-                        <span className="text-sm font-medium">{employee.name}</span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium">{employee.name}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {employee.position} · hired {employee.hiredLabel}
+                          </p>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{employee.department}</TableCell>
@@ -269,9 +326,13 @@ export function AdminDashboard() {
             {announcements.map((announcement) => (
               <div key={announcement.id} className="flex items-start gap-2.5 rounded-lg bg-card/70 p-3">
                 <Megaphone className="mt-0.5 size-4 shrink-0 text-primary" />
-                <div>
-                  <p className="text-sm font-medium leading-snug">{announcement.title}</p>
-                  <p className="text-xs text-muted-foreground">{announcement.dateLabel}</p>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="text-sm font-medium leading-snug">{announcement.title}</p>
+                    <Badge tone={ANNOUNCEMENT_TONE[announcement.category]}>{announcement.category}</Badge>
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{announcement.summary}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground/80">{announcement.dateLabel}</p>
                 </div>
               </div>
             ))}

@@ -36,7 +36,7 @@ function DefaultDashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="dashboard-elevated space-y-6">
       <PageHeader
         title="Dashboard"
         description="A quick read on payroll status, workforce health, and what needs your attention."

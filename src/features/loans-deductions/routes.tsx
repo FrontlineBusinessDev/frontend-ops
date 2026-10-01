@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { FilterField, FiltersPopover, SortControl, type SortDirection } from '@/components/ui/FiltersPopover'
 import { Input } from '@/components/ui/Input'
+import { PlainCards } from '@/components/ui/PlainCards'
 import { Select } from '@/components/ui/Select'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
@@ -42,7 +43,16 @@ const SORT_OPTIONS = [
   { value: 'name', label: 'Employee Name' },
 ]
 
+/** Loans & Deductions cards render without the soft theme's corner watermark icon. */
 export function LoansDeductionsPage() {
+  return (
+    <PlainCards>
+      <LoansDeductionsContent />
+    </PlainCards>
+  )
+}
+
+function LoansDeductionsContent() {
   const { loans, isLoading, refetch } = useLoans()
   const { employees } = useEmployees()
   const canManage = usePermission('loans.manage')

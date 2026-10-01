@@ -4,7 +4,7 @@ import { generateCompensationApprovals } from '@/mock-data/generators/compensati
 import { generateEmployeesForCompany } from '@/mock-data/generators/employees'
 import { generateLoans } from '@/mock-data/generators/loans'
 import { generateOvertimeRecords } from '@/mock-data/generators/overtime'
-import { generateAttendanceAdjustments, generateLeaveRequests } from '@/mock-data/generators/workflowRecords'
+import { generateAttendanceAdjustments, generateLeaveRequests, generateSampleLeaveOverrides } from '@/mock-data/generators/workflowRecords'
 import { branches } from '@/mock-data/seed/branches'
 import { companies } from '@/mock-data/seed/companies'
 import { compensationTypes } from '@/mock-data/seed/compensationTypes'
@@ -66,6 +66,34 @@ function assignBranchManagers() {
 }
 assignBranchManagers()
 
+const sampleLeaves = generateSampleLeaveOverrides(employees)
+
+/**
+ * The generated attendance predates leaves, so make the sample leave days look like a real device log:
+ * no punches on full-day leave (except FR-0003, kept as the "punched while on leave" conflict case),
+ * morning-only punches for a PM half-day, and none for an AM half-day with no afternoon punch.
+ */
+function alignAttendanceWithSampleLeaves() {
+  for (const leave of sampleLeaves) {
+    if (leave.status !== 'approved') continue
+    const employee = employees.find((e) => e.id === leave.employeeId)
+    if (!employee || employee.employeeNumber === 'FR-0003') continue
+    for (const record of attendanceRecords) {
+      if (record.employeeId !== leave.employeeId || record.date < leave.dateFrom || record.date > leave.dateTo) continue
+      if (leave.dayPortion === 'half_pm') {
+        record.timeIn = '08:58'
+        record.timeOut = '12:32'
+        record.status = 'undertime'
+      } else {
+        record.timeIn = null
+        record.timeOut = null
+        record.status = 'absent'
+      }
+    }
+  }
+}
+alignAttendanceWithSampleLeaves()
+
 /**
  * Payroll group seeds are authored with empty `employeeIds` (see
  * `seed/payrollGroups.ts`) since the employee generator runs after seeds
@@ -103,7 +131,7 @@ export const db = {
   payrollRules,
   attendanceRecords,
   attendanceAdjustments: generateAttendanceAdjustments(employees, attendanceRecords),
-  leaveRequests: generateLeaveRequests(employees, leaveTypes),
+  leaveRequests: [...generateLeaveRequests(employees, leaveTypes), ...sampleLeaves],
   statutoryConfigs,
   loans: generateLoans(employees),
   overtimeRecords: generateOvertimeRecords(employees),

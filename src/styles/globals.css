@@ -521,3 +521,15 @@ main[data-card-theme='soft'] [data-slot='metric-card-footer'] > svg {
   background: #ffffff;
   color: var(--foreground);
 }
+
+/* Dashboard cards sit a touch higher than elsewhere — a slightly deeper version of
+   `shadow-soft`, scoped so other pages keep the default elevation. */
+.dashboard-elevated .shadow-soft {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 12px 28px -10px rgb(0 0 0 / 0.16);
+}
+.dark .dashboard-elevated .shadow-soft {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.35), 0 12px 28px -10px rgb(0 0 0 / 0.55);
+}
+.dashboard-elevated .shadow-sm {
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05), 0 4px 10px -4px rgb(0 0 0 / 0.08);
+}

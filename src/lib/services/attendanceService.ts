@@ -1,7 +1,7 @@
 import { getEmployees } from '@/lib/services/employeeService'
 import { scopeToCompany } from '@/lib/tenancy/tenantScope'
 import { db } from '@/mock-data'
-import type { AttendanceAdjustment, AttendanceRecord, ApprovalStatus, SessionUser } from '@/types/domain'
+import type { AttendanceAdjustment, AttendanceRecord, ApprovalStatus, LeaveRequest, SessionUser } from '@/types/domain'
 
 async function scopedEmployeeIds(session: SessionUser): Promise<Set<string>> {
   const employees = await getEmployees(session)
@@ -280,4 +280,19 @@ export async function decideAttendanceAdjustment(
       record.status = 'present'
     }
   }
+}
+
+/** Approved leave requests overlapping a date range, with their leave type — for leave-aware attendance status. */
+export async function getApprovedLeavesInRange(
+  session: SessionUser,
+  from: string,
+  to: string,
+): Promise<{ request: LeaveRequest; typeName: string; isPaid: boolean }[]> {
+  const employeeIds = await scopedEmployeeIds(session)
+  return db.leaveRequests
+    .filter((r) => r.companyId === session.companyId && r.status === 'approved' && employeeIds.has(r.employeeId) && r.dateFrom <= to && r.dateTo >= from)
+    .map((request) => {
+      const type = db.leaveTypes.find((t) => t.id === request.leaveTypeId)
+      return { request, typeName: type?.name ?? 'Leave', isPaid: type?.isPaid !== false }
+    })
 }

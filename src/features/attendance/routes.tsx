@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
+import { PlainCards } from '@/components/ui/PlainCards'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import type { SortDirection } from '@/components/ui/FiltersPopover'
@@ -12,12 +13,13 @@ import { FileAdjustmentDialog } from '@/features/attendance/components/FileAdjus
 import { MiniCalendarPicker } from '@/features/attendance/components/MiniCalendarPicker'
 import { GROUP_OPTIONS, getEmployeeGroup } from '@/features/attendance/groupUtil'
 import { ImportBiometricsDialog } from '@/features/attendance/components/ImportBiometricsDialog'
-import { useAttendanceAdjustments, useDailyAttendance, useDateStatusSets } from '@/features/attendance/hooks/useAttendance'
+import { useApprovedLeavesForDate, useAttendanceAdjustments, useDailyAttendance, useDateStatusSets } from '@/features/attendance/hooks/useAttendance'
+import { approvedLeaveOn, resolveLeaveStatus, type LeaveResolution } from '@/features/attendance/leaveStatus'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
 import { useHighlightTarget } from '@/hooks/useHighlightTarget'
 import { usePermission } from '@/hooks/usePermission'
 import { useTenant } from '@/hooks/useTenant'
-import type { Employee } from '@/types/domain'
+import type { AttendanceRecord, Employee } from '@/types/domain'
 
 function shiftDate(dateKey: string, deltaDays: number) {
   const date = new Date(`${dateKey}T00:00:00`)
@@ -36,6 +38,7 @@ const DAILY_STATUS_OPTIONS = [
   { value: 'late', label: 'Late' },
   { value: 'on_leave', label: 'On Leave' },
   { value: 'pending_adjustment', label: 'Pending Adjustment' },
+  { value: 'needs_review', label: 'Needs Review (leave conflict)' },
 ]
 
 const ADJUSTMENT_STATUS_OPTIONS = [
@@ -59,7 +62,8 @@ export function AttendancePage() {
   const { highlightId, tab: highlightTab } = useHighlightTarget()
   const [date, setDate] = useState(todayKey)
   const [activeTab, setActiveTab] = useState(highlightTab ?? 'daily')
-  const { records, isLoading: isLoadingAttendance, refetch: refetchDaily } = useDailyAttendance(date)
+  const { records: punchRecords, schedules, isLoading: isLoadingAttendance, refetch: refetchAttendance } = useDailyAttendance(date)
+  const { leaves, refetch: refetchLeaves } = useApprovedLeavesForDate(date)
   const { onLeaveIds, pendingAdjustmentIds } = useDateStatusSets(date)
   const { adjustments, isLoading: isLoadingAdjustments, refetch } = useAttendanceAdjustments()
   const { employees, refetch: refetchEmployees } = useEmployees()
@@ -77,6 +81,33 @@ export function AttendancePage() {
   const [adjustmentSortDirection, setAdjustmentSortDirection] = useState<SortDirection>('desc')
 
   const employeeById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees])
+
+  function refetchDaily() {
+    refetchAttendance()
+    refetchLeaves()
+  }
+
+  // Approved leave overrides "Absent": every active employee on leave gets a row (even with no punch record),
+  // and each leave day resolves to On Leave / On Leave – Half Day, with a review flag on conflicts.
+  const { records, leaveResolutions } = useMemo(() => {
+    const resolutions = new Map<string, LeaveResolution>()
+    const rows: AttendanceRecord[] = [...punchRecords]
+    const withRecord = new Set(punchRecords.map((r) => r.employeeId))
+    for (const employee of employees) {
+      if (employee.employment.status !== 'active') continue
+      const leave = approvedLeaveOn(leaves, employee.id, date)
+      if (!leave) continue
+      const record = punchRecords.find((r) => r.employeeId === employee.id)
+      const schedule = schedules.find((s) => s.id === record?.scheduleId) ?? schedules.find((s) => s.assignedEmployeeIds?.includes(employee.id)) ?? schedules[0]
+      const resolution = resolveLeaveStatus(record, leave, schedule ?? { startTime: '09:00', endTime: '18:00' })
+      if (resolution) resolutions.set(employee.id, resolution)
+      if (!withRecord.has(employee.id)) {
+        rows.push({ id: `leave-${employee.id}-${date}`, companyId: employee.companyId, employeeId: employee.id, scheduleId: schedule?.id ?? '', date, timeIn: null, timeOut: null, status: 'absent' })
+      }
+    }
+    return { records: rows, leaveResolutions: resolutions }
+  }, [punchRecords, employees, leaves, schedules, date])
+  const effectiveStatus = (record: AttendanceRecord) => leaveResolutions.get(record.employeeId)?.status ?? record.status
 
   const branchOptions = useMemo(
     () => [{ value: 'all', label: 'All Branches' }, ...branches.map((b) => ({ value: b.id, label: b.name }))],
@@ -126,13 +157,14 @@ export function AttendancePage() {
       if (!matchesCommonFilters(employee)) return false
 
       if (status === 'all') return true
-      if (status === 'on_leave') return onLeaveIds.has(record.employeeId)
+      if (status === 'on_leave') return onLeaveIds.has(record.employeeId) || leaveResolutions.has(record.employeeId)
       if (status === 'pending_adjustment') return pendingAdjustmentIds.has(record.employeeId)
-      return record.status === status
+      if (status === 'needs_review') return !!leaveResolutions.get(record.employeeId)?.review
+      return effectiveStatus(record) === status
     })
     .sort((a, b) => {
       const result =
-        dailySortBy === 'status' ? a.status.localeCompare(b.status) : employeeName(a.employeeId).localeCompare(employeeName(b.employeeId))
+        dailySortBy === 'status' ? effectiveStatus(a).localeCompare(effectiveStatus(b)) : employeeName(a.employeeId).localeCompare(employeeName(b.employeeId))
       return dailySortDirection === 'asc' ? result : -result
     })
 
@@ -208,6 +240,7 @@ export function AttendancePage() {
             <DailyAttendanceTable
               records={filteredRecords}
               employees={employees}
+              leaveResolutions={leaveResolutions}
               onAdjustmentCreated={() => {
                 refetch()
                 refetchDaily()
@@ -217,30 +250,32 @@ export function AttendancePage() {
         </TabsContent>
 
         <TabsContent value="adjustments">
-          <div className="mb-4 flex justify-end">
-            {canAdjust && (
-              <FileAdjustmentDialog
+          <PlainCards>
+            <div className="mb-4 flex justify-end">
+              {canAdjust && (
+                <FileAdjustmentDialog
+                  employees={employees}
+                  onCreated={() => {
+                    refetch()
+                    refetchEmployees()
+                  }}
+                />
+              )}
+            </div>
+            {isLoadingAdjustments ? (
+              <Skeleton className="h-72" />
+            ) : (
+              <AdjustmentsList
+                adjustments={filteredAdjustments}
                 employees={employees}
-                onCreated={() => {
+                onDecided={() => {
                   refetch()
                   refetchEmployees()
                 }}
+                highlightId={highlightId}
               />
             )}
-          </div>
-          {isLoadingAdjustments ? (
-            <Skeleton className="h-72" />
-          ) : (
-            <AdjustmentsList
-              adjustments={filteredAdjustments}
-              employees={employees}
-              onDecided={() => {
-                refetch()
-                refetchEmployees()
-              }}
-              highlightId={highlightId}
-            />
-          )}
+          </PlainCards>
         </TabsContent>
       </Tabs>
     </div>

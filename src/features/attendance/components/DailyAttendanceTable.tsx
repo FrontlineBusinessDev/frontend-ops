@@ -1,19 +1,24 @@
+import { AlertTriangle, Plane } from 'lucide-react'
 import { useState } from 'react'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { StatusBadge } from '@/components/ui/Badge'
+import { Badge, StatusBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
 import { AdjustmentRequestDialog } from '@/features/attendance/components/AdjustmentRequestDialog'
+import type { LeaveResolution } from '@/features/attendance/leaveStatus'
 import { usePermission } from '@/hooks/usePermission'
 import type { AttendanceRecord, Employee } from '@/types/domain'
 
 export function DailyAttendanceTable({
   records,
   employees,
+  leaveResolutions,
   onAdjustmentCreated,
 }: {
   records: AttendanceRecord[]
   employees: Employee[]
+  /** Approved-leave status per employee for this date (overrides Absent). */
+  leaveResolutions?: Map<string, LeaveResolution>
   onAdjustmentCreated: () => void
 }) {
   const canAdjust = usePermission('attendance.adjust')
@@ -41,6 +46,9 @@ export function DailyAttendanceTable({
           {records.map((record) => {
             const employee = employeeById.get(record.employeeId)
             if (!employee) return null
+            const leave = leaveResolutions?.get(record.employeeId)
+            // Rows added only to show an employee's leave have no punch record to adjust.
+            const isLeaveOnlyRow = record.id.startsWith('leave-')
             return (
               <TableRow key={record.id}>
                 <TableCell>
@@ -52,11 +60,28 @@ export function DailyAttendanceTable({
                 <TableCell>{record.timeIn ?? '—'}</TableCell>
                 <TableCell>{record.timeOut ?? '—'}</TableCell>
                 <TableCell>
-                  <StatusBadge status={record.status} />
+                  {leave ? (
+                    <div className="space-y-0.5">
+                      <Badge tone="brand" className="gap-1 whitespace-nowrap">
+                        <Plane className="size-3" />
+                        {leave.label}
+                      </Badge>
+                      <p className="text-[11px] text-muted-foreground">{leave.leaveLabel}</p>
+                      {leave.detail && <p className="text-[11px] text-muted-foreground">{leave.detail}</p>}
+                      {leave.review && (
+                        <p className="flex max-w-72 items-start gap-1 text-[11px] font-medium text-warning">
+                          <AlertTriangle className="mt-px size-3 shrink-0" />
+                          Review: {leave.review}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <StatusBadge status={record.status} />
+                  )}
                 </TableCell>
                 {canAdjust && (
                   <TableCell>
-                    {record.status !== 'present' && (
+                    {record.status !== 'present' && !isLeaveOnlyRow && (!leave || leave.review) && (
                       <Button size="sm" variant="secondary" onClick={() => setAdjusting(record)}>
                         Request Adjustment
                       </Button>

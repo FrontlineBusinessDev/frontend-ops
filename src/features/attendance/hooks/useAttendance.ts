@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { useSession } from '@/hooks/useSession'
 import {
   getAttendanceAdjustments,
+  getApprovedLeavesInRange,
   getAttendanceForDate,
   getEmployeeIdsOnLeaveForDate,
   getEmployeeIdsWithPendingAdjustmentForDate,
   getSchedules,
 } from '@/lib/services/attendanceService'
+import type { ApprovedLeave } from '@/features/attendance/leaveStatus'
 import type { AttendanceAdjustment, AttendanceRecord, Schedule } from '@/types/domain'
 
 function todayKey() {
@@ -59,4 +61,20 @@ export function useAttendanceAdjustments() {
   }, [refetch])
 
   return { adjustments: adjustments ?? [], isLoading: adjustments === null, refetch }
+}
+
+/** Approved leaves covering `date` (with leave type) — drives the "On Leave" status override on the daily table. */
+export function useApprovedLeavesForDate(date: string) {
+  const { user } = useSession()
+  const [leaves, setLeaves] = useState<ApprovedLeave[]>([])
+
+  const refetch = useCallback(() => {
+    getApprovedLeavesInRange(user, date, date).then(setLeaves)
+  }, [user, date])
+
+  useEffect(() => {
+    refetch()
+  }, [refetch])
+
+  return { leaves, refetch }
 }

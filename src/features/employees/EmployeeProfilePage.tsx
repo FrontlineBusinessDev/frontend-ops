@@ -6,6 +6,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Badge, StatusBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { PlainCards } from '@/components/ui/PlainCards'
 import {
   Dialog,
   DialogContent,
@@ -63,7 +64,16 @@ function SectionEditButton({ onClick }: { onClick: () => void }) {
   )
 }
 
+/** Profile cards render without the soft theme's corner watermark icon. */
 export function EmployeeProfilePage() {
+  return (
+    <PlainCards>
+      <EmployeeProfileContent />
+    </PlainCards>
+  )
+}
+
+function EmployeeProfileContent() {
   const { id } = useParams<{ id: string }>()
   const { employee, isLoading, refetch } = useEmployee(id)
   const { branches } = useTenant()

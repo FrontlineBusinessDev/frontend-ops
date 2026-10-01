@@ -24,10 +24,11 @@ export function AppShell() {
   const { user } = useSession()
   const isEssRoute = location.pathname.startsWith('/ess')
   const softCards = user.role === 'company_admin' && !isEssRoute
-  // Each page's cards carry that page's sidebar icon as their corner watermark.
-  const pageIcon = ADMIN_NAV.flatMap((g) => g.items).find(
+  // Each page's cards carry that page's sidebar icon as their corner watermark, unless the nav item opts out.
+  const pageNavItem = ADMIN_NAV.flatMap((g) => g.items).find(
     (item) => location.pathname === item.path || location.pathname.startsWith(`${item.path}/`),
-  )?.icon
+  )
+  const pageIcon = pageNavItem?.plainCards ? undefined : pageNavItem?.icon
 
   useEffect(() => {
     try {

@@ -1,0 +1,15 @@
+Badge_No;Employee_Name;Punch_Date;Punch_Time;In_Out;Verify_Type;Terminal_ID
+0002;Ferdinand Ramos;10/01/2026;8:49 AM;IN;Fingerprint;GATE-01
+0002;Ferdinand Ramos;10/01/2026;6:04 PM;OUT;Fingerprint;GATE-01
+0003;Arnel Garcia;10/01/2026;9:21 AM;IN;Face;GATE-01
+0003;Arnel Garcia;10/01/2026;6:12 PM;OUT;Face;GATE-01
+0006;Noel Castillo;10/01/2026;9:03 AM;IN;Card;GATE-02
+0006;Noel Castillo;10/01/2026;1:31 PM;OUT;Card;GATE-02
+0007;Bryan Torres;10/01/2026;8:57 AM;IN;Fingerprint;GATE-01
+0007;Bryan Torres;10/01/2026;8:57 AM;IN;Fingerprint;GATE-01
+0007;Bryan Torres;10/01/2026;6:01 PM;OUT;Fingerprint;GATE-01
+0010;Dennis Del Rosario;09/30/2026;8:55 AM;IN;Fingerprint;GATE-01
+0010;Dennis Del Rosario;09/30/2026;5:58 PM;OUT;Fingerprint;GATE-01
+0444;Contractor;10/01/2026;7:30 AM;IN;Card;GATE-02
+0005;Carlo Salazar;10/01/2026;;IN;Face;GATE-01
+0005;Carlo Salazar;13/45/2026;9:00 AM;IN;Face;GATE-01

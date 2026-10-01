@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import type { SortDirection } from '@/components/ui/FiltersPopover'
+import { PlainCards } from '@/components/ui/PlainCards'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
@@ -19,7 +20,16 @@ const SORT_OPTIONS = [
   { value: 'name', label: 'Employee Name' },
 ]
 
+/** Leave cards render without the soft theme's corner watermark icon. */
 export function LeavePage() {
+  return (
+    <PlainCards>
+      <LeaveContent />
+    </PlainCards>
+  )
+}
+
+function LeaveContent() {
   const { requests, isLoading, refetch } = useLeaveRequests()
   const { leaveTypes, refetch: refetchLeaveTypes } = useLeaveTypes()
   const { employees } = useEmployees()

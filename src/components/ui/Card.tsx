@@ -7,9 +7,11 @@ import { cn } from '@/lib/utils/cn'
 export type CardProps = HTMLAttributes<HTMLDivElement> & {
   /** Corner watermark icon in the soft card theme. Defaults to the page's nav icon; null hides it. */
   watermark?: LucideIcon | null
+  /** Overrides the watermark's default size/placement (e.g. the metric-card corner bleed). */
+  watermarkClassName?: string
 }
 
-const CardRoot = forwardRef<HTMLDivElement, CardProps>(({ className, watermark, children, ...props }, ref) => {
+const CardRoot = forwardRef<HTMLDivElement, CardProps>(({ className, watermark, watermarkClassName, children, ...props }, ref) => {
   const theme = useCardTheme()
   const Watermark = theme.soft && !theme.nested ? (watermark === undefined ? theme.watermark : watermark) : null
 
@@ -26,7 +28,7 @@ const CardRoot = forwardRef<HTMLDivElement, CardProps>(({ className, watermark, 
       {...props}
     >
       {Watermark && (
-        <Watermark data-slot="card-watermark" aria-hidden="true" className="pointer-events-none absolute right-3 top-3 -z-10 size-16" />
+        <Watermark data-slot="card-watermark" aria-hidden="true" className={cn('pointer-events-none absolute right-3 top-3 -z-10 size-16', watermarkClassName)} />
       )}
       {children}
     </div>

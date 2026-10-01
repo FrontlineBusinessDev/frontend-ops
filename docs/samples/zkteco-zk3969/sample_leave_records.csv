@@ -1,0 +1,7 @@
+Employee ID,Employee,Leave Type,Date From,Date To,Day Portion,Status,Expected result on import
+FR-0008,Juan Bautista,Vacation Leave,2026-09-30,2026-10-01,Full Day,Approved,No punches → On Leave (not Absent)
+FR-0003,Arnel Garcia,Sick Leave,2026-10-01,2026-10-01,Full Day,Approved,Has punches → stays On Leave + review flag
+FR-0006,Noel Castillo,Vacation Leave,2026-10-01,2026-10-01,Half Day (PM),Approved,Morning punches → On Leave – Half Day (PM)
+FR-0009,Miguel Domingo,Emergency Leave,2026-10-01,2026-10-01,Half Day (AM),Approved,No punches → On Leave – Half Day (AM) + review (no afternoon punch)
+FR-0010,Dennis Del Rosario,Sick Leave,2026-09-30,2026-09-30,Full Day,Approved,On Leave; punches in generic export → review flag
+FR-0013,Ramon Reyes,Vacation Leave,2026-10-01,2026-10-01,Full Day,Pending,Pending — does NOT override attendance
