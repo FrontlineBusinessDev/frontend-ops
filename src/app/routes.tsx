@@ -1,6 +1,8 @@
 import { Navigate, createBrowserRouter } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
+import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage'
 import { LoginPage } from '@/features/auth/LoginPage'
+import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage'
 import { RequireAuth, RequireCapability } from '@/lib/rbac/guards'
 import { DashboardPage } from '@/features/dashboard/routes'
 import { EmployeeListPage, EmployeeProfilePage } from '@/features/employees/routes'
@@ -40,6 +42,8 @@ import { ForbiddenPage } from '@/features/misc/ForbiddenPage'
 
 export const router = createBrowserRouter([
   { path: 'login', element: <LoginPage /> },
+  { path: 'forgot-password', element: <ForgotPasswordPage /> },
+  { path: 'reset-password', element: <ResetPasswordPage /> },
   {
     path: '/',
     element: (
