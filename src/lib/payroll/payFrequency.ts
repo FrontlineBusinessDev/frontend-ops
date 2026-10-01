@@ -1,7 +1,7 @@
-import type { DeductionConfig, LoanRecord, PayrollFrequency, PayrollGroup, PayrollPeriod, Schedule } from '@/types/domain'
+import type { DeductionConfig, PayrollFrequency, PayrollGroup, PayrollPeriod, Schedule } from '@/types/domain'
 
 /** Which Payroll Settings deduction entry governs each loan type's collection schedule. */
-export const LOAN_CONFIG_NAME: Record<LoanRecord['type'], string> = {
+export const LOAN_CONFIG_NAME: Record<string, string> = {
   sss_salary_loan: 'SSS Salary Loan',
   sss_calamity_loan: 'SSS Salary Loan',
   pagibig_multipurpose_loan: 'Pag-IBIG Loan',
@@ -9,6 +9,11 @@ export const LOAN_CONFIG_NAME: Record<LoanRecord['type'], string> = {
   pagibig_mp2: 'Pag-IBIG Loan',
   company_loan: 'Company Loan',
   other_deduction: 'Late/Undertime Adjustment',
+}
+
+/** Loan types the company adds itself are collected like a Company Loan. */
+export function loanConfigNameFor(loanType: string): string {
+  return LOAN_CONFIG_NAME[loanType] ?? LOAN_CONFIG_NAME.company_loan
 }
 
 /**

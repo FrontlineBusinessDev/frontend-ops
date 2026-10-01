@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { AddHolidayDialog } from '@/features/company-settings/components/AddHolidayDialog'
 import { CompanyInfoForm } from '@/features/company-settings/components/CompanyInfoForm'
+import { ComplianceDeadlinesSection } from '@/features/company-settings/components/payroll/ComplianceDeadlinesSection'
 import { DeductionsSection } from '@/features/company-settings/components/payroll/DeductionsSection'
 import { EarningsSection } from '@/features/company-settings/components/payroll/EarningsSection'
 import { PayrollCalendarSection } from '@/features/company-settings/components/payroll/PayrollCalendarSection'
@@ -34,6 +35,7 @@ export function CompanySettingsPage() {
     employees,
     isLoading,
     refetch,
+    complianceDeadlines,
   } = useCompanySettings()
   const canEditCompany = usePermission('settings.company.edit')
   const canEditPayroll = usePermission('settings.payroll.edit') || canEditCompany
@@ -104,6 +106,7 @@ export function CompanySettingsPage() {
 
             <TabsContent value="calendar">
               <PayrollCalendarSection groups={payrollGroups} holidays={holidays} />
+              <ComplianceDeadlinesSection deadlines={complianceDeadlines} canEdit={canEditPayroll} onRefetch={refetch} />
             </TabsContent>
           </Tabs>
         </TabsContent>

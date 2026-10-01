@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { Button } from '@/components/ui/Button'
@@ -9,21 +9,14 @@ import { FormField } from '@/components/ui/FormField'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { useToast } from '@/components/ui/Toast'
+import { useLoanTypes } from '@/features/loans-deductions/hooks/useBenefitsDeductions'
 import { useSession } from '@/hooks/useSession'
-import { createLoan } from '@/lib/services/loanService'
-import type { Employee } from '@/types/domain'
+import { createLoan, updateLoan } from '@/lib/services/loanService'
+import type { Employee, LoanRecord } from '@/types/domain'
 
 const schema = z.object({
   employeeId: z.string().min(1, 'Select an employee'),
-  type: z.enum([
-    'sss_salary_loan',
-    'sss_calamity_loan',
-    'pagibig_multipurpose_loan',
-    'pagibig_calamity_loan',
-    'pagibig_mp2',
-    'company_loan',
-    'other_deduction',
-  ]),
+  type: z.string().min(1, 'Select a loan type'),
   label: z.string().min(1, 'Required'),
   principal: z.number().positive('Must be greater than 0'),
   monthlyDeduction: z.number().positive('Must be greater than 0'),
@@ -32,20 +25,26 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-const TYPE_OPTIONS = [
-  { value: 'sss_salary_loan', label: 'SSS Loan – Salary' },
-  { value: 'sss_calamity_loan', label: 'SSS Loan – Calamity' },
-  { value: 'pagibig_multipurpose_loan', label: 'Pag-IBIG Loan – Multi-Purpose' },
-  { value: 'pagibig_calamity_loan', label: 'Pag-IBIG Loan – Calamity' },
-  { value: 'pagibig_mp2', label: 'Pag-IBIG MP2 (Modified Pag-IBIG 2 Savings)' },
-  { value: 'company_loan', label: 'Company Loan / Emergency Advance' },
-  { value: 'other_deduction', label: 'Other Deduction (Uniform, HMO Co-pay, Equipment, etc.)' },
-]
+function toFormValues(loan?: LoanRecord): FormValues {
+  return {
+    employeeId: loan?.employeeId ?? '',
+    type: loan?.type ?? 'company_loan',
+    label: loan?.label ?? '',
+    principal: loan?.principal ?? 0,
+    monthlyDeduction: loan?.monthlyDeduction ?? 0,
+    startDate: loan?.startDate ?? new Date().toISOString().slice(0, 10),
+  }
+}
 
-export function AddLoanDialog({ employees, onCreated }: { employees: Employee[]; onCreated: () => void }) {
+/** Adds a loan, or edits an existing one (the employee and principal stay fixed once a loan exists). */
+export function AddLoanDialog({ employees, onCreated, loan, trigger }: { employees: Employee[]; onCreated: () => void; loan?: LoanRecord; trigger?: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const { user } = useSession()
   const { notify } = useToast()
+  const { types } = useLoanTypes()
+  const isEdit = Boolean(loan)
+  // Active types can be picked, plus the loan's current type even if it has since been deactivated.
+  const typeOptions = types.filter((t) => t.isActive || t.key === loan?.type).map((t) => ({ value: t.key, label: t.label }))
 
   const {
     register,
@@ -53,24 +52,32 @@ export function AddLoanDialog({ employees, onCreated }: { employees: Employee[];
     control,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { type: 'company_loan' } })
+  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: toFormValues(loan) })
+
+  useEffect(() => {
+    if (open) reset(toFormValues(loan))
+  }, [open, loan, reset])
 
   async function onSubmit(values: FormValues) {
-    await createLoan(user, values)
-    notify({ title: 'Loan/Deduction added', tone: 'success' })
-    reset()
+    if (loan) {
+      await updateLoan(user, loan.id, { type: values.type, label: values.label, monthlyDeduction: values.monthlyDeduction, startDate: values.startDate })
+      notify({ title: 'Loan updated', tone: 'success' })
+    } else {
+      await createLoan(user, values)
+      notify({ title: 'Loan added', tone: 'success' })
+    }
     setOpen(false)
     onCreated()
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button icon={<Plus className="size-4" />}>Add Loan/Deduction</Button>
-      </DialogTrigger>
+      <DialogTrigger asChild>{trigger ?? <Button icon={<Plus className="size-4" />}>Add Loan</Button>}</DialogTrigger>
       <DialogContent>
-        <DialogTitle>Add Loan/Deduction Record</DialogTitle>
-        <DialogDescription>Recurring deductions will be applied automatically to future payroll runs.</DialogDescription>
+        <DialogTitle>{isEdit ? 'Edit Loan' : 'Add Loan Record'}</DialogTitle>
+        <DialogDescription>
+          {isEdit ? 'Changes apply to the next payroll run. The employee and principal can’t be changed.' : 'Active loans are deducted automatically in payroll runs until fully repaid.'}
+        </DialogDescription>
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-5 grid grid-cols-2 gap-4">
           <FormField label="Employee" required error={errors.employeeId?.message} className="col-span-2">
@@ -82,23 +89,24 @@ export function AddLoanDialog({ employees, onCreated }: { employees: Employee[];
                   value={field.value}
                   onValueChange={field.onChange}
                   placeholder="Select employee"
+                  disabled={isEdit}
                   options={employees.map((e) => ({ value: e.id, label: `${e.personal.firstName} ${e.personal.lastName}` }))}
                 />
               )}
             />
           </FormField>
-          <FormField label="Loan/Deduction Type" required className="col-span-2">
+          <FormField label="Loan Type" required error={errors.type?.message} hint="Manage the list under Loans → Loan Types. One-off or monthly charges (uniforms, equipment…) go under Deductions." className="col-span-2">
             <Controller
               control={control}
               name="type"
-              render={({ field }) => <Select value={field.value} onValueChange={field.onChange} options={TYPE_OPTIONS} />}
+              render={({ field }) => <Select value={field.value} onValueChange={field.onChange} options={typeOptions} />}
             />
           </FormField>
           <FormField label="Label" required error={errors.label?.message} className="col-span-2">
             <Input {...register('label')} placeholder="SSS Salary Loan" />
           </FormField>
           <FormField label="Principal (PHP)" required error={errors.principal?.message}>
-            <Input type="number" {...register('principal', { valueAsNumber: true })} />
+            <Input type="number" disabled={isEdit} {...register('principal', { valueAsNumber: true })} />
           </FormField>
           <FormField label="Monthly deduction (PHP)" required error={errors.monthlyDeduction?.message}>
             <Input type="number" {...register('monthlyDeduction', { valueAsNumber: true })} />
@@ -112,7 +120,7 @@ export function AddLoanDialog({ employees, onCreated }: { employees: Employee[];
               Cancel
             </Button>
             <Button type="submit" isLoading={isSubmitting}>
-              Add Loan/Deduction
+              {isEdit ? 'Save Changes' : 'Add Loan'}
             </Button>
           </div>
         </form>

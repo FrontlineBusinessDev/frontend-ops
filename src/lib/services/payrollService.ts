@@ -1,10 +1,10 @@
 import { bonusAmountFor, bonusAppliesToEmployee, includedInRegularPayroll } from '@/lib/payroll/bonusMatching'
 import { findEmployeePayrollGroup } from '@/lib/payroll/groupAssignment'
-import { LOAN_CONFIG_NAME, allocateMonthly, payScheduleFor } from '@/lib/payroll/payFrequency'
+import { allocateMonthly, loanConfigNameFor, payScheduleFor } from '@/lib/payroll/payFrequency'
 import { basicPayFor, dailyRateFor, hourlyRateFor, monthlyEquivalentFor, workLogsForPeriod } from '@/lib/payroll/rateBasis'
 import { scopeToCompany } from '@/lib/tenancy/tenantScope'
 import { db } from '@/mock-data'
-import type { BonusIncentive, Employee, OvertimeRecord, PayrollLine, PayrollPeriod, PayrollPeriodStatus, SessionUser, SssBracket, StatutoryConfig } from '@/types/domain'
+import type { BonusIncentive, Employee, OvertimeRecord, PayrollDeductionLine, PayrollLine, PayrollPeriod, PayrollPeriodStatus, SessionUser, SssBracket, StatutoryConfig } from '@/types/domain'
 
 /** Case/whitespace-insensitive match between a bonus/13th-month payout label and a real payroll period's label — the seam that lets those modules' approved records flow into a run without a hard foreign key to a period that may not exist yet when they're created. */
 function periodLabelMatches(label: string, period: PayrollPeriod): boolean {
@@ -210,21 +210,37 @@ function computeLine(session: SessionUser, period: PayrollPeriod, config: Statut
   )
   const bonusEarnings = approvedBonuses.map((b) => ({ label: b.name, amount: bonusAmountFor(b, employee) }))
 
+  // Benefits, Loans & Deductions: benefits active in this period. Cash allowances are earnings; the rest are
+  // non-cash (shown on the payslip), with any employee share deducted below.
+  const activeBenefits = db.employeeBenefits.filter(
+    (b) =>
+      b.companyId === session.companyId &&
+      b.employeeId === employee.id &&
+      b.status === 'active' &&
+      b.startDate <= period.endDate &&
+      (!b.endDate || b.endDate >= period.startDate),
+  )
+  const benefitAllowances = activeBenefits.filter((b) => b.category === 'allowance')
+  const benefitsProvided = activeBenefits
+    .filter((b) => b.category !== 'allowance')
+    .map((b) => ({ label: b.name, category: b.category, provider: b.provider, amount: round2(b.monthlyValue / payPeriodsPerMonth) }))
+
   const earnings = [
     { label: basicPayResult.label, amount: basicPayResult.amount },
     ...paidLeaveEarning,
     ...overtimeEarnings,
     ...employee.compensation.allowances.map((a) => ({ label: a.label, amount: round2(a.amount / payPeriodsPerMonth) })),
+    ...benefitAllowances.map((b) => ({ label: b.name, amount: round2(b.monthlyValue / payPeriodsPerMonth) })),
     ...bonusEarnings,
   ]
   const grossPay = round2(earnings.reduce((sum, e) => sum + e.amount, 0))
 
   // Loans: the monthly amortization, allocated per the loan type's Payroll Settings schedule, never above the balance.
-  const activeLoans = db.loans.filter((l) => l.employeeId === employee.id && l.status === 'active' && l.balance > 0)
+  const activeLoans = db.loans.filter((l) => l.employeeId === employee.id && l.status === 'active' && l.balance > 0 && l.startDate <= period.endDate)
   const loanDeductions = activeLoans
     .map((loan) => ({
       label: loan.label,
-      amount: Math.min(allocateMonthly(loan.monthlyDeduction, schedule, configNamed(session.companyId, LOAN_CONFIG_NAME[loan.type])), loan.balance),
+      amount: Math.min(allocateMonthly(loan.monthlyDeduction, schedule, configNamed(session.companyId, loanConfigNameFor(loan.type))), loan.balance),
     }))
     .filter((d) => d.amount > 0)
 
@@ -247,12 +263,45 @@ function computeLine(session: SessionUser, period: PayrollPeriod, config: Statut
   const extrasWithholdingTax = Math.round((taxableBonusAmount + overtimePay) * monthly.marginalRate)
   const withholdingTax = baseWithholdingTax + extrasWithholdingTax
 
-  const otherDeductions = absenceDeduction > 0 ? [{ label: 'Absences', amount: absenceDeduction }] : []
+  const absenceLines = absenceDeduction > 0 ? [{ label: 'Absences', amount: absenceDeduction }] : []
+
+  // Deductions from Benefits, Loans & Deductions: benefit employee shares and recurring deductions are monthly
+  // amounts split like the other recurring deductions; a one-time deduction is taken in full in the run whose
+  // period contains its due date.
+  const periodActive = (d: { startDate: string; endDate?: string }) => d.startDate <= period.endDate && (!d.endDate || d.endDate >= period.startDate)
+  const employeeDeductions = db.employeeDeductions.filter((d) => d.companyId === session.companyId && d.employeeId === employee.id)
+  const extraDeductions: PayrollDeductionLine[] = [
+    ...activeBenefits
+      .filter((b) => b.employeeShare > 0)
+      .map((b) => ({ label: `${b.name} – Employee Share`, amount: allocateMonthly(b.employeeShare, schedule, configNamed(session.companyId, b.name)), kind: 'benefit' as const })),
+    ...employeeDeductions
+      .filter((d) => d.kind === 'recurring' && d.status === 'active' && periodActive(d))
+      .map((d) => ({ label: d.name, amount: allocateMonthly(d.amount, schedule, configNamed(session.companyId, d.name)), kind: 'recurring' as const })),
+    ...employeeDeductions
+      .filter(
+        (d) =>
+          d.kind === 'one_time' &&
+          !!d.dueDate &&
+          d.dueDate >= period.startDate &&
+          d.dueDate <= period.endDate &&
+          (d.status === 'active' || (d.status === 'completed' && d.appliedPeriodId === period.id)),
+      )
+      .map((d) => ({ label: d.name, amount: d.amount, kind: 'one_time' as const })),
+  ].filter((d) => d.amount > 0)
 
   // Statutory contributions, tax and absences are always taken; loan amortizations only up to what
   // the remaining pay covers, so a thin cutoff never goes negative. The uncollected amortization
   // simply stays on the loan balance for later cutoffs.
   let remainingForLoans = grossPay - (sssEmployeeShare + philhealthEmployeeShare + pagibigEmployeeShare + withholdingTax + absenceDeduction)
+  const collectedExtras = extraDeductions
+    .map((d) => {
+      const amount = round2(Math.max(0, Math.min(d.amount, remainingForLoans)))
+      remainingForLoans -= amount
+      return { ...d, amount }
+    })
+    .filter((d) => d.amount > 0)
+  const otherDeductions = [...absenceLines, ...collectedExtras]
+
   const collectedLoanDeductions = loanDeductions
     .map((d) => {
       const amount = round2(Math.max(0, Math.min(d.amount, remainingForLoans)))
@@ -305,6 +354,8 @@ function computeLine(session: SessionUser, period: PayrollPeriod, config: Statut
       withholdingTax: monthly.withholdingTax,
     },
     overtimePay: round2(overtimePay),
+    benefitsProvided,
+    benefitAllowances: benefitAllowances.map((b) => b.name),
   }
 }
 
@@ -418,6 +469,27 @@ export async function finalizePayroll(session: SessionUser, periodId: string): P
             remainingBalanceAfter: loan.balance,
           },
         ]
+      }
+    }
+  }
+
+  // One-time deductions taken by this run are settled so no later run takes them again.
+  for (const line of lines) {
+    for (const deduction of line.otherDeductions) {
+      if (deduction.kind !== 'one_time') continue
+      const record = db.employeeDeductions.find(
+        (d) =>
+          d.employeeId === line.employeeId &&
+          d.kind === 'one_time' &&
+          d.status === 'active' &&
+          d.name === deduction.label &&
+          !!d.dueDate &&
+          d.dueDate >= period.startDate &&
+          d.dueDate <= period.endDate,
+      )
+      if (record) {
+        record.status = 'completed'
+        record.appliedPeriodId = period.id
       }
     }
   }

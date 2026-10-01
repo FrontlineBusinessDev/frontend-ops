@@ -5,7 +5,7 @@ import {
   CalendarPlus,
   Clock3,
   FileBarChart2,
-  Megaphone,
+  BellRing,
   Plane,
   Sparkles,
   UserPlus,
@@ -22,7 +22,7 @@ import { Card } from '@/components/ui/Card'
 import { MetricCard } from '@/components/ui/MetricCard'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
-import { useAdminDashboardOverview, usePendingRequestsSummary } from '@/features/dashboard/hooks/useDashboardData'
+import { useAdminDashboardOverview } from '@/features/dashboard/hooks/useDashboardData'
 import { PendingRequestsCard } from '@/features/dashboard/components/PendingRequestsCard'
 import { cn } from '@/lib/utils/cn'
 import { formatCurrency } from '@/lib/utils/format'
@@ -49,7 +49,13 @@ const QUICK_ACTIONS = [
   { label: 'Generate Report', icon: FileBarChart2, to: '/reports' },
 ]
 
-const ANNOUNCEMENT_TONE = { Reminder: 'warning', Notice: 'neutral', Policy: 'brand', Event: 'success' } as const
+/** "Due today", "Tomorrow", "In 5 days", "Overdue by 2 days" — plus a badge tone that gets louder as the date nears. */
+function dueStatus(daysLeft: number, remindDaysBefore: number): { text: string; tone: 'danger' | 'warning' | 'neutral' } {
+  if (daysLeft < 0) return { text: `Overdue by ${-daysLeft} day${daysLeft === -1 ? '' : 's'}`, tone: 'danger' }
+  if (daysLeft === 0) return { text: 'Due today', tone: 'danger' }
+  if (daysLeft === 1) return { text: 'Tomorrow', tone: 'danger' }
+  return { text: `In ${daysLeft} days`, tone: daysLeft <= remindDaysBefore ? 'warning' : 'neutral' }
+}
 
 /** "₱4.86M" */
 function compactPeso(value: number) {
@@ -66,7 +72,6 @@ function ViewAllLink({ to }: { to: string }) {
 
 export function AdminDashboard() {
   const { overview, isLoading } = useAdminDashboardOverview()
-  const { summary: pending } = usePendingRequestsSummary()
 
   if (isLoading || !overview) {
     return (
@@ -78,11 +83,8 @@ export function AdminDashboard() {
     )
   }
 
-  const { metrics, payrollChart, payrollCalendar, recentEmployees, announcements } = overview
+  const { metrics, payrollChart, payrollCalendar, recentEmployees, reminders } = overview
   const today = new Date()
-  const pendingTotal = pending
-    ? pending.leavePending + pending.overtimePending + pending.nightDiffPending + pending.attendanceAdjustmentsPending + pending.compensationApprovalsPending
-    : null
   const latest = payrollChart[payrollChart.length - 1]
   const previous = payrollChart[payrollChart.length - 2]
   const deductionRate = latest ? Math.round(((latest.grossPay - latest.netPay) / latest.grossPay) * 1000) / 10 : 0
@@ -96,18 +98,6 @@ export function AdminDashboard() {
           <h1 className="font-display text-2xl font-semibold tracking-tight">
             {timeOfDayGreeting()}, {overview.greetingName}!
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Payroll for <span className="font-medium text-foreground">{metrics.payrollPeriodLabel}</span> is{' '}
-            <span className="font-medium text-foreground">{metrics.payrollStatusLabel.toLowerCase()}</span> · {metrics.presentToday} present and{' '}
-            {metrics.onLeaveToday} on leave today
-            {pendingTotal !== null && (
-              <>
-                {' '}
-                · <span className="font-medium text-foreground">{pendingTotal}</span> request{pendingTotal === 1 ? '' : 's'} awaiting review
-              </>
-            )}
-            .
-          </p>
         </div>
         <p className="rounded-lg border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground">
           {today.toLocaleDateString('en-PH', { year: 'numeric', month: 'short', day: 'numeric' })} |{' '}
@@ -318,24 +308,34 @@ export function AdminDashboard() {
           </Card.Body>
         </Card>
 
-        <Card data-tint="peach" watermark={Megaphone} className="relative overflow-hidden lg:col-span-1">
+        <Card data-tint="peach" watermark={BellRing} className="relative overflow-hidden lg:col-span-1">
           <Card.Header className="relative">
-            <Card.Title>Latest Announcements</Card.Title>
+            <Card.Title>Reminders</Card.Title>
           </Card.Header>
           <Card.Body className="relative space-y-3 pt-2">
-            {announcements.map((announcement) => (
-              <div key={announcement.id} className="flex items-start gap-2.5 rounded-lg bg-card/70 p-3">
-                <Megaphone className="mt-0.5 size-4 shrink-0 text-primary" />
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <p className="text-sm font-medium leading-snug">{announcement.title}</p>
-                    <Badge tone={ANNOUNCEMENT_TONE[announcement.category]}>{announcement.category}</Badge>
+            {reminders.map((reminder) => {
+              const status = dueStatus(reminder.daysLeft, reminder.remindDaysBefore)
+              return (
+                <Link
+                  key={reminder.id}
+                  to={reminder.to}
+                  className="flex items-start gap-2.5 rounded-lg bg-card/70 p-3 transition-colors hover:bg-card"
+                >
+                  <BellRing className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <p className="text-sm font-medium leading-snug">{reminder.title}</p>
+                      <Badge tone="brand">{reminder.category}</Badge>
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{reminder.summary}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+                      <span className="text-muted-foreground/80">Due {reminder.dueLabel}</span>
+                      <Badge tone={status.tone}>{status.text}</Badge>
+                    </div>
                   </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{announcement.summary}</p>
-                  <p className="mt-1 text-[11px] text-muted-foreground/80">{announcement.dateLabel}</p>
-                </div>
-              </div>
-            ))}
+                </Link>
+              )
+            })}
           </Card.Body>
         </Card>
       </div>

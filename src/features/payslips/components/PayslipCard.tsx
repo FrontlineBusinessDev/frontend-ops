@@ -1,10 +1,10 @@
-import { CalendarDays, Heart, Info, TrendingDown, TrendingUp, Trophy, User } from 'lucide-react'
+import { CalendarDays, Gift, Heart, Info, TrendingDown, TrendingUp, Trophy, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { Avatar } from '@/components/ui/Avatar'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/utils/cn'
 import { formatAddress, formatCurrency, formatDate } from '@/lib/utils/format'
-import type { Company, DeductionConfig, Employee, LoanRecord, PayrollGroup, PayrollLine, PayrollPeriod } from '@/types/domain'
+import type { BenefitCategory, Company, DeductionConfig, Employee, LoanRecord, PayrollGroup, PayrollLine, PayrollPeriod } from '@/types/domain'
 
 const EMPLOYMENT_TYPE_LABEL: Record<Employee['employment']['employmentType'], string> = {
   regular: 'Regular',
@@ -63,6 +63,47 @@ function allocationHint(monthlyAmount: number, currentPeriodAmount: number, meth
 }
 
 const OVERTIME_LABELS = new Set(['Overtime Pay', 'Night Differential', 'Rest Day / Holiday Overtime'])
+
+const BENEFIT_CATEGORY_LABEL: Record<BenefitCategory, string> = { hmo: 'HMO', allowance: 'Allowance', insurance: 'Insurance', other: 'Other Benefit' }
+const DEDUCTION_KIND_LABEL = { benefit: 'Benefit Contribution', recurring: 'Recurring Deduction', one_time: 'One-time Deduction' } as const
+
+/** Employer-paid, non-cash benefits for the period (HMO, insurance, …) — informational, not part of gross pay. */
+function BenefitsCard({ benefits }: { benefits: NonNullable<PayrollLine['benefitsProvided']> }) {
+  const total = benefits.reduce((sum, b) => sum + b.amount, 0)
+  return (
+    <div className="overflow-hidden rounded-2xl border border-primary/25 bg-card print:border-black/30">
+      <div className="flex items-center justify-between gap-3 border-b border-primary/25 px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <Gift className="size-4" />
+          </span>
+          <div>
+            <p className="font-display text-sm font-semibold tracking-tight">Benefits</p>
+            <p className="text-[10px] text-muted-foreground print:text-foreground/60">Paid for by the company — not deducted from your pay.</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground print:text-foreground/60">Employer-paid value</p>
+          <p className="font-display text-sm font-semibold text-primary">{formatCurrency(total)}</p>
+        </div>
+      </div>
+      <table className="w-full text-sm">
+        <tbody>
+          {benefits.map((b, idx) => (
+            <tr key={`${b.label}-${idx}`} className="border-t border-border/60 first:border-t-0 print:border-black/10">
+              <td className="px-4 py-2 text-muted-foreground print:text-foreground/80">{BENEFIT_CATEGORY_LABEL[b.category]}</td>
+              <td className="px-2 py-2">
+                {b.label}
+                {b.provider && <span className="text-xs text-muted-foreground"> · {b.provider}</span>}
+              </td>
+              <td className="px-4 py-2 text-right tabular-nums">{formatCurrency(b.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 /** Earnings / Deductions panel of a payslip — also reused by the 13th Month Pay computation and payslip. */
 export function BreakdownCard({
@@ -157,7 +198,7 @@ export function PayslipCard({
 }) {
   const configByName = new Map(deductionConfigs.map((c) => [c.name, c]))
 
-  const allowanceLabels = new Set(employee.compensation.allowances.map((a) => a.label))
+  const allowanceLabels = new Set([...employee.compensation.allowances.map((a) => a.label), ...(line.benefitAllowances ?? [])])
   const earningsRows: BreakdownRow[] = line.earnings.map((e, idx) => {
     if (idx === 0) {
       return { key: `${e.label}-${idx}`, type: 'Basic Pay', description: `Base compensation for ${period?.label ?? 'this period'}`, amount: e.amount }
@@ -191,7 +232,7 @@ export function PayslipCard({
         hint: loan ? allocationHint(loan.monthlyDeduction, d.amount, 'equal_split', ppm, cutoff, line.cutoffsCovered) : undefined,
       }
     }),
-    ...line.otherDeductions.map((d, idx): BreakdownRow => ({ key: `other-${idx}`, type: 'Other Deduction', description: d.label, amount: d.amount })),
+    ...line.otherDeductions.map((d, idx): BreakdownRow => ({ key: `other-${idx}`, type: d.kind ? DEDUCTION_KIND_LABEL[d.kind] : 'Other Deduction', description: d.label, amount: d.amount })),
     {
       key: 'sss',
       type: 'Statutory Contribution',
@@ -267,6 +308,12 @@ export function PayslipCard({
         <BreakdownCard tone="success" icon={TrendingUp} title="Earnings" total={line.grossPay} rows={earningsRows} />
         <BreakdownCard tone="danger" icon={TrendingDown} title="Deductions" total={line.totalDeductions} rows={deductionRows} />
       </div>
+
+      {line.benefitsProvided && line.benefitsProvided.length > 0 && (
+        <div className="px-6 pb-4">
+          <BenefitsCard benefits={line.benefitsProvided} />
+        </div>
+      )}
 
       {/* Net pay banner */}
       <div className="px-6">

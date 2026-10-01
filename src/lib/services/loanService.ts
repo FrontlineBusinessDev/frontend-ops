@@ -1,6 +1,6 @@
 import { getEmployees } from '@/lib/services/employeeService'
 import { db } from '@/mock-data'
-import type { LoanRecord, LoanType, SessionUser } from '@/types/domain'
+import type { LoanRecord, LoanStatus, LoanType, SessionUser } from '@/types/domain'
 
 export async function getLoans(session: SessionUser): Promise<LoanRecord[]> {
   const employees = await getEmployees(session)
@@ -28,4 +28,16 @@ export async function createLoan(session: SessionUser, input: CreateLoanInput): 
   }
   db.loans.unshift(loan)
   return loan
+}
+
+/** Edits the terms of a loan. The principal and balance are not editable once a loan exists. */
+export async function updateLoan(session: SessionUser, id: string, updates: Partial<Pick<LoanRecord, 'type' | 'label' | 'monthlyDeduction' | 'startDate'>>): Promise<void> {
+  const loan = db.loans.find((l) => l.id === id && l.companyId === session.companyId)
+  if (loan) Object.assign(loan, updates)
+}
+
+/** Pause ('suspended'), resume ('active') or cancel a loan. Payroll only deducts active loans. */
+export async function setLoanStatus(session: SessionUser, id: string, status: LoanStatus): Promise<void> {
+  const loan = db.loans.find((l) => l.id === id && l.companyId === session.companyId)
+  if (loan) loan.status = status
 }

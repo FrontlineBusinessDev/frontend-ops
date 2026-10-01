@@ -106,7 +106,7 @@ export const FEATURE_LABELS: Record<PlanFeature, string> = {
   overtime_night_diff: 'Overtime & Night Differential',
   bonuses_incentives: 'Bonuses & Incentives',
   thirteenth_month: '13th Month Pay',
-  loans_deductions: 'Loans & Deductions',
+  loans_deductions: 'Benefits, Loans & Deductions',
   ess: 'Employee Self-Service',
   multi_branch: 'Multi-Branch Management',
   flexible_compensation: 'Flexible Compensation & Multiple Payroll Groups',

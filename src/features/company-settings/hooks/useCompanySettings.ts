@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSession } from '@/hooks/useSession'
 import { getCompany, getHolidays, getSchedules } from '@/lib/services/companyService'
+import { getComplianceDeadlines } from '@/lib/services/complianceService'
 import { getEmployees } from '@/lib/services/employeeService'
 import {
   getCompensationTypes,
@@ -11,6 +12,7 @@ import {
 } from '@/lib/services/payrollSettingsService'
 import type {
   Company,
+  ComplianceDeadline,
   CompensationType,
   DeductionConfig,
   EarningConfig,
@@ -32,6 +34,7 @@ export function useCompanySettings() {
   const [deductionConfigs, setDeductionConfigs] = useState<DeductionConfig[]>([])
   const [payrollRules, setPayrollRules] = useState<PayrollRules | undefined>(undefined)
   const [employees, setEmployees] = useState<Employee[]>([])
+  const [complianceDeadlines, setComplianceDeadlines] = useState<ComplianceDeadline[]>([])
 
   const refetch = useCallback(() => {
     getCompany(user).then((result) => setCompany(result ?? null))
@@ -43,6 +46,7 @@ export function useCompanySettings() {
     getDeductionConfigs(user).then(setDeductionConfigs)
     getPayrollRules(user).then(setPayrollRules)
     getEmployees(user).then(setEmployees)
+    getComplianceDeadlines(user).then(setComplianceDeadlines)
   }, [user])
 
   useEffect(() => {
@@ -59,6 +63,7 @@ export function useCompanySettings() {
     deductionConfigs,
     payrollRules,
     employees,
+    complianceDeadlines,
     isLoading: company === undefined,
     refetch,
   }

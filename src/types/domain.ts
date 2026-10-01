@@ -508,6 +508,8 @@ export interface PayrollEarningLine {
 export interface PayrollDeductionLine {
   label: string
   amount: number
+  /** Set on lines from Benefits, Loans & Deductions: a benefit's employee share, a recurring deduction, or a one-time deduction. */
+  kind?: 'benefit' | 'recurring' | 'one_time'
 }
 
 export interface PayrollLine {
@@ -550,17 +552,43 @@ export interface PayrollLine {
   }
   /** Overtime / night differential pay, taxed at the marginal rate on top of regular withholding. */
   overtimePay?: number
+  /** Employer-paid, non-cash benefits (HMO, insurance, …) active this period — informational, not part of gross pay. */
+  benefitsProvided?: PayrollBenefitLine[]
+  /** Labels of `earnings` lines that come from cash Allowances in Benefits, Loans & Deductions (so payslips type them as Allowance). */
+  benefitAllowances?: string[]
 }
 
-export type LoanType =
-  | 'sss_salary_loan'
-  | 'sss_calamity_loan'
-  | 'pagibig_multipurpose_loan'
-  | 'pagibig_calamity_loan'
-  | 'pagibig_mp2'
-  | 'company_loan'
-  | 'other_deduction'
-export type LoanStatus = 'active' | 'completed' | 'suspended'
+export interface PayrollBenefitLine {
+  label: string
+  category: BenefitCategory
+  provider?: string
+  /** Employer-paid value for this period. */
+  amount: number
+}
+
+/** The key of a Loan Type (see `LoanTypeConfig`) — a built-in key like 'sss_salary_loan', or 'custom_…' for types the company added. */
+export type LoanType = string
+
+/** A loan type the company can assign to an employee loan. The built-in ones ship with the system; companies can add their own. */
+export interface LoanTypeConfig {
+  id: string
+  companyId: string
+  /** Stored on each loan as `LoanRecord.type`. */
+  key: LoanType
+  label: string
+  provider: 'SSS' | 'Pag-IBIG' | 'Company' | 'Other'
+  description: string
+  /** Reference only, e.g. "24 months". */
+  typicalTerm: string
+  /** Reference only, e.g. "Up to 1 month of basic pay". */
+  typicalAmount: string
+  /** Inactive types can't be picked for new loans; existing loans keep working. */
+  isActive: boolean
+  /** Built-in types can be edited or deactivated, never deleted. */
+  builtIn?: boolean
+}
+/** 'suspended' is a paused loan (no deductions until resumed); 'cancelled' is final. */
+export type LoanStatus = 'active' | 'completed' | 'suspended' | 'cancelled'
 
 export interface LoanRepaymentEntry {
   id: string
@@ -736,4 +764,86 @@ export interface PayslipEmailRecord {
   sentAt?: string
   sentBy?: string
   error?: string
+}
+
+/** A government filing / remittance deadline or custom reminder, shown on the dashboard's Reminders card. */
+export interface ComplianceDeadline {
+  id: string
+  companyId: string
+  name: string
+  category: 'SSS' | 'PhilHealth' | 'Pag-IBIG' | 'BIR' | 'Payroll' | 'Other'
+  /** Shown on the dashboard. `{period}` is replaced with the month a monthly remittance covers. */
+  description: string
+  frequency: 'monthly' | 'yearly' | 'one_time'
+  /** Day of the month (monthly / yearly); clamped to the month's length. */
+  dueDay?: number
+  /** 0–11, yearly only. */
+  dueMonth?: number
+  /** ISO date, one-time only. */
+  dueDate?: string
+  /** The dashboard highlights the reminder this many days before the due date. */
+  remindDaysBefore: number
+  enabled: boolean
+  /** Page where the admin acts on it (e.g. the matching report). */
+  to?: string
+  /** User-created reminders can be deleted; built-in government deadlines can only be switched off. */
+  custom?: boolean
+}
+
+// ---------- Benefits, Loans & Deductions ----------
+
+export type BenefitCategory = 'hmo' | 'allowance' | 'insurance' | 'other'
+
+/**
+ * A benefit an employee receives. Cash allowances are paid through payroll as earnings; HMO, insurance and
+ * other benefits are non-cash (employer-paid) and appear on the payslip as informational lines, with any
+ * `employeeShare` taken as a payroll deduction. Benefits on the employee profile (`compensation.allowances`,
+ * `benefits.hmoPlan`) are unchanged and still count.
+ */
+export interface EmployeeBenefit {
+  id: string
+  companyId: string
+  employeeId: string
+  category: BenefitCategory
+  name: string
+  provider?: string
+  /** Plan / coverage level, e.g. "HMO Plan B (Employee + 1 dependent)". */
+  coverage?: string
+  /** Monthly value: the cash amount paid for an allowance, or the employer-paid premium/cost for other benefits. */
+  monthlyValue: number
+  /** Monthly amount the employee contributes (payroll deduction). 0 when the employer covers it fully. */
+  employeeShare: number
+  startDate: string
+  endDate?: string
+  /** Paused benefits are left out of payroll until resumed; cancelled ones are final. */
+  status: 'active' | 'paused' | 'cancelled'
+  notes?: string
+}
+
+export type EmployeeDeductionKind = 'recurring' | 'one_time'
+
+/**
+ * A deduction applied to an employee's pay that isn't a loan or a government contribution — e.g. cooperative
+ * savings, union dues, uniform cost. Recurring deductions are a monthly amount split across the month's pay
+ * runs; one-time deductions are taken in full in the pay run covering `dueDate`.
+ */
+export interface EmployeeDeduction {
+  id: string
+  companyId: string
+  employeeId: string
+  name: string
+  kind: EmployeeDeductionKind
+  /** Monthly amount (recurring) or the full amount (one-time). */
+  amount: number
+  /** Recurring: when deductions start. */
+  startDate: string
+  /** Recurring: optional last day; open-ended when absent. */
+  endDate?: string
+  /** One-time: the date the deduction falls due — taken in the pay run whose period contains it. */
+  dueDate?: string
+  /** Paused deductions are left out of payroll until resumed; cancelled ones are final. */
+  status: 'active' | 'paused' | 'completed' | 'cancelled'
+  /** Set when a finalized payroll run has taken a one-time deduction. */
+  appliedPeriodId?: string
+  reason?: string
 }

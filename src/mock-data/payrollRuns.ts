@@ -84,24 +84,33 @@ export function samplePayrollRunSchedule(today = new Date()): SampleRun[] {
   })
   const [older, previous, latest] = months
 
-  const latestWeek3 = mondayOf(new Date(latest.year, latest.month, 15))
   const latestLastWeek = lastFullWeek(latest.year, latest.month)
+
+  // Weekly groups run every week of the sample period (Monday – Sunday), so anything dated inside it — a
+  // one-time deduction, an allowance, a loan installment — lands in a run and on a payslip.
+  const firstOfRange = new Date(older.year, older.month, 1)
+  const firstMonday = addDays(firstOfRange, (8 - firstOfRange.getDay()) % 7)
+  const weekly: SampleRun[] = []
+  for (let monday = firstMonday; monday <= latestLastWeek; monday = addDays(monday, 7)) {
+    const isLast = iso(monday) === iso(latestLastWeek)
+    weekly.push(
+      weeklyRun(monday, GROUP.weeklyProduction, isLast ? 'approved' : 'finalized', `pr_fl_wk_${iso(monday)}_prod`),
+      weeklyRun(monday, GROUP.weeklyDaily, isLast ? 'review' : 'finalized', `pr_fl_wk_${iso(monday)}_daily`),
+    )
+  }
 
   return [
     ...semiMonthlyRuns(older.year, older.month, 'finalized', 'finalized', older.key),
     monthlyRun(older.year, older.month, 'finalized', older.key),
-    weeklyRun(lastFullWeek(older.year, older.month), GROUP.weeklyProduction, 'finalized', `pr_fl_${older.key}_weekly_prod`),
 
     ...semiMonthlyRuns(previous.year, previous.month, 'finalized', 'finalized', previous.key),
     monthlyRun(previous.year, previous.month, 'finalized', previous.key),
-    weeklyRun(lastFullWeek(previous.year, previous.month), GROUP.weeklyProduction, 'finalized', `pr_fl_${previous.key}_weekly_prod`),
-    weeklyRun(mondayOf(new Date(previous.year, previous.month, 15)), GROUP.weeklyDaily, 'finalized', `pr_fl_${previous.key}_weekly_daily`),
 
     ...semiMonthlyRuns(latest.year, latest.month, 'finalized', 'review', latest.key),
     monthlyRun(latest.year, latest.month, 'approved', latest.key),
-    weeklyRun(latestWeek3, GROUP.weeklyDaily, 'finalized', `pr_fl_${latest.key}_weekly_daily`),
-    weeklyRun(latestLastWeek, GROUP.weeklyProduction, 'approved', `pr_fl_${latest.key}_weekly_prod`),
-    weeklyRun(addDays(latestLastWeek, 7), GROUP.weeklyDaily, 'draft', `pr_fl_${latest.key}_weekly_daily_next`),
+
+    ...weekly,
+    weeklyRun(addDays(latestLastWeek, 7), GROUP.weeklyDaily, 'draft', `pr_fl_wk_${iso(addDays(latestLastWeek, 7))}_daily`),
   ]
 }
 
@@ -206,6 +215,23 @@ function historicalWorkLogs(runs: SampleRun[]): CompensationApproval[] {
   return logs
 }
 
+/**
+ * The loan generator writes its own repayment history up to today. The sample runs now post those
+ * installments themselves (from each loan's start date), so history dated inside the sample period is
+ * rolled back and the balance restored — otherwise the same installment would show twice.
+ */
+function reconcileLoansWithSampleRuns(runs: SampleRun[]) {
+  const earliest = iso(runs.reduce((min, r) => (r.startDate < min ? r.startDate : min), runs[0].startDate))
+  for (const loan of db.loans.filter((l) => l.companyId === COMPANY_ID)) {
+    const history = loan.repaymentHistory ?? []
+    const rolledBack = history.filter((h) => h.date >= earliest)
+    if (rolledBack.length === 0) continue
+    loan.repaymentHistory = history.filter((h) => h.date < earliest)
+    loan.balance = Math.min(loan.principal, Math.round((loan.balance + rolledBack.reduce((sum, h) => sum + h.amount, 0)) * 100) / 100)
+    if (loan.status === 'completed' && loan.balance > 0) loan.status = 'active'
+  }
+}
+
 let seeded = false
 
 /** Creates and processes the sample runs once per page load (the mock db resets on reload). */
@@ -218,6 +244,7 @@ export async function seedSamplePayrollRuns(today = new Date()): Promise<void> {
   const session = admin as SessionUser
 
   const runs = samplePayrollRunSchedule(today)
+  reconcileLoansWithSampleRuns(runs)
   db.overtimeRecords.push(...historicalOvertime(runs, today))
   db.compensationApprovals.push(...historicalWorkLogs(runs))
 

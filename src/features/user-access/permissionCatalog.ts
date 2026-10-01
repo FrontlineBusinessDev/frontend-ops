@@ -62,8 +62,8 @@ export const CAPABILITY_INFO: Record<Capability, { label: string; description: s
 
   'employees.compensation.edit': { label: 'Edit compensation', description: 'Change pay rates, allowances, and pay rate types.', group: 'Compensation & Benefits' },
   'compensation_approvals.manage': { label: 'Manage work-log approvals', description: 'Approve hourly timecards and output submissions used for pay.', group: 'Compensation & Benefits' },
-  'loans.view': { label: 'View loans', description: 'See employee loans, balances, and amortizations.', group: 'Compensation & Benefits' },
-  'loans.manage': { label: 'Manage loans', description: 'Add, edit, and close employee loans and deductions.', group: 'Compensation & Benefits' },
+  'loans.view': { label: 'View benefits, loans & deductions', description: 'See employee benefits, loans, balances, repayment schedules, and deductions.', group: 'Compensation & Benefits' },
+  'loans.manage': { label: 'Manage benefits, loans & deductions', description: 'Add, edit, and end employee benefits, loans, and deductions.', group: 'Compensation & Benefits' },
   'bonuses.view': { label: 'View bonuses & incentives', description: 'See bonus and incentive configurations.', group: 'Compensation & Benefits' },
   'bonuses.manage': { label: 'Manage bonuses & incentives', description: 'Create, submit, and approve bonuses and incentives.', group: 'Compensation & Benefits' },
   'thirteenth_month.view': { label: 'View 13th month pay', description: 'See 13th month pay batches and computations.', group: 'Compensation & Benefits' },

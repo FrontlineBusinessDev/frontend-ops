@@ -39,7 +39,7 @@ export function EssLoansPage() {
           return (
             <Card key={loan.id} id={`row-${loan.id}`} className={cn('p-5', loan.id === highlightId && 'highlight-target')}>
               <div className="flex items-start justify-between">
-                <p className="text-sm font-medium">{TYPE_LABELS[loan.type]}</p>
+                <p className="text-sm font-medium">{TYPE_LABELS[loan.type] ?? loan.label}</p>
                 <StatusBadge status={loan.status} />
               </div>
               <p className="mt-3 font-display text-lg font-semibold">{formatCurrency(loan.balance)}</p>

@@ -1,5 +1,5 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { BarChart3, Check, ChevronDown, Download, FileText, Printer, Rows3, SquareStack, X } from 'lucide-react'
+import { Banknote, BarChart3, Building2, CalendarClock, Check, ChevronDown, Download, FileText, HandCoins, HeartPulse, Home, Landmark, Printer, Receipt, Repeat, Rows3, ShieldCheck, SquareStack, UserCheck, UserX, Users, Wallet, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
@@ -355,12 +355,31 @@ export function TablePane({ mode, className, style, children }: ViewPaneProps) {
   )
 }
 
-export function StatTile({ label, value, icon: Icon }: { label: string; value: string; icon?: LucideIcon }) {
+/** Picks a background icon from the tile's label so every summary tile gets the same watermark treatment as the dashboard cards. */
+const TILE_ICONS: Array<[RegExp, LucideIcon]> = [
+  [/inactive/i, UserX],
+  [/active/i, UserCheck],
+  [/employees? (paid|covered|affected)|^employees$|total employees/i, Users],
+  [/philhealth/i, HeartPulse],
+  [/pag-?ibig/i, Home],
+  [/sss/i, ShieldCheck],
+  [/tax/i, Receipt],
+  [/loan/i, HandCoins],
+  [/recurring|monthly/i, Repeat],
+  [/scheduled|one-time/i, CalendarClock],
+  [/cost|company/i, Building2],
+  [/remit|statutory|contribution|share/i, Landmark],
+  [/deduction|other/i, Banknote],
+  [/gross|net|pay|compensation/i, Wallet],
+]
+
+export function StatTile({ label, value, icon }: { label: string; value: string; icon?: LucideIcon }) {
+  const Icon = icon ?? TILE_ICONS.find(([pattern]) => pattern.test(label))?.[1] ?? FileText
   return (
-    <div className="stat-tile rounded-xl border border-border p-4">
+    <div className="stat-tile relative isolate overflow-hidden rounded-xl border border-border bg-card p-4 shadow-soft">
+      <Icon aria-hidden="true" className="pointer-events-none absolute -right-3 -top-3 -z-10 size-20 text-primary/10" />
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-        {Icon && <Icon className="size-3.5 text-muted-foreground" />}
       </div>
       <p className="mt-1 font-display text-lg font-semibold tracking-tight">{value}</p>
     </div>

@@ -64,7 +64,7 @@ export const ADMIN_NAV: NavGroup[] = [
         capability: 'overtime.view',
         feature: 'overtime_night_diff',
       },
-      { label: 'Loans & Deductions', path: '/loans-deductions', icon: CreditCard, capability: 'loans.view', feature: 'loans_deductions' },
+      { label: 'Benefits, Loans & Deductions', path: '/loans-deductions', icon: CreditCard, capability: 'loans.view', feature: 'loans_deductions' },
       { label: 'Approvals', path: '/approvals', icon: ClipboardCheck, capability: 'compensation_approvals.manage', feature: 'approvals' },
     ],
   },

@@ -422,6 +422,10 @@ main[data-card-theme='soft'] [data-slot='metric-card-footer'] > svg {
     break-inside: avoid;
   }
 
+  .report-print .stat-tile > svg {
+    display: none !important;
+  }
+
   .report-print .stat-tile > div > p {
     font-size: 6.5pt;
   }

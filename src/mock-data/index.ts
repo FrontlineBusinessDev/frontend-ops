@@ -1,4 +1,5 @@
 import { generateAttendanceRecords } from '@/mock-data/generators/attendance'
+import { generateBenefits, generateEmployeeDeductions } from '@/mock-data/generators/benefitsDeductions'
 import { generateBonuses } from '@/mock-data/generators/bonuses'
 import { generateCompensationApprovals } from '@/mock-data/generators/compensationApprovals'
 import { generateEmployeesForCompany } from '@/mock-data/generators/employees'
@@ -14,6 +15,8 @@ import { holidays } from '@/mock-data/seed/holidays'
 import { leaveTypes } from '@/mock-data/seed/leaveTypes'
 import { payrollGroups } from '@/mock-data/seed/payrollGroups'
 import { payrollRules } from '@/mock-data/seed/payrollRules'
+import { complianceDeadlines } from '@/mock-data/seed/complianceDeadlines'
+import { loanTypes } from '@/mock-data/seed/loanTypes'
 import { schedules } from '@/mock-data/seed/schedules'
 import { statutoryConfigs } from '@/mock-data/seed/statutoryConfig'
 import { users } from '@/mock-data/seed/users'
@@ -129,11 +132,15 @@ export const db = {
   earningConfigs,
   deductionConfigs,
   payrollRules,
+  complianceDeadlines,
   attendanceRecords,
   attendanceAdjustments: generateAttendanceAdjustments(employees, attendanceRecords),
   leaveRequests: [...generateLeaveRequests(employees, leaveTypes), ...sampleLeaves],
   statutoryConfigs,
+  loanTypes,
   loans: generateLoans(employees),
+  employeeBenefits: generateBenefits(employees),
+  employeeDeductions: generateEmployeeDeductions(employees),
   overtimeRecords: generateOvertimeRecords(employees),
   bonuses: generateBonuses(employees),
   compensationApprovals: generateCompensationApprovals(employees),

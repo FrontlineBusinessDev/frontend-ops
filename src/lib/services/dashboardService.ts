@@ -1,3 +1,4 @@
+import { daysUntil, describeDeadline, nextDueDate, toIsoDate } from '@/lib/payroll/complianceDeadlines'
 import { getAttendanceAdjustments } from '@/lib/services/attendanceService'
 import { getCompensationApprovals } from '@/lib/services/compensationApprovalService'
 import { getLeaveRequests } from '@/lib/services/leaveService'
@@ -71,7 +72,22 @@ export interface AdminDashboardOverview {
   payrollChart: { month: string; grossPay: number; netPay: number }[]
   payrollCalendar: { id: string; dateLabel: string; fullDate: string; title: string; description: string; state: 'done' | 'current' | 'upcoming' }[]
   recentEmployees: { id: string; name: string; department: string; position: string; hiredLabel: string; status: 'active' | 'on_leave' | 'inactive' }[]
-  announcements: { id: string; title: string; summary: string; category: 'Reminder' | 'Notice' | 'Policy' | 'Event'; dateLabel: string }[]
+  /** Upcoming payroll and statutory deadlines, soonest first. */
+  reminders: {
+    id: string
+    title: string
+    summary: string
+    category: 'Payroll' | 'SSS' | 'PhilHealth' | 'Pag-IBIG' | 'BIR' | 'Other'
+    /** ISO date (YYYY-MM-DD). */
+    dueDate: string
+    dueLabel: string
+    /** Whole days from today; 0 = due today, negative = overdue. */
+    daysLeft: number
+    /** Days before the due date from which the reminder is highlighted. */
+    remindDaysBefore: number
+    /** Page where the admin acts on this reminder. */
+    to: string
+  }[]
 }
 
 export interface PendingRequestsSummary {
@@ -166,6 +182,46 @@ export async function getAdminDashboardOverview(session: SessionUser): Promise<A
   const payrollChart = PAYROLL_TREND.map((values, i) => ({ month: MONTHS[(today.getMonth() - 6 + i + 12) % 12], ...values }))
   const daysAgo = (n: number) => fmtLong(addDays(today, -n))
 
+  // Reminders come from the Compliance Deadlines configured under Company & Payroll Settings → Payroll
+  // Calendar, plus the payroll cut-off of the cycle in progress (derived from the payroll cycle above).
+  const cutoffDue = today <= current.cutoff ? current.cutoff : next.cutoff
+  const configuredReminders: AdminDashboardOverview['reminders'] = db.complianceDeadlines
+    .filter((d) => d.companyId === session.companyId && d.enabled)
+    .flatMap((d) => {
+      const due = nextDueDate(d, today)
+      return due
+        ? [
+            {
+              id: d.id,
+              title: d.name,
+              summary: describeDeadline(d, due),
+              category: d.category,
+              dueDate: toIsoDate(due),
+              dueLabel: fmtLong(due),
+              daysLeft: daysUntil(due, today),
+              remindDaysBefore: d.remindDaysBefore,
+              to: d.to ?? '/company-settings',
+            },
+          ]
+        : []
+    })
+  const reminders = [
+    ...configuredReminders,
+    {
+      id: 'rem-cutoff',
+      title: 'Payroll Cut-off',
+      summary: 'Finalize attendance adjustments, overtime, leave and loan deductions before the cut-off.',
+      category: 'Payroll' as const,
+      dueDate: toIsoDate(cutoffDue),
+      dueLabel: fmtLong(cutoffDue),
+      daysLeft: daysUntil(cutoffDue, today),
+      remindDaysBefore: 7,
+      to: '/payroll',
+    },
+  ]
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    .slice(0, 5)
+
   return {
     greetingName: session.name.split(' ')[0],
     metrics: {
@@ -227,35 +283,6 @@ export async function getAdminDashboardOverview(session: SessionUser): Promise<A
       { id: 'e4', name: 'Carlos Mendoza', department: 'Warehouse', position: 'Inventory Clerk', hiredLabel: daysAgo(17), status: 'active' },
       { id: 'e5', name: 'Lea Garcia', department: 'Customer Support', position: 'Support Specialist', hiredLabel: daysAgo(23), status: 'active' },
     ],
-    announcements: [
-      {
-        id: 'ann1',
-        title: 'Payroll Cut-off Reminder',
-        summary: `Submit attendance adjustments, overtime, and leave requests before the ${fmtLong(today <= current.cutoff ? current.cutoff : next.cutoff)} cut-off.`,
-        category: 'Reminder',
-        dateLabel: daysAgo(1),
-      },
-      {
-        id: 'ann2',
-        title: 'PhilHealth Contribution Update',
-        summary: 'Premium rate remains at 5% (shared 50/50) with the ₱10,000 floor and ₱100,000 ceiling for 2026.',
-        category: 'Policy',
-        dateLabel: daysAgo(6),
-      },
-      {
-        id: 'ann3',
-        title: 'Company Town Hall',
-        summary: 'Quarterly town hall at the Makati head office, 3:00 PM — branches can join via video call.',
-        category: 'Event',
-        dateLabel: daysAgo(9),
-      },
-      {
-        id: 'ann4',
-        title: 'BIR Form 2316 Reminder',
-        summary: 'Employees with changes in civil status or dependents should update HR before year-end.',
-        category: 'Notice',
-        dateLabel: daysAgo(14),
-      },
-    ],
+    reminders,
   }
 }

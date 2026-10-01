@@ -1,4 +1,4 @@
-import { LOAN_CONFIG_NAME, allocateMonthly as allocateForDisplay, describeAllocation, periodsPerCycleForFrequency, type PaySchedule } from '@/lib/payroll/payFrequency'
+import { loanConfigNameFor, allocateMonthly as allocateForDisplay, describeAllocation, periodsPerCycleForFrequency, type PaySchedule } from '@/lib/payroll/payFrequency'
 import { basicPayFor, dailyRateFor, hourlyRateFor, monthlyEquivalentFor, type BasicPayResult } from '@/lib/payroll/rateBasis'
 import { formatCurrency } from '@/lib/utils/format'
 import type {
@@ -298,7 +298,7 @@ export function buildComputationBreakdown(params: {
 
   for (const loanDeduction of line.loanDeductions) {
     const loan = loans.find((l) => l.employeeId === employee.id && l.label === loanDeduction.label)
-    const config = loan ? configByName.get(LOAN_CONFIG_NAME[loan.type]) : undefined
+    const config = loan ? configByName.get(loanConfigNameFor(loan.type)) : undefined
     const monthly = loan?.monthlyDeduction ?? loanDeduction.amount * ppm
     const loanAlloc = realAllocation(monthly, loanDeduction.amount, config?.allocationMethod, schedule)
     deductions.push({
@@ -317,7 +317,11 @@ export function buildComputationBreakdown(params: {
       formula:
         other.label === 'Absences'
           ? `Daily Rate ${formatCurrency(dailyRate)} × ${line.absentDays} unpaid absence(s) (approved paid leave excluded) = ${formatCurrency(other.amount)}`
-          : `${formatCurrency(other.amount)} this payroll (one-time, not a monthly recurring amount)`,
+          : other.kind === 'recurring'
+            ? `Recurring deduction — monthly amount split across this month's pay runs = ${formatCurrency(other.amount)} this payroll`
+            : other.kind === 'benefit'
+              ? `Employee share of the benefit premium — monthly amount split across this month's pay runs = ${formatCurrency(other.amount)} this payroll`
+              : `${formatCurrency(other.amount)} this payroll (one-time, not a monthly recurring amount)`,
     })
   }
 

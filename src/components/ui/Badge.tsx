@@ -38,6 +38,8 @@ const STATUS_TONE: Record<string, keyof typeof TONE_CLASSES> = {
   pending: 'warning',
   review: 'warning',
   suspended: 'warning',
+  paused: 'warning',
+  cancelled: 'danger',
   open: 'brand',
   rejected: 'danger',
   late: 'warning',
