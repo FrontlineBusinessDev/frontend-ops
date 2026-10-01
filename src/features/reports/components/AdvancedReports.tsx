@@ -34,6 +34,7 @@ import {
 import { ChartPane, FilterLabel, ReportFilterBar, ReportViewShell, StatTile, TablePane, ViewModeToggle } from '@/features/reports/components/shared'
 import type { ExcelExport } from '@/features/reports/reportExport'
 import type { ReportViewMode } from '@/features/reports/components/shared'
+import { changePct, payrollMonthKey, summarizeBy, summarizeByPayrollMonth } from '@/features/reports/payrollAggregates'
 import { useAllPayrollLines, useAttendanceSummary, useLeaveSummary } from '@/features/reports/hooks/useReports'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useTenant } from '@/hooks/useTenant'
@@ -583,7 +584,17 @@ function monthLabel(monthKey: string) {
 export function OvertimeCostAnalysisReport() {
   const { records, isLoading: recordsLoading } = useOvertimeRecords()
   const { employees, isLoading: employeesLoading } = useEmployees()
+  const { rows: payrollRows } = useAllPayrollLines()
   const [mode, setMode] = useState<ReportViewMode>('split')
+
+  /** OT, night differential and rest day/holiday pay actually paid in payroll runs, per department. */
+  const paidByDepartment = useMemo(
+    () =>
+      summarizeBy(payrollRows, (r) => r.employee.employment.department)
+        .filter(([, t]) => t.overtime + t.nightDiff + t.restDay > 0)
+        .sort((a, b) => b[1].overtime + b[1].nightDiff + b[1].restDay - (a[1].overtime + a[1].nightDiff + a[1].restDay)),
+    [payrollRows],
+  )
 
   const byMonth = useMemo(() => {
     const employeeById = new Map(employees.map((e) => [e.id, e]))
@@ -603,7 +614,7 @@ export function OvertimeCostAnalysisReport() {
   }, [records, employees])
 
   return (
-    <ReportViewShell title="Overtime Cost Analysis" description="Overtime hours and estimated cost expenditure trend, month over month.">
+    <ReportViewShell title="Overtime Cost Analysis" description="Overtime hours and estimated cost trend month over month, and OT / night differential pay by department from payroll runs.">
       {recordsLoading || employeesLoading ? (
         <Skeleton className="h-64" />
       ) : byMonth.length === 0 ? (
@@ -658,6 +669,61 @@ export function OvertimeCostAnalysisReport() {
               </TableBody>
             </Table>
           </TablePane>
+
+          {paidByDepartment.length > 0 && (
+            <div className="space-y-3 pt-2">
+              <div>
+                <p className="text-sm font-semibold">OT &amp; Night Differential Pay by Department</p>
+                <p className="text-xs text-muted-foreground">Amounts paid in payroll runs, by type.</p>
+              </div>
+              <ChartPane mode={mode} className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart
+                    data={paidByDepartment.map(([dept, t]) => ({ dept, overtime: Math.round(t.overtime), nightDiff: Math.round(t.nightDiff), restDay: Math.round(t.restDay) }))}
+                    margin={{ left: 4, right: 8, top: 8 }}
+                  >
+                    <CartesianGrid vertical={false} stroke="var(--color-border)" />
+                    <XAxis dataKey="dept" tickLine={false} axisLine={false} fontSize={11} stroke="var(--color-muted-foreground)" />
+                    <YAxis tickLine={false} axisLine={false} fontSize={11} stroke="var(--color-muted-foreground)" width={70} tickFormatter={(v: number) => formatCurrency(v)} />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} contentStyle={CHART_TOOLTIP_STYLE} labelStyle={CHART_TOOLTIP_LABEL_STYLE} itemStyle={CHART_TOOLTIP_ITEM_STYLE} />
+                    <Legend wrapperStyle={CHART_LEGEND_STYLE} />
+                    <Bar dataKey="overtime" name="Regular OT" stackId="ot" fill="var(--color-brand-500)" />
+                    <Bar dataKey="nightDiff" name="Night Differential" stackId="ot" fill="var(--color-brand-300)" />
+                    <Bar dataKey="restDay" name="Rest Day / Holiday OT" stackId="ot" fill="var(--color-warning)" radius={[4, 4, 0, 0]} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </ChartPane>
+              <TablePane mode={mode}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Regular OT</TableHead>
+                      <TableHead>Night Differential</TableHead>
+                      <TableHead>Rest Day / Holiday OT</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Share of Gross</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paidByDepartment.map(([dept, t]) => {
+                      const total = t.overtime + t.nightDiff + t.restDay
+                      return (
+                        <TableRow key={dept}>
+                          <TableCell className="font-medium">{dept}</TableCell>
+                          <TableCell>{formatCurrency(t.overtime)}</TableCell>
+                          <TableCell>{formatCurrency(t.nightDiff)}</TableCell>
+                          <TableCell>{formatCurrency(t.restDay)}</TableCell>
+                          <TableCell className="font-medium">{formatCurrency(total)}</TableCell>
+                          <TableCell>{t.gross > 0 ? `${((total / t.gross) * 100).toFixed(1)}%` : '—'}</TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </TablePane>
+            </div>
+          )}
         </div>
       )}
     </ReportViewShell>
@@ -670,41 +736,36 @@ export function PayrollTrendReport() {
   const { rows, isLoading } = useAllPayrollLines()
   const [mode, setMode] = useState<ReportViewMode>('split')
 
-  const byPeriod = useMemo(() => {
-    const map = new Map<string, { period: (typeof rows)[number]['period']; gross: number; net: number }>()
-    for (const { period, line } of rows) {
-      const bucket = map.get(period.id) ?? { period, gross: 0, net: 0 }
-      bucket.gross += line.grossPay
-      bucket.net += line.netPay
-      map.set(period.id, bucket)
-    }
-    return [...map.values()].sort((a, b) => a.period.startDate.localeCompare(b.period.startDate))
-  }, [rows])
+  // Month over month (every payroll group's runs combined), so weekly, semi-monthly and monthly runs compare like for like.
+  const byMonth = useMemo(() => summarizeByPayrollMonth(rows), [rows])
 
   const chartData = useMemo(
     () =>
-      byPeriod.map((p, idx) => {
-        const prev = idx > 0 ? byPeriod[idx - 1].gross : undefined
-        const variancePct = prev && prev !== 0 ? Math.round(((p.gross - prev) / prev) * 1000) / 10 : 0
-        return { label: p.period.label, gross: p.gross, net: p.net, variancePct }
-      }),
-    [byPeriod],
+      byMonth.map(([key, t], idx) => ({
+        label: monthLabel(key),
+        runs: t.runs,
+        gross: t.gross,
+        net: t.net,
+        variancePct: changePct(t.gross, byMonth[idx - 1]?.[1].gross),
+        netVariancePct: changePct(t.net, byMonth[idx - 1]?.[1].net),
+      })),
+    [byMonth],
   )
 
   const variance =
-    byPeriod.length >= 2 ? byPeriod[byPeriod.length - 1].gross - byPeriod[byPeriod.length - 2].gross : 0
+    byMonth.length >= 2 ? byMonth[byMonth.length - 1][1].gross - byMonth[byMonth.length - 2][1].gross : 0
 
   return (
-    <ReportViewShell title="Payroll Trend & Variance" description="Gross vs. net pay across every payroll period, with period-over-period variance.">
+    <ReportViewShell title="Payroll Trend & Variance" description="Gross vs. net pay per payroll month (all payroll groups), with month-over-month variance.">
       {isLoading ? (
         <Skeleton className="h-64" />
-      ) : byPeriod.length === 0 ? (
+      ) : byMonth.length === 0 ? (
         <EmptyState title="No payroll history yet" />
       ) : (
         <div className="space-y-4">
-          {byPeriod.length >= 2 && (
+          {byMonth.length >= 2 && (
             <StatTile
-              label="Latest vs. Previous Period (Gross Pay)"
+              label="Latest vs. Previous Month (Gross Pay)"
               value={`${variance >= 0 ? '+' : ''}${formatCurrency(variance)}`}
             />
           )}
@@ -739,19 +800,23 @@ export function PayrollTrendReport() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Period</TableHead>
+                  <TableHead>Month</TableHead>
+                  <TableHead>Runs</TableHead>
                   <TableHead>Gross Pay</TableHead>
                   <TableHead>Net Pay</TableHead>
                   <TableHead>Variance % (Gross)</TableHead>
+                  <TableHead>Variance % (Net)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {chartData.map((p) => (
                   <TableRow key={p.label}>
                     <TableCell className="font-medium">{p.label}</TableCell>
+                    <TableCell>{p.runs}</TableCell>
                     <TableCell>{formatCurrency(p.gross)}</TableCell>
                     <TableCell>{formatCurrency(p.net)}</TableCell>
                     <TableCell>{p.variancePct >= 0 ? '+' : ''}{p.variancePct}%</TableCell>
+                    <TableCell>{p.netVariancePct >= 0 ? '+' : ''}{p.netVariancePct}%</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -773,53 +838,44 @@ export function PayrollCostByDimensionReport({ dimension }: { dimension: CostDim
 
   const label = dimension === 'department' ? 'Department' : dimension === 'branch' ? 'Branch' : 'Payroll Group'
 
-  const byDimension = useMemo(() => {
+  const keyFor = useMemo(() => {
     const branchById = new Map(branches.map((b) => [b.id, b.name]))
-    const map = new Map<string, { employees: Set<string>; gross: number; net: number }>()
-    for (const { employee, line } of rows) {
-      const key =
-        dimension === 'department'
-          ? employee.employment.department
-          : dimension === 'branch'
-            ? branchById.get(employee.branchId) ?? 'Unassigned'
-            : findEmployeePayrollGroup(groups, employee.id)?.name ?? 'Unassigned'
-      const bucket = map.get(key) ?? { employees: new Set<string>(), gross: 0, net: 0 }
-      bucket.employees.add(employee.id)
-      bucket.gross += line.grossPay
-      bucket.net += line.netPay
-      map.set(key, bucket)
-    }
-    return [...map.entries()].sort((a, b) => b[1].gross - a[1].gross)
-  }, [rows, branches, groups, dimension])
+    const groupById = new Map(groups.map((g) => [g.id, g.name]))
+    return ({ employee, period }: (typeof rows)[number]) =>
+      dimension === 'department'
+        ? employee.employment.department
+        : dimension === 'branch'
+          ? (branchById.get(employee.branchId) ?? 'Unassigned')
+          : // The run's own Payroll Group (historically accurate), else the employee's current group for All Employees runs.
+            ((period.payrollGroupId && groupById.get(period.payrollGroupId)) || findEmployeePayrollGroup(groups, employee.id)?.name || 'Unassigned')
+  }, [branches, groups, dimension])
 
-  /** Same real per-line gross pay, just also grouped by period so the chart can show a
-   * period-over-period trend per dimension key instead of one all-time total per key. */
+  const byDimension = useMemo(() => summarizeBy(rows, keyFor), [rows, keyFor])
+
+  /** Same real per-line gross pay, grouped by payroll month so each series is a month-over-month
+   * trend (runs of different frequencies land in the same month instead of alternating with zeros). */
   const trend = useMemo(() => {
-    const branchById = new Map(branches.map((b) => [b.id, b.name]))
-    const periodById = new Map(rows.map((r) => [r.period.id, r.period]))
+    const months = [...new Set(rows.map((r) => payrollMonthKey(r.period)))].sort()
     const seriesByKey = new Map<string, Map<string, number>>()
-    for (const { employee, line, period } of rows) {
-      const key =
-        dimension === 'department'
-          ? employee.employment.department
-          : dimension === 'branch'
-            ? branchById.get(employee.branchId) ?? 'Unassigned'
-            : findEmployeePayrollGroup(groups, employee.id)?.name ?? 'Unassigned'
-      const perPeriod = seriesByKey.get(key) ?? new Map<string, number>()
-      perPeriod.set(period.id, (perPeriod.get(period.id) ?? 0) + line.grossPay)
-      seriesByKey.set(key, perPeriod)
+    for (const row of rows) {
+      const key = keyFor(row)
+      const perMonth = seriesByKey.get(key) ?? new Map<string, number>()
+      const month = payrollMonthKey(row.period)
+      perMonth.set(month, (perMonth.get(month) ?? 0) + row.line.grossPay)
+      seriesByKey.set(key, perMonth)
     }
-    const periods = [...periodById.values()].sort((a, b) => a.startDate.localeCompare(b.startDate))
     return [...seriesByKey.entries()]
-      .map(([key, perPeriod]) => ({
+      .map(([key, perMonth]) => ({
         id: key,
-        data: periods.map((p) => ({ x: p.label, y: Math.round(perPeriod.get(p.id) ?? 0) })),
+        data: months.map((m) => ({ x: monthLabel(m), y: Math.round(perMonth.get(m) ?? 0) })),
       }))
       .sort((a, b) => b.data.reduce((s, d) => s + d.y, 0) - a.data.reduce((s, d) => s + d.y, 0))
-  }, [rows, branches, groups, dimension])
+  }, [rows, keyFor])
+
+  const totalGross = byDimension.reduce((sum, [, t]) => sum + t.gross, 0)
 
   return (
-    <ReportViewShell title={`Payroll Cost by ${label}`} description={`Period-over-period payroll cost trend, grouped by ${label.toLowerCase()}.`}>
+    <ReportViewShell title={`Payroll Cost by ${label}`} description={`Month-over-month payroll cost trend and comparative metrics, grouped by ${label.toLowerCase()}.`}>
       {isLoading ? (
         <Skeleton className="h-64" />
       ) : byDimension.length === 0 ? (
@@ -886,17 +942,27 @@ export function PayrollCostByDimensionReport({ dimension }: { dimension: CostDim
                 <TableRow>
                   <TableHead>{label}</TableHead>
                   <TableHead>Employees</TableHead>
+                  <TableHead>Runs</TableHead>
                   <TableHead>Gross Pay</TableHead>
+                  <TableHead>Deductions</TableHead>
+                  <TableHead>OT &amp; Night Diff</TableHead>
                   <TableHead>Net Pay</TableHead>
+                  <TableHead>Avg Gross / Payslip</TableHead>
+                  <TableHead>Share of Gross</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {byDimension.map(([key, bucket]) => (
+                {byDimension.map(([key, t]) => (
                   <TableRow key={key}>
                     <TableCell className="font-medium">{key}</TableCell>
-                    <TableCell>{bucket.employees.size}</TableCell>
-                    <TableCell>{formatCurrency(bucket.gross)}</TableCell>
-                    <TableCell>{formatCurrency(bucket.net)}</TableCell>
+                    <TableCell>{t.employees}</TableCell>
+                    <TableCell>{t.runs}</TableCell>
+                    <TableCell>{formatCurrency(t.gross)}</TableCell>
+                    <TableCell>{formatCurrency(t.totalDeductions)}</TableCell>
+                    <TableCell>{formatCurrency(t.overtime + t.nightDiff + t.restDay)}</TableCell>
+                    <TableCell className="font-medium">{formatCurrency(t.net)}</TableCell>
+                    <TableCell>{formatCurrency(t.lines ? t.gross / t.lines : 0)}</TableCell>
+                    <TableCell>{totalGross > 0 ? `${((t.gross / totalGross) * 100).toFixed(1)}%` : '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -1076,33 +1142,35 @@ export function EarningsVsDeductionsReport() {
   const { rows, isLoading } = useAllPayrollLines()
   const [mode, setMode] = useState<ReportViewMode>('split')
 
-  const byPeriod = useMemo(() => {
-    const map = new Map<string, { period: (typeof rows)[number]['period']; earnings: number; deductions: number }>()
-    for (const { period, line } of rows) {
-      const bucket = map.get(period.id) ?? { period, earnings: 0, deductions: 0 }
-      bucket.earnings += line.grossPay
-      bucket.deductions += line.totalDeductions
-      map.set(period.id, bucket)
-    }
-    return [...map.values()].sort((a, b) => a.period.startDate.localeCompare(b.period.startDate))
-  }, [rows])
+  const byMonth = useMemo(() => summarizeByPayrollMonth(rows), [rows])
+  const totals = byMonth.reduce(
+    (acc, [, t]) => ({ statutory: acc.statutory + t.statutory, tax: acc.tax + t.tax, loans: acc.loans + t.loans, other: acc.other + t.otherDeductions }),
+    { statutory: 0, tax: 0, loans: 0, other: 0 },
+  )
 
   return (
-    <ReportViewShell title="Earnings vs. Deductions Analysis" description="Total earnings against total deductions per period, and the resulting deduction rate.">
+    <ReportViewShell title="Earnings vs. Deductions Analysis" description="Total earnings against deductions per payroll month, with deductions tracked by type (statutory, tax, loans, other).">
       {isLoading ? (
         <Skeleton className="h-64" />
-      ) : byPeriod.length === 0 ? (
+      ) : byMonth.length === 0 ? (
         <EmptyState title="No payroll history yet" />
       ) : (
         <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatTile label="Statutory (SSS, PhilHealth, Pag-IBIG)" value={formatCurrency(totals.statutory)} />
+            <StatTile label="Withholding Tax" value={formatCurrency(totals.tax)} />
+            <StatTile label="Loan Amortizations" value={formatCurrency(totals.loans)} />
+            <StatTile label="Other (Absences, etc.)" value={formatCurrency(totals.other)} />
+          </div>
+
           <ViewModeToggle value={mode} onChange={setMode} />
 
           <ChartPane mode={mode} className="h-80">
-            <AnimatedChart className="h-full w-full" chartKey={byPeriod.length}>
+            <AnimatedChart className="h-full w-full" chartKey={byMonth.length}>
               <ResponsiveLine
                 data={[
-                  { id: 'Earnings', data: byPeriod.map((p) => ({ x: p.period.label, y: Math.round(p.earnings) })) },
-                  { id: 'Deductions', data: byPeriod.map((p) => ({ x: p.period.label, y: Math.round(p.deductions) })) },
+                  { id: 'Earnings', data: byMonth.map(([key, t]) => ({ x: monthLabel(key), y: Math.round(t.gross) })) },
+                  { id: 'Deductions', data: byMonth.map(([key, t]) => ({ x: monthLabel(key), y: Math.round(t.totalDeductions) })) },
                 ]}
                 theme={NIVO_THEME}
                 colors={EARNINGS_DEDUCTIONS_PALETTE}
@@ -1148,7 +1216,7 @@ export function EarningsVsDeductionsReport() {
                 animate
                 motionConfig="gentle"
                 role="img"
-                ariaLabel="Earnings vs. deductions per period"
+                ariaLabel="Earnings vs. deductions per month"
               />
             </AnimatedChart>
           </ChartPane>
@@ -1157,19 +1225,27 @@ export function EarningsVsDeductionsReport() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Period</TableHead>
+                  <TableHead>Month</TableHead>
                   <TableHead>Earnings</TableHead>
-                  <TableHead>Deductions</TableHead>
+                  <TableHead>Statutory</TableHead>
+                  <TableHead>Tax</TableHead>
+                  <TableHead>Loans</TableHead>
+                  <TableHead>Other</TableHead>
+                  <TableHead>Total Deductions</TableHead>
                   <TableHead>Deduction Rate</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {byPeriod.map((p) => (
-                  <TableRow key={p.period.id}>
-                    <TableCell className="font-medium">{p.period.label}</TableCell>
-                    <TableCell>{formatCurrency(p.earnings)}</TableCell>
-                    <TableCell>{formatCurrency(p.deductions)}</TableCell>
-                    <TableCell>{p.earnings > 0 ? `${((p.deductions / p.earnings) * 100).toFixed(1)}%` : '—'}</TableCell>
+                {byMonth.map(([key, t]) => (
+                  <TableRow key={key}>
+                    <TableCell className="font-medium">{monthLabel(key)}</TableCell>
+                    <TableCell>{formatCurrency(t.gross)}</TableCell>
+                    <TableCell>{formatCurrency(t.statutory)}</TableCell>
+                    <TableCell>{formatCurrency(t.tax)}</TableCell>
+                    <TableCell>{formatCurrency(t.loans)}</TableCell>
+                    <TableCell>{formatCurrency(t.otherDeductions)}</TableCell>
+                    <TableCell className="font-medium">{formatCurrency(t.totalDeductions)}</TableCell>
+                    <TableCell>{t.gross > 0 ? `${((t.totalDeductions / t.gross) * 100).toFixed(1)}%` : '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

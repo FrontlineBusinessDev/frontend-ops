@@ -13,6 +13,7 @@ import { useEmployees } from '@/features/employees/hooks/useEmployees'
 import { useOvertimeRecords } from '@/features/overtime/hooks/useOvertime'
 import { useLoans } from '@/features/loans-deductions/hooks/useLoans'
 import { FilterLabel, ReportFilterBar, ReportViewShell, StatTile } from '@/features/reports/components/shared'
+import { summarizeBy } from '@/features/reports/payrollAggregates'
 import { parseCsv, type ExcelExport, type ReportMetaItem } from '@/features/reports/reportExport'
 import {
   useAllPayrollLines,
@@ -330,6 +331,11 @@ export function PayrollRegisterReport() {
 
 export function PayrollSummaryReport() {
   const { rows, isLoading } = useAllPayrollLines()
+  const { groups } = usePayrollGroups()
+  const groupName = (id?: string) => (id ? (groups.find((g) => g.id === id)?.name ?? '—') : 'All Employees')
+
+  /** Payouts per department across every run, with the deduction split. */
+  const byDepartment = useMemo(() => summarizeBy(rows, (r) => r.employee.employment.department), [rows])
 
   const byPeriod = useMemo(() => {
     const map = new Map<string, { period: (typeof rows)[number]['period']; employees: number; gross: number; deductions: number; net: number }>()
@@ -350,15 +356,15 @@ export function PayrollSummaryReport() {
   )
 
   function onExport(): ExcelExport {
-    const header = ['Period', 'Pay Date', 'Status', 'Employees', 'Gross Pay', 'Total Deductions', 'Net Pay']
-    const dataRows = byPeriod.map((p) => [p.period.label, p.period.payDate, p.period.status, p.employees, p.gross, p.deductions, p.net])
+    const header = ['Period', 'Payroll Group', 'Pay Date', 'Status', 'Employees', 'Gross Pay', 'Total Deductions', 'Net Pay']
+    const dataRows = byPeriod.map((p) => [p.period.label, groupName(p.period.payrollGroupId), p.period.payDate, p.period.status, p.employees, p.gross, p.deductions, p.net])
     return { filename: 'payroll-summary', rows: [header, ...dataRows], sumFooter: true }
   }
 
   return (
     <ReportViewShell
       title="Payroll Summary"
-      description="High-level payroll totals for every period."
+      description="High-level payroll totals for every period, and payouts by department."
       meta={[{ label: 'Coverage', value: `All payroll periods (${byPeriod.length})` }]}
       onExportExcel={byPeriod.length > 0 ? onExport : undefined}
     >
@@ -377,6 +383,7 @@ export function PayrollSummaryReport() {
             <TableHeader>
               <TableRow>
                 <TableHead>Period</TableHead>
+                <TableHead>Payroll Group</TableHead>
                 <TableHead>Pay Date</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Employees</TableHead>
@@ -389,6 +396,7 @@ export function PayrollSummaryReport() {
               {byPeriod.map((p) => (
                 <TableRow key={p.period.id}>
                   <TableCell className="font-medium">{p.period.label}</TableCell>
+                  <TableCell className="text-muted-foreground">{groupName(p.period.payrollGroupId)}</TableCell>
                   <TableCell>{formatDate(p.period.payDate)}</TableCell>
                   <TableCell>
                     <StatusBadge status={p.period.status} />
@@ -397,6 +405,39 @@ export function PayrollSummaryReport() {
                   <TableCell>{formatCurrency(p.gross)}</TableCell>
                   <TableCell>{formatCurrency(p.deductions)}</TableCell>
                   <TableCell className="font-medium">{formatCurrency(p.net)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+
+          <div className="pt-2">
+            <p className="text-sm font-semibold">Payout by Department</p>
+            <p className="text-xs text-muted-foreground">All payroll periods combined, with deductions by type.</p>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Department</TableHead>
+                <TableHead>Employees</TableHead>
+                <TableHead>Gross Pay</TableHead>
+                <TableHead>Statutory</TableHead>
+                <TableHead>Tax</TableHead>
+                <TableHead>Loans</TableHead>
+                <TableHead>Net Pay</TableHead>
+                <TableHead>Share of Net</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {byDepartment.map(([dept, t]) => (
+                <TableRow key={dept}>
+                  <TableCell className="font-medium">{dept}</TableCell>
+                  <TableCell>{t.employees}</TableCell>
+                  <TableCell>{formatCurrency(t.gross)}</TableCell>
+                  <TableCell>{formatCurrency(t.statutory)}</TableCell>
+                  <TableCell>{formatCurrency(t.tax)}</TableCell>
+                  <TableCell>{formatCurrency(t.loans)}</TableCell>
+                  <TableCell className="font-medium">{formatCurrency(t.net)}</TableCell>
+                  <TableCell>{grandTotal.net > 0 ? `${((t.net / grandTotal.net) * 100).toFixed(1)}%` : '—'}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
