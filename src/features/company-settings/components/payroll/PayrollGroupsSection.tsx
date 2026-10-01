@@ -6,8 +6,9 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { useToast } from '@/components/ui/Toast'
 import { useSession } from '@/hooks/useSession'
 import { setPayrollGroupStatus } from '@/lib/services/payrollSettingsService'
+import { deductionScheduleOption } from '@/lib/payroll/deductionSchedule'
 import { formatDate } from '@/lib/utils/format'
-import type { CompensationType, Employee, PayrollGroup, Schedule } from '@/types/domain'
+import type { CompensationType, Employee, PayrollGroup, PayrollRules, Schedule } from '@/types/domain'
 import { PayrollGroupAssignDialog } from '@/features/company-settings/components/payroll/PayrollGroupAssignDialog'
 import { PayrollGroupDetailDialog } from '@/features/company-settings/components/payroll/PayrollGroupDetailDialog'
 import { PayrollGroupDialog } from '@/features/company-settings/components/payroll/PayrollGroupDialog'
@@ -26,6 +27,7 @@ export function PayrollGroupsSection({
   compensationTypes,
   schedules,
   employees,
+  deductionDefaults,
   canEdit,
   onRefetch,
 }: {
@@ -33,6 +35,7 @@ export function PayrollGroupsSection({
   compensationTypes: CompensationType[]
   schedules: Schedule[]
   employees: Employee[]
+  deductionDefaults?: PayrollRules['defaultDeductionSchedules']
   canEdit: boolean
   onRefetch: () => void
 }) {
@@ -52,7 +55,7 @@ export function PayrollGroupsSection({
           <p className="text-sm font-medium">Payroll Groups</p>
           <p className="text-xs text-muted-foreground">How and when each group of employees is processed for payroll.</p>
         </div>
-        {canEdit && <PayrollGroupDialog compensationTypes={compensationTypes} schedules={schedules} onSaved={onRefetch} />}
+        {canEdit && <PayrollGroupDialog compensationTypes={compensationTypes} schedules={schedules} deductionDefaults={deductionDefaults} onSaved={onRefetch} />}
       </div>
 
       {groups.length === 0 ? (
@@ -90,6 +93,10 @@ export function PayrollGroupsSection({
                   <div className="col-span-2">
                     <dt className="text-muted-foreground">Pay dates</dt>
                     <dd className="mt-0.5 font-medium text-foreground">{group.payDates}</dd>
+                  </div>
+                  <div className="col-span-2">
+                    <dt className="text-muted-foreground">Deduction schedule</dt>
+                    <dd className="mt-0.5 font-medium text-foreground">{deductionScheduleOption(group.frequency, group.deductionSchedule).label}</dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Work schedule</dt>
@@ -136,6 +143,7 @@ export function PayrollGroupsSection({
                           group={group}
                           compensationTypes={compensationTypes}
                           schedules={schedules}
+                          deductionDefaults={deductionDefaults}
                           onSaved={onRefetch}
                           trigger={
                             <Button size="sm" variant="ghost" icon={<Pencil className="size-3.5" />}>

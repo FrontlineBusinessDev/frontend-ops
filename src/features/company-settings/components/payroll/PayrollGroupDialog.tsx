@@ -10,8 +10,9 @@ import { Input, Textarea } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { useToast } from '@/components/ui/Toast'
 import { useSession } from '@/hooks/useSession'
+import { DEDUCTION_SCHEDULE_HELP, deductionScheduleOptions, resolveDeductionSchedule } from '@/lib/payroll/deductionSchedule'
 import { createPayrollGroup, updatePayrollGroup } from '@/lib/services/payrollSettingsService'
-import type { CompensationType, PayrollFrequency, PayrollGroup, Schedule } from '@/types/domain'
+import type { CompensationType, DeductionSchedule, PayrollFrequency, PayrollGroup, Schedule } from '@/types/domain'
 
 const schema = z.object({
   name: z.string().min(1, 'Required'),
@@ -19,6 +20,7 @@ const schema = z.object({
   frequency: z.enum(['daily', 'weekly', 'biweekly', 'semi_monthly', 'monthly', 'custom']),
   cutoffSchedule: z.string().min(1, 'Required'),
   payDates: z.string().min(1, 'Required'),
+  deductionSchedule: z.enum(['DIVIDED', 'FIRST_PERIOD', 'LAST_PERIOD', 'SECOND_AND_LAST_PERIOD', 'CUSTOM_SPLIT', 'FULL_MONTHLY']),
   compensationTypeId: z.string().optional(),
   workScheduleId: z.string().optional(),
   effectiveDate: z.string().min(1, 'Required'),
@@ -44,13 +46,17 @@ const FREQUENCY_DEFAULTS: Record<PayrollFrequency, { cutoffSchedule: string; pay
   custom: { cutoffSchedule: '', payDates: '' },
 }
 
-function toFormValues(group?: PayrollGroup): FormValues {
+type DeductionDefaults = Partial<Record<PayrollFrequency, DeductionSchedule>>
+
+function toFormValues(group: PayrollGroup | undefined, deductionDefaults: DeductionDefaults | undefined): FormValues {
+  const frequency = group?.frequency ?? 'semi_monthly'
   return {
     name: group?.name ?? '',
     description: group?.description ?? '',
-    frequency: group?.frequency ?? 'semi_monthly',
+    frequency,
     cutoffSchedule: group?.cutoffSchedule ?? FREQUENCY_DEFAULTS.semi_monthly.cutoffSchedule,
     payDates: group?.payDates ?? FREQUENCY_DEFAULTS.semi_monthly.payDates,
+    deductionSchedule: resolveDeductionSchedule(frequency, group?.deductionSchedule, deductionDefaults),
     compensationTypeId: group?.compensationTypeId ?? '',
     workScheduleId: group?.workScheduleId ?? '',
     effectiveDate: group?.effectiveDate ?? new Date().toISOString().slice(0, 10),
@@ -61,12 +67,15 @@ export function PayrollGroupDialog({
   group,
   compensationTypes,
   schedules,
+  deductionDefaults,
   onSaved,
   trigger,
 }: {
   group?: PayrollGroup
   compensationTypes: CompensationType[]
   schedules: Schedule[]
+  /** Company default Deduction Application Schedule per frequency (Payroll Rules). */
+  deductionDefaults?: DeductionDefaults
   onSaved: () => void
   trigger?: React.ReactNode
 }) {
@@ -83,19 +92,23 @@ export function PayrollGroupDialog({
     setValue,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: toFormValues(group) })
+  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: toFormValues(group, deductionDefaults) })
 
   useEffect(() => {
-    if (open) reset(toFormValues(group))
-  }, [open, group, reset])
+    if (open) reset(toFormValues(group, deductionDefaults))
+  }, [open, group, deductionDefaults, reset])
 
   const frequency = watch('frequency')
+  const deductionOptions = deductionScheduleOptions(frequency)
+  const selectedDeduction = deductionOptions.find((o) => o.value === watch('deductionSchedule'))
 
   function handleFrequencyChange(value: PayrollFrequency) {
     setValue('frequency', value)
     const defaults = FREQUENCY_DEFAULTS[value]
     setValue('cutoffSchedule', defaults.cutoffSchedule)
     setValue('payDates', defaults.payDates)
+    // Options differ per frequency — keep the current choice if still valid, else use the company default.
+    setValue('deductionSchedule', resolveDeductionSchedule(value, watch('deductionSchedule'), deductionDefaults))
   }
 
   async function onSubmit(values: FormValues) {
@@ -150,6 +163,20 @@ export function PayrollGroupDialog({
           </FormField>
           <FormField label="Pay dates" required error={errors.payDates?.message} className="col-span-2">
             <Input {...register('payDates')} />
+          </FormField>
+          <FormField label="Deduction application schedule" required hint={`${selectedDeduction?.description ?? ''} ${DEDUCTION_SCHEDULE_HELP}`} className="col-span-2">
+            <Controller
+              control={control}
+              name="deductionSchedule"
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  options={deductionOptions.map((o) => ({ value: o.value, label: o.label }))}
+                  disabled={deductionOptions.length === 1}
+                />
+              )}
+            />
           </FormField>
           <FormField label="Default compensation type">
             <Controller

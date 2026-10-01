@@ -11,6 +11,7 @@ import { useToast } from '@/components/ui/Toast'
 import { useSession } from '@/hooks/useSession'
 import { useTenant } from '@/hooks/useTenant'
 import { setEmployeePayrollGroup } from '@/lib/services/payrollSettingsService'
+import { deductionScheduleOption } from '@/lib/payroll/deductionSchedule'
 import { formatDate } from '@/lib/utils/format'
 import type { CompensationType, Employee, PayrollGroup, Schedule } from '@/types/domain'
 import { PayrollGroupAssignDialog } from '@/features/company-settings/components/payroll/PayrollGroupAssignDialog'
@@ -93,6 +94,11 @@ export function PayrollGroupDetailDialog({
             <div>
               <p className="text-xs text-muted-foreground">Pay Date(s)</p>
               <p className="mt-0.5 text-sm font-medium">{group.payDates}</p>
+            </div>
+            <div className="sm:col-span-2 md:col-span-3">
+              <p className="text-xs text-muted-foreground">Deduction Application Schedule</p>
+              <p className="mt-0.5 text-sm font-medium">{deductionScheduleOption(group.frequency, group.deductionSchedule).label}</p>
+              <p className="text-xs text-muted-foreground">{deductionScheduleOption(group.frequency, group.deductionSchedule).description}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Compensation Type</p>

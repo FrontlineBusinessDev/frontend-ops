@@ -275,7 +275,19 @@ export interface PayrollGroup {
   employeeIds: string[]
   /** Only meaningful when frequency is 'custom' — how many pay periods this group runs per month, for allocating monthly recurring deductions. Defaults to 2 when unset. */
   periodsPerMonth?: number
+  /** When monthly statutory/recurring deductions are applied across this group's pay runs. Falls back to the company default for its frequency. */
+  deductionSchedule?: DeductionSchedule
 }
+
+/**
+ * Deduction Application Schedule options (valid values depend on the pay frequency):
+ *  - DIVIDED: split equally across the month's pay runs
+ *  - FIRST_PERIOD / LAST_PERIOD: full amount on the first / last pay run of the month
+ *  - SECOND_AND_LAST_PERIOD: split between the 2nd and last pay runs (weekly / bi-weekly)
+ *  - CUSTOM_SPLIT: statutory on the 1st pay run, voluntary/loans on the 2nd (semi-monthly)
+ *  - FULL_MONTHLY: full amount on the monthly pay date (monthly)
+ */
+export type DeductionSchedule = 'DIVIDED' | 'FIRST_PERIOD' | 'LAST_PERIOD' | 'SECOND_AND_LAST_PERIOD' | 'CUSTOM_SPLIT' | 'FULL_MONTHLY'
 
 export type CompensationKind =
   | 'monthly_rate'
@@ -368,6 +380,8 @@ export interface PayrollRules {
   adjustmentsRetroactiveAllowed: boolean
   adjustmentsManualAllowed: boolean
   adjustmentsApprovalRequired: boolean
+  /** Company-wide default Deduction Application Schedule per pay frequency, pre-filled on new payroll groups. */
+  defaultDeductionSchedules?: Partial<Record<PayrollFrequency, DeductionSchedule>>
 }
 
 export type AttendanceStatus = 'present' | 'late' | 'undertime' | 'absent'

@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/Select'
 import { Switch } from '@/components/ui/Switch'
 import { useToast } from '@/components/ui/Toast'
 import { useSession } from '@/hooks/useSession'
+import { CONFIGURABLE_FREQUENCIES, DEDUCTION_SCHEDULE_HELP, deductionScheduleOptions, resolveDeductionSchedule } from '@/lib/payroll/deductionSchedule'
 import { updatePayrollRules } from '@/lib/services/payrollSettingsService'
 import type { PayrollRules } from '@/types/domain'
 
@@ -51,6 +52,9 @@ function toFormValues(rules?: PayrollRules): FormValues {
     adjustmentsRetroactiveAllowed: rules?.adjustmentsRetroactiveAllowed ?? true,
     adjustmentsManualAllowed: rules?.adjustmentsManualAllowed ?? true,
     adjustmentsApprovalRequired: rules?.adjustmentsApprovalRequired ?? true,
+    defaultDeductionSchedules: Object.fromEntries(
+      [...CONFIGURABLE_FREQUENCIES.map((f) => f.value), 'monthly' as const].map((f) => [f, resolveDeductionSchedule(f, rules?.defaultDeductionSchedules?.[f])]),
+    ),
   }
 }
 
@@ -153,6 +157,32 @@ export function PayrollRulesSection({ rules, canEdit, onRefetch }: { rules?: Pay
               Adjustment approval required
               <Controller control={control} name="adjustmentsApprovalRequired" render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} disabled={!canEdit} />} />
             </label>
+          </div>
+        </Card>
+
+        <Card className="p-5 lg:col-span-2">
+          <Card.Title>Deduction Application Schedule</Card.Title>
+          <Card.Description>{DEDUCTION_SCHEDULE_HELP} These are the defaults for new payroll groups; each group can override them.</Card.Description>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {CONFIGURABLE_FREQUENCIES.map((f) => (
+              <FormField key={f.value} label={f.label}>
+                <Controller
+                  control={control}
+                  name={`defaultDeductionSchedules.${f.value}`}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={deductionScheduleOptions(f.value).map((o) => ({ value: o.value, label: o.label }))}
+                      disabled={!canEdit}
+                    />
+                  )}
+                />
+              </FormField>
+            ))}
+            <FormField label="Monthly" hint="Monthly groups have a single pay run.">
+              <Select value="FULL_MONTHLY" options={deductionScheduleOptions('monthly').map((o) => ({ value: o.value, label: o.label }))} disabled />
+            </FormField>
           </div>
         </Card>
       </div>

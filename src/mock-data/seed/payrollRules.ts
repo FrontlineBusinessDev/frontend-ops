@@ -20,4 +20,5 @@ export const payrollRules: PayrollRules[] = companies.map((company) => ({
   adjustmentsRetroactiveAllowed: true,
   adjustmentsManualAllowed: true,
   adjustmentsApprovalRequired: true,
+  defaultDeductionSchedules: { semi_monthly: 'DIVIDED', weekly: 'DIVIDED', biweekly: 'DIVIDED', monthly: 'FULL_MONTHLY' },
 }))

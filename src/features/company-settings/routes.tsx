@@ -73,6 +73,7 @@ export function CompanySettingsPage() {
             <TabsContent value="groups">
               <PayrollGroupsSection
                 groups={payrollGroups}
+                deductionDefaults={payrollRules?.defaultDeductionSchedules}
                 compensationTypes={compensationTypes}
                 schedules={schedules}
                 employees={employees}
