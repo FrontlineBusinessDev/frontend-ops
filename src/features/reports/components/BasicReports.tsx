@@ -12,8 +12,8 @@ import { usePayrollGroups } from '@/features/company-settings/hooks/usePayrollGr
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
 import { useOvertimeRecords } from '@/features/overtime/hooks/useOvertime'
 import { useLoans } from '@/features/loans-deductions/hooks/useLoans'
-import { FilterLabel, ReportFilterBar, ReportViewShell, StatTile } from '@/features/reports/components/shared'
-import { summarizeBy } from '@/features/reports/payrollAggregates'
+import { FilterLabel, ReportFilterBar, ReportScopePicker, ReportViewShell, StatTile } from '@/features/reports/components/shared'
+import { defaultScope, inScope, monthLabel, payrollMonthKey, scopeLabel, summarizeBy, type ReportScope } from '@/features/reports/payrollAggregates'
 import { parseCsv, type ExcelExport, type ReportMetaItem } from '@/features/reports/reportExport'
 import {
   useAllPayrollLines,
@@ -234,8 +234,47 @@ export function EmployeeCompensationReport() {
 
 export function PayrollRegisterReport() {
   const { periods, isLoading: periodsLoading } = usePayrollPeriodOptions()
+  const { rows: allLines, isLoading: linesLoading } = useAllPayrollLines()
   const [periodId, setPeriodId] = useState<string | undefined>(undefined)
-  const { report, isLoading } = usePayrollRegister(periodId ?? periods[0]?.id)
+  const [scopeState, setScope] = useState<ReportScope | undefined>(undefined)
+  const scope = scopeState ?? defaultScope(periods)
+  const { report: runReport, isLoading: runLoading } = usePayrollRegister(periodId ?? periods[0]?.id)
+
+  // Month / year / date range: each employee's pay summed across every run in the range.
+  const rangeReport = useMemo(() => {
+    if (scope.basis === 'run') return null
+    type Row = { employee: Employee; grossPay: number; sssEmployeeShare: number; philhealthEmployeeShare: number; pagibigEmployeeShare: number; withholdingTax: number; totalDeductions: number; netPay: number }
+    const byEmployee = new Map<string, Row>()
+    const runIds = new Set<string>()
+    for (const { period, employee, line } of allLines) {
+      if (!inScope(period, scope)) continue
+      runIds.add(period.id)
+      const prev = byEmployee.get(employee.id)
+      byEmployee.set(employee.id, {
+        employee,
+        grossPay: (prev?.grossPay ?? 0) + line.grossPay,
+        sssEmployeeShare: (prev?.sssEmployeeShare ?? 0) + line.sssEmployeeShare,
+        philhealthEmployeeShare: (prev?.philhealthEmployeeShare ?? 0) + line.philhealthEmployeeShare,
+        pagibigEmployeeShare: (prev?.pagibigEmployeeShare ?? 0) + line.pagibigEmployeeShare,
+        withholdingTax: (prev?.withholdingTax ?? 0) + line.withholdingTax,
+        totalDeductions: (prev?.totalDeductions ?? 0) + line.totalDeductions,
+        netPay: (prev?.netPay ?? 0) + line.netPay,
+      })
+    }
+    const rows = [...byEmployee.values()].sort((a, b) => fullName(a.employee.personal).localeCompare(fullName(b.employee.personal)))
+    return {
+      runs: runIds.size,
+      rows,
+      totals: {
+        grossPay: rows.reduce((s, r) => s + r.grossPay, 0),
+        totalDeductions: rows.reduce((s, r) => s + r.totalDeductions, 0),
+        netPay: rows.reduce((s, r) => s + r.netPay, 0),
+      },
+    }
+  }, [allLines, scope])
+
+  const report = scope.basis === 'run' ? runReport : rangeReport
+  const isLoading = scope.basis === 'run' ? runLoading : linesLoading
 
   function onExport(): ExcelExport {
     const header = ['Employee', 'Gross Pay', 'SSS', 'PhilHealth', 'Pag-IBIG', 'Withholding Tax', 'Total Deductions', 'Net Pay']
@@ -250,7 +289,7 @@ export function PayrollRegisterReport() {
       r.netPay,
     ])
     return {
-      filename: `payroll-register-${report?.period?.label ?? 'period'}`,
+      filename: scope.basis === 'run' ? `payroll-register-${runReport?.period?.label ?? 'period'}` : `payroll-register-${scopeLabel(scope).replace(/\s+/g, '-').toLowerCase()}`,
       rows: [header, ...rows],
       sumFooter: true,
       columnTypes: { SSS: 'currency', PhilHealth: 'currency', 'Pag-IBIG': 'currency' },
@@ -260,14 +299,19 @@ export function PayrollRegisterReport() {
   return (
     <ReportViewShell
       title="Payroll Register"
-      description="Detailed payroll breakdown per employee for a pay period."
+      description="Detailed payroll breakdown per employee — for one payroll run, a month, a year or any date range."
       meta={
-        report?.period
+        scope.basis !== 'run'
           ? [
-              { label: 'Payroll Period', value: report.period.label },
-              { label: 'Pay Date', value: formatDate(report.period.payDate) },
+              { label: 'Report Period', value: scopeLabel(scope) },
+              { label: 'Payroll Runs Included', value: String(rangeReport?.runs ?? 0) },
             ]
-          : []
+          : runReport?.period
+            ? [
+                { label: 'Payroll Period', value: runReport.period.label },
+                { label: 'Pay Date', value: formatDate(runReport.period.payDate) },
+              ]
+            : []
       }
       onExportExcel={report ? onExport : undefined}
     >
@@ -277,14 +321,19 @@ export function PayrollRegisterReport() {
         <EmptyState title="No payroll periods yet" description="Run a payroll period first to see the register here." />
       ) : (
         <div className="space-y-4">
-          <div className="max-w-xs print:hidden">
-            <Select value={periodId ?? periods[0]?.id} onValueChange={setPeriodId} options={periods.map((p) => ({ value: p.id, label: p.label }))} />
-          </div>
+          <ReportFilterBar>
+            <ReportScopePicker scope={scope} onChange={setScope} periods={periods} />
+            {scope.basis === 'run' && (
+              <FilterLabel label="Payroll Run" className="w-72">
+                <Select value={periodId ?? periods[0]?.id} onValueChange={setPeriodId} options={periods.map((p) => ({ value: p.id, label: p.label }))} />
+              </FilterLabel>
+            )}
+          </ReportFilterBar>
 
           {isLoading || !report ? (
             <Skeleton className="h-72" />
           ) : report.rows.length === 0 ? (
-            <EmptyState title="No payroll lines" description="This period hasn't been run yet." />
+            <EmptyState title="No payroll lines" description={scope.basis === 'run' ? "This period hasn't been run yet." : 'No payroll runs fall in this report period.'} />
           ) : (
             <>
               <div className="grid gap-4 sm:grid-cols-3">
@@ -330,8 +379,11 @@ export function PayrollRegisterReport() {
 }
 
 export function PayrollSummaryReport() {
-  const { rows, isLoading } = useAllPayrollLines()
+  const { rows: allRows, isLoading } = useAllPayrollLines()
   const { groups } = usePayrollGroups()
+  const [scopeState, setScope] = useState<ReportScope | undefined>(undefined)
+  const scope = scopeState ?? defaultScope(allRows.map((r) => r.period))
+  const rows = useMemo(() => allRows.filter((r) => inScope(r.period, scope)), [allRows, scope])
   const groupName = (id?: string) => (id ? (groups.find((g) => g.id === id)?.name ?? '—') : 'All Employees')
 
   /** Payouts per department across every run, with the deduction split. */
@@ -350,12 +402,29 @@ export function PayrollSummaryReport() {
     return [...map.values()].sort((a, b) => b.period.startDate.localeCompare(a.period.startDate))
   }, [rows])
 
+  // Annual reports roll the runs up into one row per payroll month.
+  const byMonth = useMemo(
+    () =>
+      summarizeBy(rows, (r) => payrollMonthKey(r.period), false)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([key, t]) => ({ key, runs: t.runs, employees: t.employees, gross: t.gross, deductions: t.totalDeductions, net: t.net })),
+    [rows],
+  )
+  const monthlyRollup = scope.basis === 'year'
+
   const grandTotal = byPeriod.reduce(
     (acc, p) => ({ gross: acc.gross + p.gross, deductions: acc.deductions + p.deductions, net: acc.net + p.net }),
     { gross: 0, deductions: 0, net: 0 },
   )
 
   function onExport(): ExcelExport {
+    if (monthlyRollup) {
+      return {
+        filename: `payroll-summary-${scope.year}`,
+        rows: [['Month', 'Payroll Runs', 'Employees', 'Gross Pay', 'Total Deductions', 'Net Pay'], ...byMonth.map((m) => [monthLabel(m.key), m.runs, m.employees, m.gross, m.deductions, m.net])],
+        sumFooter: true,
+      }
+    }
     const header = ['Period', 'Payroll Group', 'Pay Date', 'Status', 'Employees', 'Gross Pay', 'Total Deductions', 'Net Pay']
     const dataRows = byPeriod.map((p) => [p.period.label, groupName(p.period.payrollGroupId), p.period.payDate, p.period.status, p.employees, p.gross, p.deductions, p.net])
     return { filename: 'payroll-summary', rows: [header, ...dataRows], sumFooter: true }
@@ -364,8 +433,8 @@ export function PayrollSummaryReport() {
   return (
     <ReportViewShell
       title="Payroll Summary"
-      description="High-level payroll totals for every period, and payouts by department."
-      meta={[{ label: 'Coverage', value: `All payroll periods (${byPeriod.length})` }]}
+      description="High-level payroll totals per payroll run, month, year or custom date range, and payouts by department."
+      meta={[{ label: 'Report Period', value: scopeLabel(scope) }, { label: 'Payroll Runs', value: String(byPeriod.length) }]}
       onExportExcel={byPeriod.length > 0 ? onExport : undefined}
     >
       {isLoading ? (
@@ -374,11 +443,42 @@ export function PayrollSummaryReport() {
         <EmptyState title="No payroll periods run yet" />
       ) : (
         <div className="space-y-4">
+          <ReportFilterBar>
+            <ReportScopePicker scope={scope} onChange={setScope} periods={allRows.map((r) => r.period)} />
+          </ReportFilterBar>
+          {byPeriod.length === 0 && <EmptyState title="No payroll runs in this report period" description="Try another month, year or date range." />}
           <div className="grid gap-4 sm:grid-cols-3">
-            <StatTile label="Gross Pay (All Periods)" value={formatCurrency(grandTotal.gross)} />
+            <StatTile label={scope.basis === 'run' ? 'Gross Pay (All Periods)' : `Gross Pay (${scopeLabel(scope)})`} value={formatCurrency(grandTotal.gross)} />
             <StatTile label="Total Deductions" value={formatCurrency(grandTotal.deductions)} />
             <StatTile label="Net Pay" value={formatCurrency(grandTotal.net)} />
           </div>
+          {monthlyRollup && byMonth.length > 0 && (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Month</TableHead>
+                  <TableHead>Payroll Runs</TableHead>
+                  <TableHead>Employees</TableHead>
+                  <TableHead>Gross Pay</TableHead>
+                  <TableHead>Deductions</TableHead>
+                  <TableHead>Net Pay</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {byMonth.map((m) => (
+                  <TableRow key={m.key}>
+                    <TableCell className="font-medium">{monthLabel(m.key)}</TableCell>
+                    <TableCell>{m.runs}</TableCell>
+                    <TableCell>{m.employees}</TableCell>
+                    <TableCell>{formatCurrency(m.gross)}</TableCell>
+                    <TableCell>{formatCurrency(m.deductions)}</TableCell>
+                    <TableCell className="font-medium">{formatCurrency(m.net)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          {!monthlyRollup && byPeriod.length > 0 && (
           <Table>
             <TableHeader>
               <TableRow>
@@ -409,10 +509,11 @@ export function PayrollSummaryReport() {
               ))}
             </TableBody>
           </Table>
+          )}
 
           <div className="pt-2">
             <p className="text-sm font-semibold">Payout by Department</p>
-            <p className="text-xs text-muted-foreground">All payroll periods combined, with deductions by type.</p>
+            <p className="text-xs text-muted-foreground">{scope.basis === 'run' ? 'All payroll periods combined' : scopeLabel(scope)}, with deductions by type.</p>
           </div>
           <Table>
             <TableHeader>
@@ -452,9 +553,11 @@ export function PayrollSummaryPerEmployeeReport() {
   const { employees, isLoading: employeesLoading } = useEmployees()
   const { rows, isLoading } = useAllPayrollLines()
   const [employeeId, setEmployeeId] = useState<string | undefined>(undefined)
+  const [scopeState, setScope] = useState<ReportScope | undefined>(undefined)
+  const scope = scopeState ?? defaultScope(rows.map((r) => r.period))
 
   const activeEmployeeId = employeeId ?? employees[0]?.id
-  const employeeRows = rows.filter((r) => r.employee.id === activeEmployeeId).sort((a, b) => a.period.startDate.localeCompare(b.period.startDate))
+  const employeeRows = rows.filter((r) => r.employee.id === activeEmployeeId && inScope(r.period, scope)).sort((a, b) => a.period.startDate.localeCompare(b.period.startDate))
 
   const activeEmployee = employees.find((e) => e.id === activeEmployeeId)
 
@@ -467,10 +570,11 @@ export function PayrollSummaryPerEmployeeReport() {
   return (
     <ReportViewShell
       title="Payroll Summary per Employee"
-      description="Compare one employee's pay across every period they've been run in."
+      description="Compare one employee's pay across payroll runs, or limit it to a month, a year or a date range."
       meta={
         activeEmployee
           ? [
+              { label: 'Report Period', value: scopeLabel(scope) },
               { label: 'Employee', value: `${fullName(activeEmployee.personal)} (${activeEmployee.employeeNumber})` },
               { label: 'Department', value: activeEmployee.employment.department },
             ]
@@ -488,6 +592,7 @@ export function PayrollSummaryPerEmployeeReport() {
             <FilterLabel label="Employee" className="w-64">
               <EmployeeCombobox employees={comboboxOptions(employees)} value={activeEmployeeId} onChange={setEmployeeId} />
             </FilterLabel>
+            <ReportScopePicker scope={scope} onChange={setScope} periods={rows.map((r) => r.period)} />
           </ReportFilterBar>
           {employeeRows.length === 0 ? (
             <EmptyState title="No payroll history for this employee" />

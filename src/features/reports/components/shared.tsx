@@ -6,6 +6,10 @@ import { flushSync } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { Input } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
+import { REPORT_BASIS_LABEL, monthLabel, payrollMonthKey, type ReportBasis, type ReportScope } from '@/features/reports/payrollAggregates'
+import type { PayrollPeriod } from '@/types/domain'
 import {
   downloadReportWorkbook,
   formatGeneratedAt,
@@ -297,6 +301,45 @@ export function FilterLabel({ label, children, className }: { label: string; chi
       <p className="mb-1 text-xs font-medium text-muted-foreground">{label}</p>
       {children}
     </div>
+  )
+}
+
+/**
+ * "Report Period" controls: every payroll run, or all runs in a month, a year or a custom date range.
+ * Reports that have their own per-run selector show it next to this when the basis is "Per Payroll Run".
+ */
+export function ReportScopePicker({ scope, onChange, periods }: { scope: ReportScope; onChange: (scope: ReportScope) => void; periods: PayrollPeriod[] }) {
+  const months = [...new Set(periods.map(payrollMonthKey))].sort().reverse()
+  const years = [...new Set(periods.map((p) => p.startDate.slice(0, 4)))].sort().reverse()
+  const basisOptions = (Object.keys(REPORT_BASIS_LABEL) as ReportBasis[]).map((value) => ({ value, label: REPORT_BASIS_LABEL[value] }))
+  const patch = (updates: Partial<ReportScope>) => onChange({ ...scope, ...updates })
+
+  return (
+    <>
+      <FilterLabel label="Report Period" className="w-44">
+        <Select value={scope.basis} onValueChange={(v) => patch({ basis: v as ReportBasis })} options={basisOptions} />
+      </FilterLabel>
+      {scope.basis === 'month' && (
+        <FilterLabel label="Month" className="w-48">
+          <Select value={scope.month} onValueChange={(v) => patch({ month: v })} options={(months.length ? months : [scope.month]).map((m) => ({ value: m, label: monthLabel(m) }))} />
+        </FilterLabel>
+      )}
+      {scope.basis === 'year' && (
+        <FilterLabel label="Year" className="w-32">
+          <Select value={scope.year} onValueChange={(v) => patch({ year: v })} options={(years.length ? years : [scope.year]).map((y) => ({ value: y, label: y }))} />
+        </FilterLabel>
+      )}
+      {scope.basis === 'range' && (
+        <>
+          <FilterLabel label="From" className="w-40">
+            <Input type="date" value={scope.from} max={scope.to || undefined} onChange={(e) => patch({ from: e.target.value })} />
+          </FilterLabel>
+          <FilterLabel label="To" className="w-40">
+            <Input type="date" value={scope.to} min={scope.from || undefined} onChange={(e) => patch({ to: e.target.value })} />
+          </FilterLabel>
+        </>
+      )}
+    </>
   )
 }
 

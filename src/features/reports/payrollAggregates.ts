@@ -94,3 +94,62 @@ export function summarizeByPayrollMonth(rows: PayrollLineWithContext[]): [string
 export function changePct(current: number, previous: number | undefined): number {
   return previous ? Math.round(((current - previous) / previous) * 1000) / 10 : 0
 }
+
+/** What a payroll report covers: one payroll run, or every run in a month / year / custom date range. */
+export type ReportBasis = 'run' | 'month' | 'year' | 'range'
+
+export interface ReportScope {
+  basis: ReportBasis
+  /** "2026-09" */
+  month: string
+  /** "2026" */
+  year: string
+  from: string
+  to: string
+}
+
+export const REPORT_BASIS_LABEL: Record<ReportBasis, string> = {
+  run: 'Per Payroll Run',
+  month: 'Monthly',
+  year: 'Annual',
+  range: 'Date Range',
+}
+
+export function monthLabel(key: string): string {
+  const [year, month] = key.split('-').map(Number)
+  return new Date(year, month - 1, 1).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
+}
+
+/** Starts on the latest payroll month/year, with the date range spanning that month through the last run's end. */
+export function defaultScope(periods: PayrollPeriod[]): ReportScope {
+  const latest = [...periods].sort((a, b) => b.startDate.localeCompare(a.startDate))[0]
+  const month = latest ? payrollMonthKey(latest) : new Date().toISOString().slice(0, 7)
+  return { basis: 'run', month, year: month.slice(0, 4), from: `${month}-01`, to: latest?.endDate ?? `${month}-28` }
+}
+
+/** A run belongs to a month/year/range by the date its period starts (the same rule as `payrollMonthKey`). */
+export function inScope(period: PayrollPeriod, scope: ReportScope): boolean {
+  switch (scope.basis) {
+    case 'run':
+      return true
+    case 'month':
+      return payrollMonthKey(period) === scope.month
+    case 'year':
+      return period.startDate.slice(0, 4) === scope.year
+    case 'range':
+      return period.startDate >= scope.from && period.startDate <= scope.to
+  }
+}
+
+export function scopeLabel(scope: ReportScope): string {
+  switch (scope.basis) {
+    case 'run':
+      return 'All payroll runs'
+    case 'month':
+      return monthLabel(scope.month)
+    case 'year':
+      return `Year ${scope.year}`
+    case 'range':
+      return `${scope.from} to ${scope.to}`
+  }
+}
