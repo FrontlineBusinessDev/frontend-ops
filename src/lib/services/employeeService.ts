@@ -107,20 +107,49 @@ export async function updateEmployeeSelf(session: SessionUser, updates: SelfServ
   employee.personal.address = updates.address
 }
 
+export const SEPARATION_LABEL = {
+  resigned: 'Resigned',
+  terminated: 'Terminated',
+  end_of_contract: 'End of Contract',
+  retired: 'Retired',
+} as const
+
 export async function updateEmployeeStatus(
   session: SessionUser,
   employeeId: string,
   status: EmploymentStatus,
+  separation?: { reason: NonNullable<Employee['employment']['separationReason']>; date: string; notes?: string },
 ): Promise<void> {
   const employee = db.employees.find((e) => e.id === employeeId && e.companyId === session.companyId)
   if (!employee) return
 
   employee.employment.status = status
+  if (separation) {
+    employee.employment.dateSeparated = separation.date
+    employee.employment.separationReason = separation.reason
+  } else if (status === 'active') {
+    // Reactivating (e.g. rehire or a mistaken separation) clears the separation record.
+    delete employee.employment.dateSeparated
+    delete employee.employment.separationReason
+  }
+  if (separation) {
+    // Nothing recurring continues past the last working day; one-time deductions due afterwards are dropped.
+    for (const b of db.employeeBenefits) {
+      if (b.employeeId === employeeId && b.status === 'active' && (!b.endDate || b.endDate > separation.date)) b.endDate = separation.date
+    }
+    for (const d of db.employeeDeductions) {
+      if (d.employeeId !== employeeId || d.status !== 'active') continue
+      if (d.kind === 'recurring' && (!d.endDate || d.endDate > separation.date)) d.endDate = separation.date
+      if (d.kind === 'one_time' && d.dueDate && d.dueDate > separation.date) d.status = 'cancelled'
+    }
+  }
   employee.history.push({
     id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
     actor: session.name,
-    action: `Status changed to ${status}`,
+    action: separation
+      ? `Separated: ${SEPARATION_LABEL[separation.reason]} — last day ${separation.date}${separation.notes ? ` (${separation.notes})` : ''}`
+      : `Status changed to ${status}`,
   })
 }
 

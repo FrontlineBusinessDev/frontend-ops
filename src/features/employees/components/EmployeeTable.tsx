@@ -4,7 +4,8 @@ import { ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Avatar } from '@/components/ui/Avatar'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { StatusBadge } from '@/components/ui/Badge'
+import { Badge, StatusBadge } from '@/components/ui/Badge'
+import { SEPARATION_LABEL } from '@/lib/services/employeeService'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
 import { useTenant } from '@/hooks/useTenant'
 import { useMixedCompensationStore, summarizeMixedCompensationShort } from '@/features/employees/mixedCompensationStore'
@@ -62,7 +63,10 @@ export function EmployeeTable({ employees }: { employees: Employee[] }) {
     {
       id: 'status',
       header: 'Status',
-      cell: ({ row }) => <StatusBadge status={row.original.employment.status} />,
+      cell: ({ row }) => {
+        const { dateSeparated, separationReason, status } = row.original.employment
+        return dateSeparated && separationReason ? <Badge tone="danger">{SEPARATION_LABEL[separationReason]}</Badge> : <StatusBadge status={status} />
+      },
     },
     {
       id: 'actions',

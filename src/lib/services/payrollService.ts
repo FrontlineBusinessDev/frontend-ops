@@ -225,12 +225,22 @@ function computeLine(session: SessionUser, period: PayrollPeriod, config: Statut
     .filter((b) => b.category !== 'allowance')
     .map((b) => ({ label: b.name, category: b.category, provider: b.provider, amount: round2(b.monthlyValue / payPeriodsPerMonth) }))
 
+  // Final pay: an employee who separates mid-run is paid only through their last working day. Salaried basic pay
+  // and fixed allowances are prorated by calendar days; daily/hourly/output pay already follows recorded work.
+  const lastDay = employee.employment.dateSeparated
+  const isFinalRun = !!lastDay && lastDay >= period.startDate && lastDay < period.endDate
+  const daysBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1
+  const workedFraction = isFinalRun ? daysBetween(period.startDate, lastDay) / daysBetween(period.startDate, period.endDate) : 1
+  const prorate = (amount: number) => round2(amount * workedFraction)
+  const basicPayAmount = isSalaried ? prorate(basicPayResult.amount) : basicPayResult.amount
+  const basicPayLabel = isFinalRun ? `${basicPayResult.label} (final pay, prorated to ${lastDay})` : basicPayResult.label
+
   const earnings = [
-    { label: basicPayResult.label, amount: basicPayResult.amount },
+    { label: basicPayLabel, amount: basicPayAmount },
     ...paidLeaveEarning,
     ...overtimeEarnings,
-    ...employee.compensation.allowances.map((a) => ({ label: a.label, amount: round2(a.amount / payPeriodsPerMonth) })),
-    ...benefitAllowances.map((b) => ({ label: b.name, amount: round2(b.monthlyValue / payPeriodsPerMonth) })),
+    ...employee.compensation.allowances.map((a) => ({ label: a.label, amount: prorate(round2(a.amount / payPeriodsPerMonth)) })),
+    ...benefitAllowances.map((b) => ({ label: b.name, amount: prorate(round2(b.monthlyValue / payPeriodsPerMonth)) })),
     ...bonusEarnings,
   ]
   const grossPay = round2(earnings.reduce((sum, e) => sum + e.amount, 0))
@@ -247,7 +257,8 @@ function computeLine(session: SessionUser, period: PayrollPeriod, config: Statut
   // Statutory: full monthly amounts, then each allocated to this cutoff per its Payroll Settings schedule
   // (equal split by pay frequency, one specific cutoff, or a custom split).
   const monthly = monthlyStatutoryFor(config, employee)
-  const alloc = (amount: number, name: string) => allocateMonthly(amount, schedule, configNamed(session.companyId, name))
+  // In a final-pay run the contributions and withholding tax are prorated with the salary (workedFraction is 1 otherwise).
+  const alloc = (amount: number, name: string) => prorate(allocateMonthly(amount, schedule, configNamed(session.companyId, name)))
   const sssEmployeeShare = alloc(monthly.sssEmployee, 'SSS Contribution')
   const sssEmployerShare = alloc(monthly.sssEmployer, 'SSS Contribution')
   const philhealthEmployeeShare = alloc(monthly.philhealthEmployee, 'PhilHealth Contribution')
@@ -414,7 +425,8 @@ export async function runPayroll(session: SessionUser, periodId: string): Promis
   const activeEmployees = db.employees.filter(
     (e) =>
       e.companyId === session.companyId &&
-      e.employment.status === 'active' &&
+      // Separated employees stay in the one run that covers their last working day, to receive their final pay.
+      (e.employment.status === 'active' || (!!e.employment.dateSeparated && e.employment.dateSeparated >= period.startDate && e.employment.dateSeparated <= period.endDate)) &&
       (!payrollGroup || payrollGroup.employeeIds.includes(e.id)),
   )
 

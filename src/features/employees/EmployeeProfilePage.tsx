@@ -29,7 +29,8 @@ import { useEmployee } from '@/features/employees/hooks/useEmployee'
 import { usePayrollGroups } from '@/features/company-settings/hooks/usePayrollGroups'
 import { usePermission } from '@/hooks/usePermission'
 import { useTenant } from '@/hooks/useTenant'
-import { updateEmployeeStatus } from '@/lib/services/employeeService'
+import { SEPARATION_LABEL, updateEmployeeStatus } from '@/lib/services/employeeService'
+import { Input } from '@/components/ui/Input'
 import { useSession } from '@/hooks/useSession'
 import { categoryLabel, findEmployeePayrollGroup } from '@/lib/payroll/groupAssignment'
 import { PAY_RATE_TYPE_LABEL, estimatedEquivalentFor, formatBaseRate, rateFieldLabel } from '@/lib/payroll/payRate'
@@ -82,6 +83,10 @@ function EmployeeProfileContent() {
   const { notify } = useToast()
   const navigate = useNavigate()
   const [statusDialog, setStatusDialog] = useState<EmploymentStatus | null>(null)
+  const [separateOpen, setSeparateOpen] = useState(false)
+  const [separationReason, setSeparationReason] = useState<keyof typeof SEPARATION_LABEL>('resigned')
+  const [separationDate, setSeparationDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [separationNotes, setSeparationNotes] = useState('')
   const [editingSection, setEditingSection] = useState<EditableSection | null>(null)
   const [pendingGroupId, setPendingGroupId] = useState<string | null | undefined>(undefined)
   const canEditProfile = usePermission('employees.edit')
@@ -121,6 +126,15 @@ function EmployeeProfileContent() {
     refetch()
   }
 
+  async function applySeparation() {
+    if (!employee || !separationDate) return
+    await updateEmployeeStatus(user, employee.id, 'archived', { reason: separationReason, date: separationDate, notes: separationNotes.trim() || undefined })
+    notify({ title: `${fullName} marked as ${SEPARATION_LABEL[separationReason].toLowerCase()}`, description: `Last working day ${formatDate(separationDate)}`, tone: 'success' })
+    setSeparateOpen(false)
+    setSeparationNotes('')
+    refetch()
+  }
+
   async function applyGroupChange() {
     if (pendingGroupId === undefined || !employee) return
     await setEmployeePayrollGroup(user, employee.id, pendingGroupId)
@@ -141,15 +155,21 @@ function EmployeeProfileContent() {
         description={`${employee.employment.position} · ${employee.employment.department} · ${branch?.name ?? ''}`}
         actions={
           <div className="flex items-center gap-2">
-            <StatusBadge status={employee.employment.status} />
+            {employee.employment.dateSeparated && employee.employment.separationReason ? (
+              <Badge tone="danger">
+                {SEPARATION_LABEL[employee.employment.separationReason]} · {formatDate(employee.employment.dateSeparated)}
+              </Badge>
+            ) : (
+              <StatusBadge status={employee.employment.status} />
+            )}
             {employee.employment.status === 'active' && (
               <Button size="sm" variant="secondary" onClick={() => setStatusDialog('inactive')}>
                 Deactivate
               </Button>
             )}
             {employee.employment.status !== 'archived' && (
-              <Button size="sm" variant="destructive" icon={<Archive className="size-4" />} onClick={() => setStatusDialog('archived')}>
-                Archive
+              <Button size="sm" variant="destructive" icon={<Archive className="size-4" />} onClick={() => setSeparateOpen(true)}>
+                Separate Employee
               </Button>
             )}
             {employee.employment.status !== 'active' && (
@@ -457,6 +477,41 @@ function EmployeeProfileContent() {
             </Button>
             <Button variant={statusDialog === 'archived' ? 'destructive' : 'primary'} onClick={applyStatusChange}>
               Confirm
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={separateOpen} onOpenChange={setSeparateOpen}>
+        <DialogContent>
+          <DialogTitle>Separate {fullName}?</DialogTitle>
+          <DialogDescription>
+            Record why and when the employment ended. The employee is archived — removed from active lists and payroll — but their record, payslips and history are kept.
+          </DialogDescription>
+          <div className="mt-4 space-y-4">
+            <div>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Separation type</p>
+              <Select
+                value={separationReason}
+                onValueChange={(v) => setSeparationReason(v as keyof typeof SEPARATION_LABEL)}
+                options={Object.entries(SEPARATION_LABEL).map(([value, label]) => ({ value, label }))}
+              />
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Last working day</p>
+              <Input type="date" value={separationDate} min={employee.employment.dateHired} onChange={(e) => setSeparationDate(e.target.value)} />
+            </div>
+            <div>
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Notes (optional)</p>
+              <Input value={separationNotes} onChange={(e) => setSeparationNotes(e.target.value)} placeholder="e.g. Accepted another offer" />
+            </div>
+          </div>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setSeparateOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" disabled={!separationDate} onClick={applySeparation}>
+              Confirm separation
             </Button>
           </div>
         </DialogContent>
