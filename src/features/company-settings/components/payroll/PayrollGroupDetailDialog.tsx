@@ -13,7 +13,7 @@ import { useTenant } from '@/hooks/useTenant'
 import { setEmployeePayrollGroup } from '@/lib/services/payrollSettingsService'
 import { deductionScheduleOption } from '@/lib/payroll/deductionSchedule'
 import { formatDate } from '@/lib/utils/format'
-import type { CompensationType, Employee, PayrollGroup, Schedule } from '@/types/domain'
+import type { CompensationType, Employee, PayrollGroup } from '@/types/domain'
 import { PayrollGroupAssignDialog } from '@/features/company-settings/components/payroll/PayrollGroupAssignDialog'
 
 const FREQUENCY_LABEL: Record<PayrollGroup['frequency'], string> = {
@@ -29,7 +29,6 @@ export function PayrollGroupDetailDialog({
   group,
   groups,
   compensationTypes,
-  schedules,
   employees,
   canEdit,
   onRefetch,
@@ -38,7 +37,6 @@ export function PayrollGroupDetailDialog({
   group: PayrollGroup
   groups: PayrollGroup[]
   compensationTypes: CompensationType[]
-  schedules: Schedule[]
   employees: Employee[]
   canEdit: boolean
   onRefetch: () => void
@@ -53,7 +51,6 @@ export function PayrollGroupDetailDialog({
   const navigate = useNavigate()
 
   const compensationType = compensationTypes.find((c) => c.id === group.compensationTypeId)
-  const schedule = schedules.find((s) => s.id === group.workScheduleId)
   const members = employees.filter((e) => group.employeeIds.includes(e.id))
   const otherActiveGroups = groups.filter((g) => g.id !== group.id && g.status === 'active')
 
@@ -114,12 +111,6 @@ export function PayrollGroupDetailDialog({
                 {group.status}
               </Badge>
             </div>
-            {schedule && (
-              <div>
-                <p className="text-xs text-muted-foreground">Work Schedule</p>
-                <p className="mt-0.5 text-sm font-medium">{schedule.name}</p>
-              </div>
-            )}
             <div>
               <p className="text-xs text-muted-foreground">Effective Date</p>
               <p className="mt-0.5 text-sm font-medium">{formatDate(group.effectiveDate)}</p>

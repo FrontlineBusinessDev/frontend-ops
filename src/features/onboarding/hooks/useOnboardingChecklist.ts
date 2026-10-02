@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSession } from '@/hooks/useSession'
-import { getCompany, getHolidays, getSchedules } from '@/lib/services/companyService'
+import { getCompany, getHolidays } from '@/lib/services/companyService'
+import { getShiftTemplates } from '@/lib/services/scheduleService'
 import { getEmployees } from '@/lib/services/employeeService'
 import { getStatutoryConfig } from '@/lib/services/payrollService'
 import { getUsers } from '@/lib/services/userService'
@@ -24,7 +25,7 @@ export function useOnboardingChecklist() {
       const [company, employees, schedules, holidays, statutory, users] = await Promise.all([
         getCompany(user),
         getEmployees(user),
-        getSchedules(user),
+        getShiftTemplates(user),
         getHolidays(user),
         getStatutoryConfig(user),
         getUsers(user),
@@ -42,10 +43,10 @@ export function useOnboardingChecklist() {
         },
         {
           id: 'work-schedule',
-          label: 'Work Schedule',
-          description: 'At least one work schedule is defined.',
+          label: 'Schedules',
+          description: 'At least one shift template is defined for the roster.',
           done: schedules.length > 0,
-          link: '/company-settings',
+          link: '/schedules',
         },
         {
           id: 'holidays',

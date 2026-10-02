@@ -8,6 +8,8 @@ export type Capability =
   | 'attendance.view'
   | 'attendance.adjust'
   | 'attendance.approve'
+  | 'schedules.view'
+  | 'schedules.manage'
   | 'overtime.view'
   | 'overtime.log'
   | 'overtime.approve'
@@ -53,6 +55,8 @@ const ALL_ADMIN_CAPS: Capability[] = [
   'attendance.view',
   'attendance.adjust',
   'attendance.approve',
+  'schedules.view',
+  'schedules.manage',
   'overtime.view',
   'overtime.log',
   'overtime.approve',
@@ -98,6 +102,8 @@ export const ROLE_PERMISSIONS: Record<Role, Capability[]> = {
     'employees.edit',
     'attendance.view',
     'attendance.adjust',
+    'schedules.view',
+    'schedules.manage',
     'overtime.view',
     'overtime.log',
     'overtime.approve',
@@ -114,6 +120,7 @@ export const ROLE_PERMISSIONS: Record<Role, Capability[]> = {
     'dashboard.view',
     'employees.view',
     'attendance.view',
+    'schedules.view',
     'overtime.view',
     'overtime.log',
     'overtime.approve',
@@ -141,6 +148,7 @@ export const ROLE_PERMISSIONS: Record<Role, Capability[]> = {
     'dashboard.view',
     'attendance.view',
     'attendance.approve',
+    'schedules.view',
     'overtime.view',
     'overtime.approve',
     'leave.view',

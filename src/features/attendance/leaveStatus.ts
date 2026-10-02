@@ -1,4 +1,4 @@
-import type { AttendanceStatus, Employee, LeaveDayPortion, LeaveRequest, Schedule } from '@/types/domain'
+import type { AttendanceStatus, Employee, LeaveDayPortion, LeaveRequest, ShiftTemplate } from '@/types/domain'
 
 /*
  * Leave-aware attendance status (Company Admin portal).
@@ -133,7 +133,7 @@ export function annotateImportWithLeaves(
   records: { key: string; employeeId: string; date: string; timeIn: string | null; timeOut: string | null }[],
   leaves: ApprovedLeave[],
   employees: Employee[],
-  schedules: Pick<Schedule, 'id' | 'startTime' | 'endTime' | 'gracePeriodMinutes' | 'assignedEmployeeIds'>[],
+  schedules: Pick<ShiftTemplate, 'id' | 'startTime' | 'endTime' | 'gracePeriodMinutes' | 'assignedEmployeeIds'>[],
 ): ImportLeaveContext {
   const scheduleFor = (employeeId: string) => schedules.find((s) => s.assignedEmployeeIds?.includes(employeeId)) ?? schedules[0] ?? { startTime: '09:00', endTime: '18:00' }
   const byKey = new Map<string, LeaveResolution>()

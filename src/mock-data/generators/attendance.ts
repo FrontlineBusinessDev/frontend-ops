@@ -1,4 +1,4 @@
-import type { AttendanceRecord, AttendanceStatus, Employee, Schedule } from '@/types/domain'
+import type { AttendanceRecord, AttendanceStatus, Employee, ShiftTemplate } from '@/types/domain'
 
 function toDateKey(date: Date) {
   return date.toISOString().slice(0, 10)
@@ -15,7 +15,7 @@ function pickStatus(seed: number): AttendanceStatus {
 /** Generates the last `days` weekdays of attendance for every active employee, following each company's default schedule. */
 export function generateAttendanceRecords(
   employees: Employee[],
-  schedulesByCompany: Map<string, Schedule>,
+  schedulesByCompany: Map<string, ShiftTemplate>,
   days = 14,
 ): AttendanceRecord[] {
   const records: AttendanceRecord[] = []

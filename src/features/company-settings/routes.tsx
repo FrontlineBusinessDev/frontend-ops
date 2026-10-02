@@ -12,7 +12,6 @@ import { PayrollCalendarSection } from '@/features/company-settings/components/p
 import { OvertimeHolidayRatesSection } from '@/features/company-settings/components/payroll/OvertimeHolidayRatesSection'
 import { PayrollGroupsSection } from '@/features/company-settings/components/payroll/PayrollGroupsSection'
 import { PayrollRulesSection } from '@/features/company-settings/components/payroll/PayrollRulesSection'
-import { WorkSchedulesSection } from '@/features/company-settings/components/payroll/WorkSchedulesSection'
 import { useCompanySettings } from '@/features/company-settings/hooks/useCompanySettings'
 import { usePermission } from '@/hooks/usePermission'
 import { formatDate } from '@/lib/utils/format'
@@ -25,7 +24,6 @@ const HOLIDAY_TYPE_LABEL: Record<string, string> = {
 export function CompanySettingsPage() {
   const {
     company,
-    schedules,
     holidays,
     payrollGroups,
     compensationTypes,
@@ -68,7 +66,6 @@ export function CompanySettingsPage() {
               <TabsTrigger value="deductions">Deductions</TabsTrigger>
               <TabsTrigger value="rules">Payroll Rules</TabsTrigger>
               <TabsTrigger value="ot-holiday-rates">Overtime &amp; Holiday Rates</TabsTrigger>
-              <TabsTrigger value="schedules">Work Schedules</TabsTrigger>
               <TabsTrigger value="calendar">Payroll Calendar</TabsTrigger>
             </TabsList>
 
@@ -77,7 +74,6 @@ export function CompanySettingsPage() {
                 groups={payrollGroups}
                 deductionDefaults={payrollRules?.defaultDeductionSchedules}
                 compensationTypes={compensationTypes}
-                schedules={schedules}
                 employees={employees}
                 canEdit={canEditPayroll}
                 onRefetch={refetch}
@@ -98,10 +94,6 @@ export function CompanySettingsPage() {
 
             <TabsContent value="ot-holiday-rates">
               <OvertimeHolidayRatesSection rules={payrollRules} canEdit={canEditPayroll} onRefetch={refetch} />
-            </TabsContent>
-
-            <TabsContent value="schedules">
-              <WorkSchedulesSection schedules={schedules} employees={employees} canEdit={canEditPayroll} onRefetch={refetch} />
             </TabsContent>
 
             <TabsContent value="calendar">

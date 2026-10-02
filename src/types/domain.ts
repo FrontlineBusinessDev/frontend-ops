@@ -244,7 +244,10 @@ export interface CompensationApproval {
 
 export type ShiftType = 'day' | 'night' | 'split' | 'flexible'
 
-export interface Schedule {
+export type ShiftTone = 'accent' | 'warning' | 'purple' | 'success'
+
+/** A reusable shift pattern managed in the Schedules module (hours, working days, grace period). */
+export interface ShiftTemplate {
   id: string
   companyId: string
   name: string
@@ -254,8 +257,37 @@ export interface Schedule {
   breakMinutes?: number
   shiftType?: ShiftType
   gracePeriodMinutes?: number
-  restDays?: number[]
+  /** Roster color. */
+  tone?: ShiftTone
+  /** Employees who follow this template on days that have no individual assignment. */
   assignedEmployeeIds?: string[]
+}
+
+/** A day-level override of an employee's template: a specific shift, or a rest day (`scheduleId: null`). */
+export interface ShiftAssignment {
+  id: string
+  companyId: string
+  employeeId: string
+  /** ISO date. */
+  date: string
+  scheduleId: string | null
+  assignedById: string
+  assignedByRole: Role | 'seed'
+}
+
+/**
+ * Who manages scheduling for a branch (`department: null`) or one of its departments. The department's supervisor
+ * decides its employees' shifts, then the branch's, then the company admin.
+ */
+export interface ScheduleTeam {
+  id: string
+  companyId: string
+  branchId: string
+  department: string | null
+  managerEmployeeId?: string
+  supervisorEmployeeId?: string
+  /** When off, only the company admin can change this team's schedules. */
+  canEdit: boolean
 }
 
 export type PayrollFrequency = 'daily' | 'weekly' | 'biweekly' | 'semi_monthly' | 'monthly' | 'custom'

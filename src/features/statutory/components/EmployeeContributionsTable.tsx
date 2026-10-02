@@ -4,9 +4,10 @@ import { Card } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/Table'
-import { useCompanySettings } from '@/features/company-settings/hooks/useCompanySettings'
 import { usePayrollGroups } from '@/features/company-settings/hooks/usePayrollGroups'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
+import { useShiftTemplates } from '@/features/schedules/hooks/useSchedules'
+import { payrollTemplateFor } from '@/lib/schedule/roster'
 import { findEmployeePayrollGroup } from '@/lib/payroll/groupAssignment'
 import { periodsPerCycleForFrequency, periodsPerMonthFor, workingDaysPerMonthFor } from '@/lib/payroll/payFrequency'
 import { monthlyStatutoryFor } from '@/lib/services/payrollService'
@@ -34,7 +35,7 @@ function Money({ value, muted }: { value: number; muted?: boolean }) {
 export function EmployeeContributionsTable({ config }: { config: StatutoryConfig }) {
   const { employees, isLoading } = useEmployees()
   const { groups } = usePayrollGroups()
-  const { schedules } = useCompanySettings()
+  const { templates } = useShiftTemplates()
   const [search, setSearch] = useState('')
 
   const rows = useMemo(
@@ -44,7 +45,7 @@ export function EmployeeContributionsTable({ config }: { config: StatutoryConfig
         .map((employee) => {
           const group = findEmployeePayrollGroup(groups, employee.id)
           const frequency: PayrollFrequency = group?.frequency ?? 'semi_monthly'
-          const workSchedule = schedules.find((sc) => sc.id === group?.workScheduleId) ?? schedules[0]
+          const workSchedule = payrollTemplateFor(employee.id, templates)
           const workingDays = workingDaysPerMonthFor(workSchedule)
           // Split divisor: ÷1 monthly, ÷2 semi-monthly, ÷4 weekly, ÷22/26 daily, periods-in-month for bi-weekly/custom.
           const periodsPerMonth = periodsPerCycleForFrequency(frequency, periodsPerMonthFor(frequency, group, workSchedule), workingDays)
@@ -62,7 +63,7 @@ export function EmployeeContributionsTable({ config }: { config: StatutoryConfig
           }
         })
         .sort((a, b) => a.employee.personal.lastName.localeCompare(b.employee.personal.lastName)),
-    [employees, groups, schedules, config],
+    [employees, groups, templates, config],
   )
 
   const query = search.trim().toLowerCase()

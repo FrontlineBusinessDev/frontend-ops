@@ -8,7 +8,7 @@ import { useSession } from '@/hooks/useSession'
 import { setPayrollGroupStatus } from '@/lib/services/payrollSettingsService'
 import { deductionScheduleOption } from '@/lib/payroll/deductionSchedule'
 import { formatDate } from '@/lib/utils/format'
-import type { CompensationType, Employee, PayrollGroup, PayrollRules, Schedule } from '@/types/domain'
+import type { CompensationType, Employee, PayrollGroup, PayrollRules } from '@/types/domain'
 import { PayrollGroupAssignDialog } from '@/features/company-settings/components/payroll/PayrollGroupAssignDialog'
 import { PayrollGroupDetailDialog } from '@/features/company-settings/components/payroll/PayrollGroupDetailDialog'
 import { PayrollGroupDialog } from '@/features/company-settings/components/payroll/PayrollGroupDialog'
@@ -25,7 +25,6 @@ const FREQUENCY_LABEL: Record<PayrollGroup['frequency'], string> = {
 export function PayrollGroupsSection({
   groups,
   compensationTypes,
-  schedules,
   employees,
   deductionDefaults,
   canEdit,
@@ -33,7 +32,6 @@ export function PayrollGroupsSection({
 }: {
   groups: PayrollGroup[]
   compensationTypes: CompensationType[]
-  schedules: Schedule[]
   employees: Employee[]
   deductionDefaults?: PayrollRules['defaultDeductionSchedules']
   canEdit: boolean
@@ -55,7 +53,7 @@ export function PayrollGroupsSection({
           <p className="text-sm font-medium">Payroll Groups</p>
           <p className="text-xs text-muted-foreground">How and when each group of employees is processed for payroll.</p>
         </div>
-        {canEdit && <PayrollGroupDialog compensationTypes={compensationTypes} schedules={schedules} deductionDefaults={deductionDefaults} onSaved={onRefetch} />}
+        {canEdit && <PayrollGroupDialog compensationTypes={compensationTypes} deductionDefaults={deductionDefaults} onSaved={onRefetch} />}
       </div>
 
       {groups.length === 0 ? (
@@ -64,7 +62,6 @@ export function PayrollGroupsSection({
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {groups.map((group) => {
             const compensationType = compensationTypes.find((c) => c.id === group.compensationTypeId)
-            const schedule = schedules.find((s) => s.id === group.workScheduleId)
             return (
               <Card key={group.id} className="p-5">
                 <div className="flex items-start justify-between gap-3">
@@ -99,10 +96,6 @@ export function PayrollGroupsSection({
                     <dd className="mt-0.5 font-medium text-foreground">{deductionScheduleOption(group.frequency, group.deductionSchedule).label}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Work schedule</dt>
-                    <dd className="mt-0.5 font-medium text-foreground">{schedule?.name ?? '—'}</dd>
-                  </div>
-                  <div>
                     <dt className="text-muted-foreground">Effective</dt>
                     <dd className="mt-0.5 font-medium text-foreground">{formatDate(group.effectiveDate)}</dd>
                   </div>
@@ -115,7 +108,7 @@ export function PayrollGroupsSection({
                       group={group}
                       groups={groups}
                       compensationTypes={compensationTypes}
-                      schedules={schedules}
+                     
                       employees={employees}
                       canEdit={canEdit}
                       onRefetch={onRefetch}
@@ -142,7 +135,7 @@ export function PayrollGroupsSection({
                         <PayrollGroupDialog
                           group={group}
                           compensationTypes={compensationTypes}
-                          schedules={schedules}
+                         
                           deductionDefaults={deductionDefaults}
                           onSaved={onRefetch}
                           trigger={

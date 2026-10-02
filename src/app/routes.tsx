@@ -7,6 +7,7 @@ import { RequireAuth, RequireCapability } from '@/lib/rbac/guards'
 import { DashboardPage } from '@/features/dashboard/routes'
 import { EmployeeListPage, EmployeeProfilePage } from '@/features/employees/routes'
 import { AttendancePage } from '@/features/attendance/routes'
+import { SchedulesPage } from '@/features/schedules/routes'
 import { OvertimePage } from '@/features/overtime/routes'
 import { LeavePage } from '@/features/leave/routes'
 import { PayrollListPage, PayrollPeriodDetailPage } from '@/features/payroll/routes'
@@ -82,6 +83,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireCapability capability="attendance.view">
             <AttendancePage />
+          </RequireCapability>
+        ),
+      },
+      {
+        path: 'schedules',
+        element: (
+          <RequireCapability capability="schedules.view">
+            <SchedulesPage />
           </RequireCapability>
         ),
       },

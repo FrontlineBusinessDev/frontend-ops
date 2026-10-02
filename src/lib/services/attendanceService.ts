@@ -1,4 +1,5 @@
 import { getEmployees } from '@/lib/services/employeeService'
+import { shiftForDay } from '@/lib/schedule/roster'
 import { scopeToCompany } from '@/lib/tenancy/tenantScope'
 import { db } from '@/mock-data'
 import type { AttendanceAdjustment, AttendanceRecord, ApprovalStatus, LeaveRequest, SessionUser } from '@/types/domain'
@@ -9,7 +10,7 @@ async function scopedEmployeeIds(session: SessionUser): Promise<Set<string>> {
 }
 
 export async function getSchedules(session: SessionUser) {
-  return scopeToCompany(db.schedules, session.companyId)
+  return scopeToCompany(db.shiftTemplates, session.companyId)
 }
 
 export async function getAttendanceForDate(session: SessionUser, date: string): Promise<AttendanceRecord[]> {
@@ -143,6 +144,7 @@ export async function applyBiometricsPunches(session: SessionUser, punches: Biom
   const schedules = await getSchedules(session)
   const defaultSchedule = schedules[0]
   if (!defaultSchedule) return 0
+  const rosterCtx = { templates: schedules, assignments: db.shiftAssignments.filter((a) => a.companyId === session.companyId) }
 
   let applied = 0
   for (const punch of punches) {
@@ -150,11 +152,10 @@ export async function applyBiometricsPunches(session: SessionUser, punches: Biom
     const existing = db.attendanceRecords.find(
       (r) => r.companyId === session.companyId && r.employeeId === punch.employeeId && r.date === punch.date,
     )
-    const schedule =
-      schedules.find((s) => s.id === existing?.scheduleId) ??
-      schedules.find((s) => s.assignedEmployeeIds?.includes(punch.employeeId)) ??
-      defaultSchedule
-    const status = statusForPunch(punch.timeIn, punch.timeOut, schedule.startTime, schedule.endTime, schedule.gracePeriodMinutes ?? 0)
+    // The roster decides the shift for that day; on a rest day nothing is "late" or "undertime".
+    const { template, restDay } = shiftForDay(punch.employeeId, punch.date, rosterCtx)
+    const schedule = template ?? defaultSchedule
+    const status = restDay ? 'present' : statusForPunch(punch.timeIn, punch.timeOut, schedule.startTime, schedule.endTime, schedule.gracePeriodMinutes ?? 0)
 
     if (existing) {
       existing.timeIn = punch.timeIn
@@ -237,7 +238,7 @@ export async function fileAttendanceAdjustment(session: SessionUser, input: File
   )
 
   if (!record) {
-    const schedule = db.schedules.find((s) => s.companyId === session.companyId)
+    const schedule = db.shiftTemplates.find((s) => s.companyId === session.companyId)
     record = {
       id: crypto.randomUUID(),
       companyId: session.companyId,

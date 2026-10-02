@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/Toast'
 import { useSession } from '@/hooks/useSession'
 import { DEDUCTION_SCHEDULE_HELP, deductionScheduleOptions, resolveDeductionSchedule } from '@/lib/payroll/deductionSchedule'
 import { createPayrollGroup, updatePayrollGroup } from '@/lib/services/payrollSettingsService'
-import type { CompensationType, DeductionSchedule, PayrollFrequency, PayrollGroup, Schedule } from '@/types/domain'
+import type { CompensationType, DeductionSchedule, PayrollFrequency, PayrollGroup } from '@/types/domain'
 
 const schema = z.object({
   name: z.string().min(1, 'Required'),
@@ -22,7 +22,6 @@ const schema = z.object({
   payDates: z.string().min(1, 'Required'),
   deductionSchedule: z.enum(['DIVIDED', 'FIRST_PERIOD', 'LAST_PERIOD', 'SECOND_AND_LAST_PERIOD', 'CUSTOM_SPLIT', 'FULL_MONTHLY']),
   compensationTypeId: z.string().optional(),
-  workScheduleId: z.string().optional(),
   effectiveDate: z.string().min(1, 'Required'),
 })
 
@@ -58,7 +57,6 @@ function toFormValues(group: PayrollGroup | undefined, deductionDefaults: Deduct
     payDates: group?.payDates ?? FREQUENCY_DEFAULTS.semi_monthly.payDates,
     deductionSchedule: resolveDeductionSchedule(frequency, group?.deductionSchedule, deductionDefaults),
     compensationTypeId: group?.compensationTypeId ?? '',
-    workScheduleId: group?.workScheduleId ?? '',
     effectiveDate: group?.effectiveDate ?? new Date().toISOString().slice(0, 10),
   }
 }
@@ -66,14 +64,12 @@ function toFormValues(group: PayrollGroup | undefined, deductionDefaults: Deduct
 export function PayrollGroupDialog({
   group,
   compensationTypes,
-  schedules,
   deductionDefaults,
   onSaved,
   trigger,
 }: {
   group?: PayrollGroup
   compensationTypes: CompensationType[]
-  schedules: Schedule[]
   /** Company default Deduction Application Schedule per frequency (Payroll Rules). */
   deductionDefaults?: DeductionDefaults
   onSaved: () => void
@@ -124,7 +120,6 @@ export function PayrollGroupDialog({
   }
 
   const compensationOptions = [{ value: '', label: 'None' }, ...compensationTypes.map((c) => ({ value: c.id, label: c.name }))]
-  const scheduleOptions = [{ value: '', label: 'None' }, ...schedules.map((s) => ({ value: s.id, label: s.name }))]
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -183,13 +178,6 @@ export function PayrollGroupDialog({
               control={control}
               name="compensationTypeId"
               render={({ field }) => <Select value={field.value} onValueChange={field.onChange} options={compensationOptions} />}
-            />
-          </FormField>
-          <FormField label="Work schedule">
-            <Controller
-              control={control}
-              name="workScheduleId"
-              render={({ field }) => <Select value={field.value} onValueChange={field.onChange} options={scheduleOptions} />}
             />
           </FormField>
           <p className="col-span-2 -mt-1 text-xs text-muted-foreground">Selected frequency: {frequency.replace('_', ' ')}</p>

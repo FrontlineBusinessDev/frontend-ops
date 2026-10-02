@@ -1,4 +1,5 @@
 import { ChevronsLeft, ChevronsRight, Lock, X } from 'lucide-react'
+import { useRef } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { useSession } from '@/hooks/useSession'
 import { usePermission } from '@/hooks/usePermission'
@@ -83,8 +84,18 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavGroup['items'][
 }
 
 function SidebarNav({ groups, collapsed, onNavigate }: { groups: NavGroup[]; collapsed: boolean; onNavigate?: () => void }) {
+  // The scrollbar stays hidden until the menu is scrolled, then fades out again shortly after.
+  const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  function onScroll(event: React.UIEvent<HTMLElement>) {
+    const nav = event.currentTarget
+    nav.dataset.scrolling = 'true'
+    clearTimeout(hideTimer.current)
+    hideTimer.current = setTimeout(() => {
+      nav.dataset.scrolling = 'false'
+    }, 800)
+  }
   return (
-    <nav className="flex flex-1 scroll-smooth flex-col gap-4 overflow-y-auto">
+    <nav onScroll={onScroll} className="autohide-scrollbar flex flex-1 scroll-smooth flex-col gap-4 overflow-y-auto">
       {groups.map((group, idx) => (
         <div key={group.label ?? idx} className="flex flex-col gap-1">
           {group.label && !collapsed && (

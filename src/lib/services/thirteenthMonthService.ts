@@ -136,7 +136,7 @@ export function thirteenthMonthDeductionsFor(session: SessionUser, employee: Emp
   const undertimeDates: string[] = []
   for (const r of records) {
     if (r.status !== 'undertime' || !r.timeOut) continue
-    const schedule = db.schedules.find((s) => s.id === r.scheduleId)
+    const schedule = db.shiftTemplates.find((s) => s.id === r.scheduleId)
     if (!schedule) continue
     const short = Math.max(0, minutesOf(schedule.endTime) - minutesOf(r.timeOut))
     if (short > 0) {

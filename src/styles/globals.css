@@ -487,6 +487,22 @@ main[data-card-theme='soft'] [data-slot='metric-card-footer'] > svg {
   height: 0;
 }
 
+/* Auto-hiding scrollbar (sidebar menu): invisible until the element is scrolled — the scroll handler
+   toggles data-scrolling — and transparent again a moment after scrolling stops. */
+.autohide-scrollbar {
+  scrollbar-color: transparent transparent;
+}
+.autohide-scrollbar::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  transition: background-color 200ms ease;
+}
+.autohide-scrollbar[data-scrolling='true'] {
+  scrollbar-color: #1e6f5e transparent;
+}
+.autohide-scrollbar[data-scrolling='true']::-webkit-scrollbar-thumb {
+  background-color: #1e6f5e;
+}
+
 /* Brief attention pulse for a table row/card jumped to from a notification — soft background
    flash + ring, using the existing primary token, then fades back to normal. */
 @keyframes highlight-pulse {

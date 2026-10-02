@@ -17,7 +17,8 @@ import { payrollGroups } from '@/mock-data/seed/payrollGroups'
 import { payrollRules } from '@/mock-data/seed/payrollRules'
 import { complianceDeadlines } from '@/mock-data/seed/complianceDeadlines'
 import { loanTypes } from '@/mock-data/seed/loanTypes'
-import { schedules } from '@/mock-data/seed/schedules'
+import { shiftTemplates } from '@/mock-data/seed/shiftTemplates'
+import { generateScheduleTeams, seedRoster } from '@/mock-data/generators/schedules'
 import { statutoryConfigs } from '@/mock-data/seed/statutoryConfig'
 import { users } from '@/mock-data/seed/users'
 import type { ActivityLogEntry, ApiKey, Employee, PayrollLine, PayrollPeriod, PayslipEmailRecord, ThirteenthMonthLine, ThirteenthMonthRun, Webhook } from '@/types/domain'
@@ -37,8 +38,8 @@ function buildEmployees(): Employee[] {
 }
 
 const employees = buildEmployees()
-const schedulesByCompany = new Map(schedules.map((s) => [s.companyId, s]))
-const attendanceRecords = generateAttendanceRecords(employees, schedulesByCompany)
+const defaultTemplateByCompany = new Map(shiftTemplates.filter((s) => s.id.endsWith('_sched_default')).map((s) => [s.companyId, s]))
+const attendanceRecords = generateAttendanceRecords(employees, defaultTemplateByCompany)
 
 /**
  * The hand-authored user seeds link to specific employee ids, but the employee
@@ -68,6 +69,9 @@ function assignBranchManagers() {
   }
 }
 assignBranchManagers()
+
+const shiftAssignments = seedRoster(employees, shiftTemplates)
+const scheduleTeams = generateScheduleTeams(employees, branches)
 
 const sampleLeaves = generateSampleLeaveOverrides(employees)
 
@@ -125,7 +129,9 @@ export const db = {
   branches,
   users,
   employees,
-  schedules,
+  shiftTemplates,
+  shiftAssignments,
+  scheduleTeams,
   leaveTypes,
   compensationTypes,
   payrollGroups,

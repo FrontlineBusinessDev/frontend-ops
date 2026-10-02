@@ -1,6 +1,7 @@
 import {
   Building2,
   CalendarClock,
+  CalendarRange,
   CalendarDays,
   ClipboardCheck,
   Clock,
@@ -56,6 +57,7 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       { label: 'Employees', path: '/employees', icon: Users, capability: 'employees.view' },
       { label: 'Attendance', path: '/attendance', icon: Clock, capability: 'attendance.view', feature: 'attendance' },
+      { label: 'Schedules', path: '/schedules', icon: CalendarRange, capability: 'schedules.view', feature: 'attendance' },
       { label: 'Leave', path: '/leave', icon: CalendarDays, capability: 'leave.view', feature: 'leave' },
       {
         label: 'Overtime & Night Differential',

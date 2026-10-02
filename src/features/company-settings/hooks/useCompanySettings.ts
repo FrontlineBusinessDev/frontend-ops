@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSession } from '@/hooks/useSession'
-import { getCompany, getHolidays, getSchedules } from '@/lib/services/companyService'
+import { getCompany, getHolidays } from '@/lib/services/companyService'
 import { getComplianceDeadlines } from '@/lib/services/complianceService'
 import { getEmployees } from '@/lib/services/employeeService'
 import {
@@ -20,13 +20,11 @@ import type {
   Holiday,
   PayrollGroup,
   PayrollRules,
-  Schedule,
 } from '@/types/domain'
 
 export function useCompanySettings() {
   const { user } = useSession()
   const [company, setCompany] = useState<Company | null | undefined>(undefined)
-  const [schedules, setSchedules] = useState<Schedule[]>([])
   const [holidays, setHolidays] = useState<Holiday[]>([])
   const [payrollGroups, setPayrollGroups] = useState<PayrollGroup[]>([])
   const [compensationTypes, setCompensationTypes] = useState<CompensationType[]>([])
@@ -38,7 +36,6 @@ export function useCompanySettings() {
 
   const refetch = useCallback(() => {
     getCompany(user).then((result) => setCompany(result ?? null))
-    getSchedules(user).then(setSchedules)
     getHolidays(user).then(setHolidays)
     getPayrollGroups(user).then(setPayrollGroups)
     getCompensationTypes(user).then(setCompensationTypes)
@@ -55,7 +52,6 @@ export function useCompanySettings() {
 
   return {
     company,
-    schedules,
     holidays,
     payrollGroups,
     compensationTypes,

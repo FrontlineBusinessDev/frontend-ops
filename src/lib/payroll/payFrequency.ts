@@ -1,4 +1,4 @@
-import type { DeductionConfig, PayrollFrequency, PayrollGroup, PayrollPeriod, Schedule } from '@/types/domain'
+import type { DeductionConfig, PayrollFrequency, PayrollGroup, PayrollPeriod, ShiftTemplate } from '@/types/domain'
 
 /** Which Payroll Settings deduction entry governs each loan type's collection schedule. */
 export const LOAN_CONFIG_NAME: Record<string, string> = {
@@ -41,7 +41,7 @@ export interface PaySchedule {
 }
 
 /** Standard working days per month for a work schedule: 26 for 6-day weeks, 22 otherwise. */
-export function workingDaysPerMonthFor(workSchedule: Pick<Schedule, 'daysOfWeek'> | undefined): number {
+export function workingDaysPerMonthFor(workSchedule: Pick<ShiftTemplate, 'daysOfWeek'> | undefined): number {
   return (workSchedule?.daysOfWeek.length ?? 5) >= 6 ? 26 : 22
 }
 
@@ -82,7 +82,7 @@ export function frequencyForPeriod(period: PayrollPeriod, group: PayrollGroup | 
 }
 
 /** Average pay periods per month for a frequency (custom groups use their configured count, default 2). */
-export function periodsPerMonthFor(frequency: PayrollFrequency, group?: PayrollGroup, workSchedule?: Pick<Schedule, 'daysOfWeek'>): number {
+export function periodsPerMonthFor(frequency: PayrollFrequency, group?: PayrollGroup, workSchedule?: Pick<ShiftTemplate, 'daysOfWeek'>): number {
   if (frequency === 'custom') return group?.periodsPerMonth ?? 2
   if (frequency === 'daily') return workingDaysPerMonthFor(workSchedule)
   return AVERAGE_PERIODS_PER_MONTH[frequency]
@@ -102,7 +102,7 @@ function periodsOccurringInMonth(startDate: string, stepDays: number): { count: 
 }
 
 /** 1-based working-day number of `date` within its month, per the work schedule's days of week. */
-function workingDayIndex(date: string, workSchedule: Pick<Schedule, 'daysOfWeek'> | undefined): number {
+function workingDayIndex(date: string, workSchedule: Pick<ShiftTemplate, 'daysOfWeek'> | undefined): number {
   const target = parseDate(date)
   const workDays = new Set(workSchedule?.daysOfWeek ?? [1, 2, 3, 4, 5])
   let count = 0
@@ -134,7 +134,7 @@ function typicalPeriodDays(frequency: PayrollFrequency, group: PayrollGroup | un
 function cutoffAt(
   frequency: PayrollFrequency,
   date: string,
-  ctx: { group: PayrollGroup | undefined; workSchedule: Pick<Schedule, 'daysOfWeek'> | undefined; anchorDate: string; periodDays: number },
+  ctx: { group: PayrollGroup | undefined; workSchedule: Pick<ShiftTemplate, 'daysOfWeek'> | undefined; anchorDate: string; periodDays: number },
 ): { count: number; index: number } {
   const day = parseDate(date).getDate()
   switch (frequency) {
@@ -178,7 +178,7 @@ function periodsOccurringAt(anchorDate: string, date: string, stepDays: number):
 export function payScheduleFor(
   period: PayrollPeriod,
   group: PayrollGroup | undefined,
-  workSchedule?: Pick<Schedule, 'daysOfWeek'>,
+  workSchedule?: Pick<ShiftTemplate, 'daysOfWeek'>,
   employeeGroup?: PayrollGroup,
 ): PaySchedule {
   const runDays = daysBetween(period.startDate, period.endDate)

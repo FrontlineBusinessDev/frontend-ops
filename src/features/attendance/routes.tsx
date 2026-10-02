@@ -17,6 +17,7 @@ import { useApprovedLeavesForDate, useAttendanceAdjustments, useDailyAttendance,
 import { approvedLeaveOn, resolveLeaveStatus, type LeaveResolution } from '@/features/attendance/leaveStatus'
 import { useEmployees } from '@/features/employees/hooks/useEmployees'
 import { useHighlightTarget } from '@/hooks/useHighlightTarget'
+import { shiftForDay } from '@/lib/schedule/roster'
 import { usePermission } from '@/hooks/usePermission'
 import { useTenant } from '@/hooks/useTenant'
 import type { AttendanceRecord, Employee } from '@/types/domain'
@@ -62,7 +63,7 @@ export function AttendancePage() {
   const { highlightId, tab: highlightTab } = useHighlightTarget()
   const [date, setDate] = useState(todayKey)
   const [activeTab, setActiveTab] = useState(highlightTab ?? 'daily')
-  const { records: punchRecords, schedules, isLoading: isLoadingAttendance, refetch: refetchAttendance } = useDailyAttendance(date)
+  const { records: punchRecords, schedules, rosterCtx, isLoading: isLoadingAttendance, refetch: refetchAttendance } = useDailyAttendance(date)
   const { leaves, refetch: refetchLeaves } = useApprovedLeavesForDate(date)
   const { onLeaveIds, pendingAdjustmentIds } = useDateStatusSets(date)
   const { adjustments, isLoading: isLoadingAdjustments, refetch } = useAttendanceAdjustments()
@@ -98,7 +99,7 @@ export function AttendancePage() {
       const leave = approvedLeaveOn(leaves, employee.id, date)
       if (!leave) continue
       const record = punchRecords.find((r) => r.employeeId === employee.id)
-      const schedule = schedules.find((s) => s.id === record?.scheduleId) ?? schedules.find((s) => s.assignedEmployeeIds?.includes(employee.id)) ?? schedules[0]
+      const schedule = shiftForDay(employee.id, date, rosterCtx).template ?? schedules.find((s) => s.id === record?.scheduleId) ?? schedules[0]
       const resolution = resolveLeaveStatus(record, leave, schedule ?? { startTime: '09:00', endTime: '18:00' })
       if (resolution) resolutions.set(employee.id, resolution)
       if (!withRecord.has(employee.id)) {
@@ -106,7 +107,7 @@ export function AttendancePage() {
       }
     }
     return { records: rows, leaveResolutions: resolutions }
-  }, [punchRecords, employees, leaves, schedules, date])
+  }, [punchRecords, employees, leaves, schedules, rosterCtx, date])
   const effectiveStatus = (record: AttendanceRecord) => leaveResolutions.get(record.employeeId)?.status ?? record.status
 
   const branchOptions = useMemo(

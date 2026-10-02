@@ -8,8 +8,10 @@ import {
   getEmployeeIdsWithPendingAdjustmentForDate,
   getSchedules,
 } from '@/lib/services/attendanceService'
+import type { RosterContext } from '@/lib/schedule/roster'
+import { getRosterContext } from '@/lib/services/scheduleService'
 import type { ApprovedLeave } from '@/features/attendance/leaveStatus'
-import type { AttendanceAdjustment, AttendanceRecord, Schedule } from '@/types/domain'
+import type { AttendanceAdjustment, AttendanceRecord, ShiftTemplate } from '@/types/domain'
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10)
@@ -18,11 +20,13 @@ function todayKey() {
 export function useDailyAttendance(date: string = todayKey()) {
   const { user } = useSession()
   const [records, setRecords] = useState<AttendanceRecord[] | null>(null)
-  const [schedules, setSchedules] = useState<Schedule[]>([])
+  const [schedules, setSchedules] = useState<ShiftTemplate[]>([])
+  const [rosterCtx, setRosterCtx] = useState<RosterContext>({ templates: [], assignments: [] })
 
   const refetch = useCallback(() => {
     getAttendanceForDate(user, date).then(setRecords)
     getSchedules(user).then(setSchedules)
+    getRosterContext(user, date, date).then(setRosterCtx)
   }, [user, date])
 
   useEffect(() => {
@@ -30,7 +34,7 @@ export function useDailyAttendance(date: string = todayKey()) {
     refetch()
   }, [refetch])
 
-  return { records: records ?? [], schedules, isLoading: records === null, refetch }
+  return { records: records ?? [], schedules, rosterCtx, isLoading: records === null, refetch }
 }
 
 /** Powers the "On Leave" / "Pending Adjustment" status filter options on the Daily Attendance tab. */

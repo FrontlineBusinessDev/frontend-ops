@@ -41,6 +41,8 @@ export const CAPABILITY_INFO: Record<Capability, { label: string; description: s
 
   'attendance.view': { label: 'View attendance', description: 'See time logs, daily attendance, and biometric records.', group: 'Time & Attendance' },
   'attendance.adjust': { label: 'Adjust attendance', description: 'Correct time logs and file attendance adjustments.', group: 'Time & Attendance' },
+  'schedules.view': { label: 'View schedules', description: 'See the weekly roster, shift templates, and who supervises each team.', group: 'Time & Attendance' },
+  'schedules.manage': { label: 'Manage schedules', description: 'Assign shifts and rest days, edit shift templates, and set team supervisors.', group: 'Time & Attendance' },
   'attendance.approve': { label: 'Approve attendance adjustments', description: 'Approve or reject attendance correction requests.', group: 'Time & Attendance' },
   'overtime.view': { label: 'View overtime', description: 'See overtime and night differential records.', group: 'Time & Attendance' },
   'overtime.log': { label: 'Log overtime', description: 'File overtime and night differential entries.', group: 'Time & Attendance' },

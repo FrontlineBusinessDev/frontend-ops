@@ -1,3 +1,4 @@
+import { payrollTemplateFor, shiftForDay } from '@/lib/schedule/roster'
 import { bonusAmountFor, bonusAppliesToEmployee, includedInRegularPayroll } from '@/lib/payroll/bonusMatching'
 import { findEmployeePayrollGroup } from '@/lib/payroll/groupAssignment'
 import { allocateMonthly, loanConfigNameFor, payScheduleFor } from '@/lib/payroll/payFrequency'
@@ -54,7 +55,11 @@ function coveredByPaidLeave(companyId: string, employeeId: string, date: string)
 
 /** Absent days in the period, split into unpaid absences (deducted) and paid-leave days (paid). */
 function attendanceOutcome(companyId: string, employeeId: string, startDate: string, endDate: string): { unpaidAbsentDays: number; paidLeaveDays: number } {
-  const absences = db.attendanceRecords.filter((r) => r.employeeId === employeeId && r.status === 'absent' && r.date >= startDate && r.date <= endDate)
+  // An "absence" on a rostered rest day isn't one — the employee wasn't scheduled to work.
+  const rosterCtx = { templates: db.shiftTemplates.filter((s) => s.companyId === companyId), assignments: db.shiftAssignments.filter((a) => a.employeeId === employeeId) }
+  const absences = db.attendanceRecords.filter(
+    (r) => r.employeeId === employeeId && r.status === 'absent' && r.date >= startDate && r.date <= endDate && !shiftForDay(employeeId, r.date, rosterCtx).restDay,
+  )
   const paidLeaveDays = absences.filter((r) => coveredByPaidLeave(companyId, employeeId, r.date)).length
   return { unpaidAbsentDays: absences.length - paidLeaveDays, paidLeaveDays }
 }
@@ -168,7 +173,7 @@ function computeLine(session: SessionUser, period: PayrollPeriod, config: Statut
   // All Employees runs follow each employee's own Payroll Group frequency (see payScheduleFor).
   const employeeGroup = findEmployeePayrollGroup(db.payrollGroups.filter((g) => g.companyId === session.companyId), employee.id)
   const workSchedule =
-    db.schedules.find((s) => s.id === (group ?? employeeGroup)?.workScheduleId) ?? db.schedules.find((s) => s.companyId === session.companyId)
+    payrollTemplateFor(employee.id, db.shiftTemplates.filter((s) => s.companyId === session.companyId))
   const schedule = payScheduleFor(period, group, workSchedule, employeeGroup)
   // A run covering several of the employee's cutoffs pays that many periods' worth of salary/allowances.
   const payPeriodsPerMonth = schedule.periodsPerMonth / (schedule.cutoffsCovered?.length ?? 1)
